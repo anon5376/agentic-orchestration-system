@@ -1,0 +1,133 @@
+.capabilities-page {
+  --page-line: rgba(242, 241, 236, 0.74);
+  --page-dim: rgba(167, 163, 155, 0.82);
+  min-height: calc(100vh - var(--rail-height) - var(--footer-height) + 120px);
+  margin: calc(-1 * var(--space-6)) calc(-1 * var(--space-6)) -120px;
+  padding: 0 10px 70px;
+  overflow: hidden;
+  background: var(--atlas-void);
+  color: var(--atlas-chalk);
+}
+
+.capabilities-hero {
+  display: grid;
+  grid-template-columns: minmax(0, 2.15fr) minmax(155px, 0.78fr) minmax(230px, 1fr) minmax(190px, 0.82fr);
+  min-height: 168px;
+  border-bottom: 1px solid var(--page-line);
+}
+
+.capabilities-hero > * { min-width: 0; padding: 26px 22px 20px; border-right: 1px solid var(--page-line); }
+.capabilities-hero > :last-child { border-right: 0; }
+.capabilities-kicker { margin: 0 0 12px; color: var(--atlas-vermilion); font-family: var(--font-mono); font-size: 9px; letter-spacing: 0.15em; }
+.capabilities-hero h1 { margin: 0; font-family: var(--font-display); font-size: clamp(68px, 8.2vw, 136px); font-weight: 700; letter-spacing: -0.07em; line-height: 0.77; }
+.capabilities-hero__thesis,
+.capabilities-hero__context,
+.capabilities-hero__branch,
+.capability-column,
+.capabilities-bottom { font-family: var(--font-mono); text-transform: uppercase; }
+.capabilities-hero__thesis { margin: 0; font-size: 10px; letter-spacing: 0.12em; line-height: 1.55; }
+.capabilities-hero__thesis span { color: var(--page-dim); }
+.capabilities-hero__context { display: grid; align-content: space-between; color: var(--page-dim); font-size: 10px; letter-spacing: 0.09em; line-height: 1.5; }
+.capabilities-hero__context p { margin: 0; }
+.capabilities-hero__context > span { height: 1px; background: var(--page-line); }
+.capabilities-hero__branch { display: grid; align-content: start; gap: 7px; border-left: 10px solid var(--atlas-vermilion); font-size: 9px; letter-spacing: 0.1em; }
+.capabilities-hero__branch > span { color: var(--page-dim); }
+.capabilities-hero__branch strong { color: var(--atlas-vermilion); font-size: 15px; letter-spacing: 0.04em; }
+.capabilities-hero__branch small { margin-top: 12px; font-size: 9px; letter-spacing: 0.08em; line-height: 1.7; }
+.capabilities-hero__branch i { display: block; height: 6px; margin-top: 3px; border: 1px solid var(--page-dim); }
+.capabilities-hero__branch i b { display: block; width: 62%; height: 100%; background: var(--atlas-vermilion); }
+
+.capabilities-field { display: grid; grid-template-columns: minmax(220px, 0.74fr) minmax(0, 2.46fr); min-height: 560px; border-bottom: 1px solid var(--page-line); }
+.capability-topology-field { position: relative; min-width: 0; padding: 16px 14px; border-right: 1px solid var(--page-line); overflow: hidden; }
+.capability-topology { display: block; width: 100%; height: 100%; min-height: 540px; overflow: visible; }
+.capability-topology__grid { stroke: rgba(167, 163, 155, 0.18); stroke-width: 1; fill: none; }
+.capability-route { fill: none; stroke: rgba(242, 241, 236, 0.35); stroke-width: 1.4; vector-effect: non-scaling-stroke; }
+.capability-route.is-active { stroke: var(--atlas-vermilion); stroke-width: 2.5; filter: drop-shadow(0 0 4px rgba(255, 59, 18, 0.32)); }
+.capability-topology circle { fill: var(--atlas-void); stroke: var(--atlas-ash); stroke-width: 1.5; }
+.capability-topology g.is-selected circle { stroke: var(--atlas-vermilion); }
+.capability-topology text { fill: var(--atlas-chalk); font-family: var(--font-mono); font-size: 11px; }
+.capability-topology__core { fill: var(--atlas-vermilion); fill-opacity: 0.13; stroke: var(--atlas-vermilion); stroke-width: 2; }
+.capability-topology__core-dot { fill: var(--atlas-vermilion) !important; stroke: var(--atlas-vermilion) !important; }
+.capability-topology__labels { position: absolute; top: 18px; right: 14px; left: 14px; display: flex; justify-content: space-between; color: var(--page-dim); font-size: 8px; letter-spacing: 0.08em; }
+.capability-topology__caption { position: absolute; right: 14px; bottom: 16px; left: 14px; margin: 0; color: var(--page-dim); font-size: 8px; letter-spacing: 0.1em; line-height: 1.55; }
+.capability-topology__caption small { display: block; margin-top: 8px; color: var(--atlas-chalk); line-height: 1.45; }
+
+.capabilities-columns { display: grid; grid-template-columns: repeat(6, minmax(122px, 1fr)); min-width: 0; overflow-x: auto; }
+.capability-column { min-width: 122px; padding: 15px 9px 12px; border-right: 1px solid var(--page-line); }
+.capability-column:last-child { border-right: 0; }
+.capability-column header { min-height: 52px; padding: 0 2px 11px; border-bottom: 1px solid var(--page-line); }
+.capability-column header h2 { margin: 0; font-family: var(--font-display); font-size: 22px; letter-spacing: -0.03em; line-height: 0.84; }
+.capability-column header p { margin: 8px 0 0; color: var(--page-dim); font-size: 7px; letter-spacing: 0.06em; line-height: 1.25; }
+.capability-column ol { display: grid; gap: 6px; margin: 10px 0 0; padding: 0; list-style: none; }
+.capability-item { display: grid; grid-template-columns: 23px minmax(0, 1fr) 10px; gap: 6px; align-items: center; width: 100%; min-height: 66px; padding: 7px 5px; border: 1px solid rgba(167, 163, 155, 0.55); background: transparent; color: var(--atlas-chalk); text-align: left; }
+.capability-item:hover,
+.capability-item.is-selected { border-color: var(--atlas-vermilion); background: rgba(255, 59, 18, 0.09); }
+.capability-item__glyph { display: grid; place-items: center; width: 22px; height: 22px; color: var(--atlas-chalk); font-size: 15px; }
+.capability-item__copy { display: grid; min-width: 0; gap: 4px; }
+.capability-item__copy strong { overflow: hidden; font-size: 9px; letter-spacing: 0.04em; text-overflow: ellipsis; white-space: nowrap; }
+.capability-item__copy small { overflow: hidden; color: var(--page-dim); font-size: 7px; letter-spacing: 0.03em; text-overflow: ellipsis; white-space: nowrap; }
+.capability-item__copy em { color: var(--page-dim); font-size: 7px; font-style: normal; letter-spacing: 0.08em; }
+.capability-dot { display: inline-block; width: 6px; height: 6px; margin-right: 4px; border-radius: 50%; background: var(--page-dim); }
+.capability-dot.is-ready { background: #67f59a; }
+.capability-dot.is-limited { background: var(--atlas-vermilion); }
+.capability-dot.is-auth { background: var(--page-dim); }
+.capability-item__menu { align-self: start; color: var(--page-dim); font-size: 15px; line-height: 1; }
+.capability-column__add { width: 100%; margin-top: 8px; padding: 10px 3px; border: 1px dashed var(--page-dim); background: transparent; color: var(--page-dim); font-family: var(--font-mono); font-size: 8px; letter-spacing: 0.04em; text-align: left; }
+.capability-column__add:hover { border-color: var(--atlas-vermilion); color: var(--atlas-vermilion); }
+
+.capabilities-bottom { display: grid; grid-template-columns: minmax(0, 1.75fr) minmax(170px, 0.66fr) minmax(230px, 0.88fr); min-height: 145px; border-bottom: 1px solid var(--page-line); }
+.capabilities-routes,
+.capabilities-actions,
+.capabilities-inspector { min-width: 0; padding: 15px; border-right: 1px solid var(--page-line); }
+.capabilities-routes h2 { margin: 0 0 12px; font-family: var(--font-display); font-size: 18px; letter-spacing: 0.02em; line-height: 0.9; }
+.capabilities-routes p { margin: 5px 0; overflow: hidden; color: var(--page-dim); font-size: 8px; letter-spacing: 0.04em; text-overflow: ellipsis; white-space: nowrap; }
+.capabilities-routes p i { display: inline-block; width: 7px; height: 7px; margin-right: 6px; border-radius: 50%; background: var(--atlas-vermilion); }
+.capabilities-routes p b { margin: 0 5px; color: var(--atlas-vermilion); font-weight: 400; }
+.capabilities-actions { display: grid; align-content: center; gap: 8px; }
+.capabilities-actions button { padding: 9px 10px; border: 1px solid var(--page-line); background: transparent; color: var(--atlas-chalk); font-family: var(--font-mono); font-size: 8px; letter-spacing: 0.08em; text-align: left; }
+.capabilities-actions button:first-child { border-color: var(--atlas-vermilion); color: var(--atlas-vermilion); }
+.capabilities-actions button:hover { background: var(--atlas-chalk); color: var(--atlas-void); }
+.capabilities-inspector { display: grid; align-content: center; gap: 9px; border-right: 0; }
+.capabilities-inspector h2 { margin: 0; font-family: var(--font-display); font-size: 24px; letter-spacing: -0.03em; line-height: 0.9; }
+.capabilities-inspector p { margin: 0; color: var(--page-dim); font-size: 9px; line-height: 1.4; }
+.capabilities-inspector dl { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; margin: 3px 0 0; padding-top: 9px; border-top: 1px solid var(--page-line); }
+.capabilities-inspector dt { color: var(--page-dim); font-size: 7px; letter-spacing: 0.08em; }
+.capabilities-inspector dd { margin: 4px 0 0; color: var(--atlas-chalk); font-size: 8px; letter-spacing: 0.03em; }
+
+@media (max-width: 1240px) {
+  .capabilities-hero { grid-template-columns: 1.7fr 0.74fr 0.9fr; }
+  .capabilities-hero__branch { display: none; }
+  .capabilities-field { grid-template-columns: minmax(190px, 0.55fr) minmax(0, 2fr); }
+  .capabilities-columns { grid-template-columns: repeat(6, minmax(118px, 1fr)); }
+}
+
+@media (max-width: 920px) {
+  .capabilities-page { margin: calc(-1 * var(--space-4)) calc(-1 * var(--space-4)) -100px; padding-inline: 0; }
+  .capabilities-hero { grid-template-columns: 1fr 0.82fr; }
+  .capabilities-hero > * { padding-inline: 16px; }
+  .capabilities-hero__context { display: none; }
+  .capabilities-hero h1 { font-size: clamp(68px, 14vw, 116px); }
+  .capabilities-field { grid-template-columns: 1fr; }
+  .capability-topology-field { min-height: 390px; border-right: 0; border-bottom: 1px solid var(--page-line); }
+  .capability-topology { min-height: 360px; }
+  .capabilities-columns { overflow-x: auto; }
+  .capabilities-bottom { grid-template-columns: 1fr; }
+  .capabilities-routes,
+  .capabilities-actions,
+  .capabilities-inspector { border-right: 0; border-bottom: 1px solid var(--page-line); }
+}
+
+@media (max-width: 560px) {
+  .capabilities-hero { grid-template-columns: 1fr; }
+  .capabilities-hero__thesis { display: none; }
+  .capabilities-hero h1 { font-size: 18vw; }
+  .capabilities-columns { grid-template-columns: repeat(6, 150px); }
+}
+
+@media (min-width: 1201px) {
+  .capabilities-page {
+    height: calc(100vh - var(--rail-height));
+    min-height: 0;
+    padding-bottom: 0;
+  }
+}

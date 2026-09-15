@@ -1,0 +1,57 @@
+@font-face {
+  font-family: "Archivo";
+  src: url("/assets/fonts/aos-sans.woff2") format("woff2");
+  font-display: swap;
+  font-weight: 100 900;
+  font-style: normal;
+}
+
+@font-face {
+  font-family: "IBM Plex Mono";
+  src: url("/assets/fonts/aos-mono.woff2") format("woff2");
+  font-display: swap;
+  font-weight: 400 700;
+  font-style: normal;
+}
+
+:root {
+  --docket-cobalt: #101cff;
+  --docket-cobalt-deep: #0b13bd;
+  --docket-paper: #050509;
+  --docket-white: #f4f5fa;
+  --docket-ink: #f4f5fa;
+  --docket-quiet: #9b9aa5;
+  --docket-rule: rgba(244, 245, 250, 0.18);
+  --docket-success: #b8ff3d;
+  --docket-warning: #ff3b12;
+
+  --font-display: "Archivo", "Helvetica Neue", Helvetica, Arial, sans-serif;
+  --font-body: "Archivo", "Helvetica Neue", Helvetica, Arial, sans-serif;
+  --font-mono: "IBM Plex Mono", "JetBrains Mono", ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+
+  --space-1: 8px;
+  --space-2: 16px;
+  --space-3: 24px;
+  --space-4: 32px;
+  --space-5: 40px;
+  --space-6: 48px;
+  --space-7: 64px;
+  --rail-height: 52px;
+  --footer-height: 36px;
+  --focus-ring: 0 0 0 1px var(--aos-void), 0 0 0 3px var(--aos-ion);
+
+  /* Acceleration Chamber aliases from the supplied AOS design system. */
+  --aos-cobalt: #101cff;
+  --aos-void: #050509;
+  --aos-void-plate: #0b0b12;
+  --aos-void-raise: #11111a;
+  --aos-ultraviolet: #6b45ff;
+  --aos-ion: #b8ff3d;
+  --aos-vermilion: #ff3b12;
+  --aos-mineral: #9b9aa5;
+  --aos-cold-white: #f4f5fa;
+  --aos-rule: rgba(244, 245, 250, 0.18);
+  --aos-rule-strong: rgba(244, 245, 250, 0.34);
+  --aos-page-gutter: clamp(18px, 3vw, 48px);
+  --aos-console-rail: 36px;
+}

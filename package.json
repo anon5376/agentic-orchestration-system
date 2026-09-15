@@ -1,0 +1,24 @@
+{
+  "name": "aos-research-workspace",
+  "private": true,
+  "version": "0.1.0",
+  "type": "module",
+  "bin": {
+    "aos": "./bin/aos.mjs"
+  },
+  "scripts": {
+    "dev": "vite",
+    "dev:all": "node scripts/dev.mjs",
+    "engine": "node engine/serve.js",
+    "aos": "node bin/aos.mjs",
+    "test": "node --test tests/*.test.js",
+    "test:e2e": "node --test tests/e2e.test.js",
+    "build": "vite build",
+    "preview": "vite preview"
+  },
+  "dependencies": {
+    "react": "^19.1.1",
+    "react-dom": "^19.1.1",
+    "vite": "^7.1.5"
+  }
+}

@@ -1,0 +1,571 @@
+<!doctype html>
+<!--
+THESIS: Night Index treats an agent run as an archival record, with signal and silence carrying equal weight.
+OWN-WORLD: Near-black lab paper, bone-white type, red carrier marks, hairline rules, and indexed tabs.
+STORY: Locate a task in the hierarchy, read its selected record, and decide whether the live route should pause.
+FIRST VIEWPORT: A quiet black title field, one red carrier line, a compact telemetry index, then a three-column folio with tree, record, and ledger.
+FORM: Operate surface; archival folio and index-tab hierarchy replace dashboard cards, while density appears only beside measured evidence.
+-->
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="theme-color" content="#0a0b0c" />
+    <title>AOS · Night Index</title>
+    <style>
+      :root {
+        --black: #090a0b;
+        --black-2: #0e0f10;
+        --black-3: #141516;
+        --bone: #e8e3d8;
+        --bone-soft: #b6b0a5;
+        --quiet: #77746d;
+        --hair: #343637;
+        --hair-soft: #242627;
+        --red: #c83235;
+        --red-dark: #8f1f25;
+        --font-sans: "Helvetica Neue", Helvetica, Arial, sans-serif;
+        --font-mono: "SFMono-Regular", Consolas, "Liberation Mono", monospace;
+        --font-serif: Georgia, "Times New Roman", serif;
+      }
+
+      *,
+      *::before,
+      *::after { box-sizing: border-box; }
+
+      html { min-width: 320px; background: var(--black); color-scheme: dark; scroll-behavior: smooth; }
+
+      body {
+        min-width: 320px;
+        margin: 0;
+        overflow-x: hidden;
+        background: var(--black);
+        color: var(--bone);
+        font-family: var(--font-sans);
+        font-size: 14px;
+        line-height: 1.45;
+        -webkit-font-smoothing: antialiased;
+      }
+
+      a { color: inherit; text-decoration: none; }
+      button, input { font: inherit; }
+      button { border: 0; border-radius: 0; cursor: pointer; }
+      button:focus-visible, a:focus-visible, input:focus-visible {
+        outline: 2px solid var(--red);
+        outline-offset: 3px;
+      }
+
+      .index-head {
+        min-height: 58px;
+        padding: 0 clamp(18px, 4vw, 68px);
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 24px;
+        border-bottom: 1px solid var(--hair);
+        background: var(--black);
+      }
+
+      .index-brand {
+        display: inline-flex;
+        align-items: center;
+        gap: 12px;
+        min-width: max-content;
+        font-family: var(--font-mono);
+        font-size: 10px;
+        letter-spacing: .1em;
+        text-transform: uppercase;
+      }
+
+      .index-mark {
+        width: 30px;
+        height: 30px;
+        display: grid;
+        place-items: center;
+        border: 1px solid var(--bone-soft);
+        color: var(--bone);
+        font-size: 9px;
+        font-weight: 700;
+      }
+
+      .index-head nav {
+        display: flex;
+        align-items: center;
+        gap: clamp(14px, 2.6vw, 32px);
+        color: var(--bone-soft);
+        font-family: var(--font-mono);
+        font-size: 10px;
+        letter-spacing: .07em;
+        text-transform: uppercase;
+      }
+
+      .index-head nav a {
+        padding: 19px 0 16px;
+        border-bottom: 1px solid transparent;
+        white-space: nowrap;
+      }
+      .index-head nav a:hover,
+      .index-head nav a[aria-current="page"] { color: var(--bone); border-bottom-color: var(--red); }
+
+      .index-page {
+        width: min(1600px, calc(100% - 36px));
+        margin: 0 auto;
+        padding-bottom: 64px;
+      }
+
+      .top-field {
+        min-height: 310px;
+        padding: 58px clamp(4px, 3vw, 42px) 48px;
+        display: grid;
+        grid-template-columns: minmax(0, 1.25fr) minmax(260px, .75fr);
+        gap: 50px;
+        align-items: end;
+        border-bottom: 1px solid var(--hair);
+      }
+
+      .label,
+      .micro,
+      .folio-label {
+        margin: 0;
+        color: var(--bone-soft);
+        font-family: var(--font-mono);
+        font-size: 10px;
+        font-weight: 700;
+        letter-spacing: .11em;
+        line-height: 1.35;
+        text-transform: uppercase;
+      }
+      .label { color: var(--red); }
+
+      h1 {
+        max-width: 6rem;
+        margin: 17px 0 17px;
+        font-family: var(--font-serif);
+        font-size: clamp(4rem, 9vw, 6rem);
+        font-weight: 400;
+        letter-spacing: -.075em;
+        line-height: .8;
+        text-transform: uppercase;
+      }
+
+      .top-copy { max-width: 51ch; margin: 0; color: var(--bone-soft); font-size: 15px; }
+
+      .run-slate {
+        min-height: 168px;
+        padding: 4px 0 0 27px;
+        display: flex;
+        flex-direction: column;
+        justify-content: space-between;
+        border-left: 1px solid var(--hair);
+      }
+      .run-slate dl { margin: 0; }
+      .run-slate dt { margin-top: 11px; color: var(--quiet); font-family: var(--font-mono); font-size: 9px; letter-spacing: .1em; text-transform: uppercase; }
+      .run-slate dd { margin: 3px 0 0; color: var(--bone); font-family: var(--font-mono); font-size: 12px; overflow-wrap: anywhere; }
+      .carrier {
+        display: inline-flex;
+        align-items: center;
+        gap: 8px;
+        color: var(--red);
+        font-family: var(--font-mono);
+        font-size: 10px;
+        letter-spacing: .1em;
+        text-transform: uppercase;
+      }
+      .carrier::before { content: ""; width: 8px; height: 8px; display: inline-block; border: 1px solid var(--red); background: var(--red); border-radius: 50%; }
+      .pause-index {
+        width: max-content;
+        padding: 10px 14px;
+        border: 1px solid var(--red);
+        background: transparent;
+        color: var(--red);
+        font-family: var(--font-mono);
+        font-size: 10px;
+        font-weight: 700;
+        letter-spacing: .1em;
+        text-transform: uppercase;
+      }
+      .pause-index:hover, .pause-index[data-paused="true"] { background: var(--red); color: var(--black); }
+
+      .telemetry-index {
+        display: grid;
+        grid-template-columns: repeat(4, minmax(0, 1fr));
+        border-bottom: 1px solid var(--hair);
+      }
+      .telemetry-index > div { min-height: 92px; padding: 17px 18px 15px; border-right: 1px solid var(--hair); }
+      .telemetry-index > div:last-child { border-right: 0; }
+      .telemetry-index dt { color: var(--quiet); font-family: var(--font-mono); font-size: 9px; letter-spacing: .1em; text-transform: uppercase; }
+      .telemetry-index dd { margin: 6px 0 0; color: var(--bone); font-family: var(--font-mono); font-size: clamp(15px, 2vw, 20px); letter-spacing: -.06em; }
+      .telemetry-index small { display: block; margin-top: 3px; color: var(--quiet); font-family: var(--font-mono); font-size: 9px; letter-spacing: .04em; }
+      .token-set { display: flex; flex-wrap: wrap; gap: 4px 12px; margin-top: 5px; }
+      .token-set span { color: var(--bone-soft); font-family: var(--font-mono); font-size: 10px; white-space: nowrap; }
+      .token-set b { color: var(--bone); }
+
+      .index-workbench {
+        display: grid;
+        grid-template-columns: minmax(220px, .78fr) minmax(380px, 1.48fr) minmax(290px, .92fr);
+        border-bottom: 1px solid var(--hair);
+      }
+      .work-panel { min-width: 0; }
+      .archive-panel { border-right: 1px solid var(--hair); }
+      .folio-panel { border-right: 1px solid var(--hair); }
+      .panel-top {
+        min-height: 65px;
+        padding: 18px 18px 14px;
+        display: flex;
+        align-items: start;
+        justify-content: space-between;
+        gap: 15px;
+        border-bottom: 1px solid var(--hair);
+      }
+      .panel-top h2 { margin: 0; font-size: 12px; font-weight: 500; letter-spacing: .04em; text-transform: uppercase; }
+      .panel-top p { margin: 3px 0 0; color: var(--quiet); font-family: var(--font-mono); font-size: 9px; }
+      .panel-number { color: var(--red); font-family: var(--font-mono); font-size: 10px; }
+
+      .filter-box { padding: 16px 18px 17px; border-bottom: 1px solid var(--hair); }
+      .filter-box label { display: block; }
+      .filter-input {
+        width: 100%;
+        margin-top: 8px;
+        padding: 9px 0;
+        border: 0;
+        border-bottom: 1px solid var(--hair);
+        border-radius: 0;
+        background: transparent;
+        color: var(--bone);
+        font-family: var(--font-mono);
+        font-size: 11px;
+      }
+      .filter-input::placeholder { color: var(--quiet); }
+      .filter-status { min-height: 16px; margin: 9px 0 0; color: var(--quiet); font-family: var(--font-mono); font-size: 9px; }
+
+      .task-index { margin: 0; padding: 14px 0 30px; list-style: none; counter-reset: task; }
+      .task-index ol { margin: 0 0 0 18px; padding: 0; list-style: none; border-left: 1px solid var(--hair); }
+      .task-index li { counter-increment: task; }
+      .task-index button {
+        position: relative;
+        width: 100%;
+        padding: 11px 18px;
+        display: grid;
+        grid-template-columns: 44px minmax(0, 1fr);
+        gap: 7px;
+        text-align: left;
+        background: transparent;
+        color: var(--bone-soft);
+        border-bottom: 1px solid var(--hair-soft);
+      }
+      .task-index ol button { padding-left: 15px; }
+      .task-index button:hover { color: var(--bone); background: var(--black-2); }
+      .task-index button[aria-current="true"] { color: var(--bone); box-shadow: inset 2px 0 0 var(--red); background: var(--black-3); }
+      .task-index button[hidden] { display: none; }
+      .index-code { color: var(--quiet); font-family: var(--font-mono); font-size: 9px; letter-spacing: .05em; }
+      .task-index button[aria-current="true"] .index-code { color: var(--red); }
+      .index-name { display: block; font-size: 12px; line-height: 1.25; }
+      .index-meta { display: block; margin-top: 3px; color: var(--quiet); font-family: var(--font-mono); font-size: 9px; line-height: 1.3; }
+      .index-state { display: inline-flex; align-items: center; gap: 5px; margin-top: 4px; color: var(--quiet); font-family: var(--font-mono); font-size: 9px; text-transform: uppercase; }
+      .index-state::before { content: ""; width: 5px; height: 5px; display: inline-block; border: 1px solid currentColor; border-radius: 50%; }
+      .index-state.active::before { background: var(--red); border-color: var(--red); }
+      .index-state.queued::before { background: transparent; }
+      .index-state.hold { color: var(--red); }
+      .index-state.hold::before { background: var(--red); border-color: var(--red); }
+
+      .folio { padding: 30px clamp(20px, 3vw, 36px) 38px; }
+      .folio-head { display: flex; align-items: center; justify-content: space-between; gap: 16px; }
+      .folio-label { color: var(--red); }
+      .folio-time { color: var(--quiet); font-family: var(--font-mono); font-size: 9px; }
+      .folio h2 { margin: 13px 0 12px; font-family: var(--font-serif); font-size: clamp(27px, 3.2vw, 44px); font-weight: 400; letter-spacing: -.06em; line-height: .96; }
+      .folio-lede { max-width: 57ch; margin: 0; color: var(--bone-soft); font-size: 15px; }
+      .folio-terms { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 16px; margin: 28px 0 0; padding: 14px 0 15px; border-top: 1px solid var(--hair); border-bottom: 1px solid var(--hair); }
+      .folio-terms dt { color: var(--quiet); font-family: var(--font-mono); font-size: 9px; letter-spacing: .08em; text-transform: uppercase; }
+      .folio-terms dd { margin: 4px 0 0; color: var(--bone); font-family: var(--font-mono); font-size: 10px; overflow-wrap: anywhere; }
+
+      .trace-box { margin-top: 28px; padding: 13px 12px 10px; border: 1px solid var(--hair); }
+      .trace-head { display: flex; justify-content: space-between; gap: 16px; color: var(--quiet); font-family: var(--font-mono); font-size: 9px; letter-spacing: .06em; text-transform: uppercase; }
+      .trace-box svg { display: block; width: 100%; height: auto; margin-top: 13px; }
+      .trace-box .trace-grid { fill: none; stroke: var(--hair); stroke-width: 1; }
+      .trace-box .trace-main { fill: none; stroke: var(--bone-soft); stroke-width: 1.5; }
+      .trace-box .trace-carrier { fill: none; stroke: var(--red); stroke-width: 2; }
+      .trace-box .trace-node { fill: var(--black); stroke: var(--bone-soft); stroke-width: 1.5; }
+      .trace-box .trace-node.hot { fill: var(--red); stroke: var(--red); }
+      .trace-box text { fill: var(--quiet); font-family: var(--font-mono); font-size: 8px; letter-spacing: .05em; }
+
+      .record-notes { margin: 27px 0 0; padding: 0; list-style: none; border-top: 1px solid var(--hair); }
+      .record-notes li { padding: 12px 0; border-bottom: 1px solid var(--hair); }
+      .record-notes strong { display: block; color: var(--bone); font-size: 12px; font-weight: 500; }
+      .record-notes span { display: block; margin-top: 3px; color: var(--bone-soft); font-size: 12px; }
+      .next-decision { margin-top: 22px; padding: 13px 14px; border: 1px solid var(--hair); }
+      .next-decision strong { display: block; color: var(--red); font-family: var(--font-mono); font-size: 9px; letter-spacing: .1em; text-transform: uppercase; }
+      .next-decision p { margin: 7px 0 0; color: var(--bone-soft); font-size: 12px; }
+
+      .ledger-copy { margin: 17px 18px 22px; color: var(--quiet); font-size: 12px; }
+      .ledger-table { width: calc(100% - 36px); margin: 0 18px; border-collapse: collapse; table-layout: fixed; font-family: var(--font-mono); font-size: 9px; }
+      .ledger-table caption { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); }
+      .ledger-table th { padding: 8px 3px; color: var(--quiet); font-size: 8px; font-weight: 400; letter-spacing: .07em; text-align: left; text-transform: uppercase; border-bottom: 1px solid var(--hair); }
+      .ledger-table td { padding: 12px 3px; color: var(--bone-soft); vertical-align: top; border-bottom: 1px solid var(--hair-soft); overflow-wrap: anywhere; }
+      .ledger-table th:first-child, .ledger-table td:first-child { padding-left: 0; width: 28%; }
+      .ledger-table th:last-child, .ledger-table td:last-child { padding-right: 0; width: 23%; text-align: right; }
+      .session-id { color: var(--bone); }
+      .session-sub { display: block; margin-top: 3px; color: var(--quiet); font-size: 8px; }
+      .ledger-state { color: var(--quiet); }
+      .ledger-state.live { color: var(--red); }
+      .ledger-state.hold { color: var(--bone); }
+      .aggregate { margin: 28px 18px 0; border-top: 1px solid var(--hair); }
+      .aggregate-row { display: flex; justify-content: space-between; gap: 16px; padding: 10px 0; border-bottom: 1px solid var(--hair-soft); font-family: var(--font-mono); font-size: 10px; }
+      .aggregate-row span { color: var(--quiet); text-transform: uppercase; }
+      .aggregate-row strong { color: var(--bone); font-weight: 400; }
+      .aggregate-row:last-child strong { color: var(--red); }
+
+      .quiet-foot {
+        min-height: 142px;
+        padding: 38px clamp(4px, 3vw, 42px) 0;
+        display: flex;
+        justify-content: space-between;
+        align-items: flex-start;
+        gap: 28px;
+        color: var(--quiet);
+      }
+      .quiet-foot p { max-width: 58ch; margin: 0; font-size: 12px; }
+      .quiet-foot .carrier { white-space: nowrap; }
+      body[data-paused="true"] .carrier { color: var(--bone-soft); }
+      body[data-paused="true"] .carrier::before { background: transparent; border-color: var(--bone-soft); }
+      body[data-paused="true"] .run-state { color: var(--bone-soft); }
+      .run-state { margin-top: 10px; color: var(--red); font-family: var(--font-mono); font-size: 9px; letter-spacing: .08em; text-transform: uppercase; }
+
+      @media (max-width: 1200px) {
+        .index-workbench { grid-template-columns: minmax(220px, .78fr) minmax(0, 1.4fr); }
+        .ledger-panel { grid-column: 1 / -1; border-top: 1px solid var(--hair); }
+        .ledger-table { width: calc(100% - 36px); table-layout: auto; }
+        .ledger-table th:first-child, .ledger-table td:first-child, .ledger-table th:last-child, .ledger-table td:last-child { width: auto; }
+        .aggregate { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 18px; }
+      }
+
+      @media (max-width: 760px) {
+        .index-head { align-items: flex-start; flex-direction: column; padding-top: 13px; padding-bottom: 0; gap: 5px; }
+        .index-head nav { width: 100%; overflow-x: auto; gap: 24px; }
+        .index-head nav a { padding: 11px 0 14px; }
+        .index-page { width: min(100% - 24px, 1600px); }
+        .top-field { min-height: 0; grid-template-columns: 1fr; gap: 30px; padding-top: 38px; padding-bottom: 32px; }
+        .run-slate { min-height: 0; padding: 17px 0 0; border-top: 1px solid var(--hair); border-left: 0; gap: 23px; }
+        .telemetry-index { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+        .telemetry-index > div:nth-child(2n) { border-right: 0; }
+        .telemetry-index > div { border-bottom: 1px solid var(--hair); }
+        .telemetry-index > div:last-child { grid-column: 1 / -1; }
+        .index-workbench { display: block; }
+        .archive-panel, .folio-panel { border-right: 0; border-bottom: 1px solid var(--hair); }
+        .folio { padding-top: 25px; }
+        .folio-terms { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+        .aggregate { display: block; }
+        .quiet-foot { min-height: 170px; flex-direction: column; padding-top: 28px; }
+      }
+
+      @media (prefers-reduced-motion: reduce) {
+        html { scroll-behavior: auto; }
+        *, *::before, *::after { animation-duration: .001ms !important; transition-duration: .001ms !important; }
+      }
+    </style>
+  </head>
+  <body>
+    <header class="index-head">
+      <a class="index-brand" href="../" aria-label="AOS prototype index">
+        <span class="index-mark">AOS</span>
+        <span>archive / operating index</span>
+      </a>
+      <nav aria-label="Prototype navigation">
+        <a href="../">Index</a>
+        <a href="../01-signal-yard/">Signal Yard</a>
+        <a href="./" aria-current="page">Night Index</a>
+      </nav>
+    </header>
+
+    <main class="index-page" id="main-content">
+      <section class="top-field" aria-labelledby="page-title">
+        <div>
+          <p class="label">VISUAL PROTOTYPE · SYNTHETIC RUNNING STATE</p>
+          <h1 id="page-title">Night<br />Index</h1>
+          <p class="top-copy">An after-hours research terminal for the moment between delegation and decision. The archive stays quiet until a measured signal deserves the operator's attention.</p>
+        </div>
+        <div class="run-slate">
+          <dl>
+            <dt>Run record</dt>
+            <dd>NI-0069 / 14:22:08Z</dd>
+            <dt>Objective</dt>
+            <dd>Map contradiction routes in the source register</dd>
+          </dl>
+          <button class="pause-index" id="pauseIndex" type="button" aria-pressed="false" data-paused="false">Pause run</button>
+        </div>
+      </section>
+
+      <section class="telemetry-index" aria-label="Run telemetry index">
+        <div><dt>Active agents / cap</dt><dd>03 / 04</dd><small id="agentState">three on carrier</small></div>
+        <div><dt>Model / policy</dt><dd>LUNA / MAX</dd><small>gpt-5.6-luna · max</small></div>
+        <div><dt>Verified sessions</dt><dd>27</dd><small>receipts reconciled</small></div>
+        <div><dt>Aggregate tokens</dt><dd class="token-set"><span><b>7.3M</b> input</span><span><b>5.8M</b> cached</span><span><b>381.3K</b> output</span><span><b>311.7K</b> reasoning</span></dd><small>synthetic counters · current run</small></div>
+      </section>
+
+      <section class="index-workbench" aria-label="Run workbench">
+        <aside class="work-panel archive-panel" aria-labelledby="taskIndexTitle">
+          <div class="panel-top">
+            <div><h2 id="taskIndexTitle">Task index</h2><p>hierarchy / live route</p></div>
+            <span class="panel-number" id="taskCount">08</span>
+          </div>
+          <div class="filter-box">
+            <label class="micro" for="taskFilter">Find in index
+              <input class="filter-input" id="taskFilter" type="search" placeholder="name, owner, state" autocomplete="off" />
+            </label>
+            <p class="filter-status" id="filterStatus" role="status" aria-live="polite">All eight records visible</p>
+          </div>
+          <ol class="task-index" id="taskIndex" aria-label="Delegated task hierarchy">
+            <li><button type="button" aria-current="true" data-task-id="anchor"><span class="index-code">A / 01</span><span><span class="index-name">Anchor contradiction map</span><span class="index-meta">lead / 62% route mapped</span><span class="index-state active">active</span></span></button>
+              <ol>
+                <li><button type="button" aria-current="false" data-task-id="registry"><span class="index-code">A.1</span><span><span class="index-name">Sift source registry</span><span class="index-meta">LUNA-01 / 184 records</span><span class="index-state active">active</span></span></button></li>
+                <li><button type="button" aria-current="false" data-task-id="contradictions"><span class="index-code">A.2</span><span><span class="index-name">Mark contradiction set</span><span class="index-meta">LUNA-02 / 11 flags</span><span class="index-state active">active</span></span></button>
+                  <ol><li><button type="button" aria-current="false" data-task-id="crosscheck"><span class="index-code">A.2.1</span><span><span class="index-name">Cross-check provenance</span><span class="index-meta">LUNA-03 / waits on flags</span><span class="index-state queued">queued</span></span></button></li></ol>
+                </li>
+              </ol>
+            </li>
+            <li><button type="button" aria-current="false" data-task-id="synthesis"><span class="index-code">B / 01</span><span><span class="index-name">Prepare synthesis plate</span><span class="index-meta">lead / 3 findings held</span><span class="index-state active">active</span></span></button>
+              <ol>
+                <li><button type="button" aria-current="false" data-task-id="claimset"><span class="index-code">B.1</span><span><span class="index-name">Bound claim set</span><span class="index-meta">LUNA-01 / evidence gate</span><span class="index-state queued">queued</span></span></button></li>
+                <li><button type="button" aria-current="false" data-task-id="review"><span class="index-code">B.2</span><span><span class="index-name">Owner review checkpoint</span><span class="index-meta">operator / one exception</span><span class="index-state hold">hold</span></span></button></li>
+              </ol>
+            </li>
+            <li><button type="button" aria-current="false" data-task-id="archive"><span class="index-code">C / 01</span><span><span class="index-name">Archive verified run</span><span class="index-meta">system / after decision</span><span class="index-state queued">queued</span></span></button></li>
+          </ol>
+        </aside>
+
+        <article class="work-panel folio-panel" aria-labelledby="recordTitle" aria-live="polite">
+          <div class="folio">
+            <div class="folio-head"><p class="folio-label" id="recordStatus">Active work order</p><span class="folio-time" id="recordSignal">14:21:44Z</span></div>
+            <h2 id="recordTitle">Anchor contradiction map</h2>
+            <p class="folio-lede" id="recordObjective">Keep source claims attached to their provenance while the registry is being sifted. The selected route is the lead agent's current handoff surface.</p>
+            <dl class="folio-terms">
+              <div><dt>Owner</dt><dd id="recordOwner">Lead / night desk</dd></div>
+              <div><dt>Route state</dt><dd id="recordRoute">62% mapped</dd></div>
+              <div><dt>Carrier</dt><dd>gpt-5.6-luna / max</dd></div>
+            </dl>
+
+            <div class="trace-box" aria-label="Archival route trace">
+              <div class="trace-head"><span>Trace folio 03</span><span id="routeMark">junction / A—B</span></div>
+              <svg viewBox="0 0 560 170" role="img" aria-label="Bone-white archive trace with a single carrier-red exception">
+                <path class="trace-grid" d="M22 138H538M22 31H538M22 84H538M72 14V154M184 14V154M318 14V154M468 14V154" />
+                <path class="trace-main" d="M26 118H92V68H190V108H318V54H462V91H534" />
+                <path class="trace-carrier" d="M190 108V143H318V54H462" />
+                <circle class="trace-node" cx="92" cy="68" r="7" />
+                <circle class="trace-node" cx="190" cy="108" r="7" />
+                <circle class="trace-node hot" cx="318" cy="54" r="7" />
+                <circle class="trace-node" cx="462" cy="91" r="7" />
+                <text x="76" y="53">REGISTRY</text><text x="165" y="128">FLAGS 11</text><text x="297" y="39">CARRIER</text><text x="442" y="112">REVIEW</text>
+              </svg>
+            </div>
+
+            <ul class="record-notes" id="recordNotes" aria-label="Selected task evidence">
+              <li><strong>184 source records attached</strong><span>Registry sweep has a stable owner and immutable route IDs.</span></li>
+              <li><strong>11 contradiction flags held</strong><span>Two claims share a citation but diverge in stated date.</span></li>
+              <li><strong>One decision still needs a human</strong><span>The red mark is a consequence signal, not a failed run.</span></li>
+            </ul>
+            <div class="next-decision"><strong>Next safe action</strong><p id="recordNext">Open the cross-check route when the registry pass closes; do not merge the held claims yet.</p></div>
+          </div>
+        </article>
+
+        <aside class="work-panel ledger-panel" aria-labelledby="ledgerTitle">
+          <div class="panel-top"><div><h2 id="ledgerTitle">Model-session ledger</h2><p>verified worker handoffs</p></div><span class="panel-number">27</span></div>
+          <p class="ledger-copy">Synthetic receipts remain readable beside the selected record: model identity, policy, state, and token count are never hidden behind a drawer.</p>
+          <table class="ledger-table">
+            <caption>Current model-session ledger</caption>
+            <thead><tr><th>Session</th><th>Model</th><th>State</th><th>Tokens</th></tr></thead>
+            <tbody>
+              <tr><td><span class="session-id">S-027</span><span class="session-sub">14:22:08Z</span></td><td>luna<br /><span class="session-sub">max</span></td><td><span class="ledger-state live">live</span></td><td>1.8M</td></tr>
+              <tr><td><span class="session-id">S-026</span><span class="session-sub">14:20:51Z</span></td><td>luna<br /><span class="session-sub">max</span></td><td><span class="ledger-state live">live</span></td><td>2.1M</td></tr>
+              <tr><td><span class="session-id">S-025</span><span class="session-sub">14:17:04Z</span></td><td>luna<br /><span class="session-sub">max</span></td><td><span class="ledger-state hold">hold</span></td><td>1.5M</td></tr>
+              <tr><td><span class="session-id">S-024</span><span class="session-sub">14:10:18Z</span></td><td>luna<br /><span class="session-sub">max</span></td><td><span class="ledger-state live">live</span></td><td>1.9M</td></tr>
+            </tbody>
+          </table>
+          <div class="aggregate" aria-label="Aggregate token totals">
+            <div class="aggregate-row"><span>Input</span><strong>7.3M</strong></div>
+            <div class="aggregate-row"><span>Cached</span><strong>5.8M</strong></div>
+            <div class="aggregate-row"><span>Output</span><strong>381.3K</strong></div>
+            <div class="aggregate-row"><span>Reasoning</span><strong>311.7K</strong></div>
+          </div>
+        </aside>
+      </section>
+
+      <footer class="quiet-foot">
+        <p><strong>Archive note:</strong> This is a synthetic running state for AOS. Dense fields record measured handoffs; the black between them is deliberate working room.</p>
+        <div><span class="carrier" id="carrierSignal">carrier on line</span><p class="run-state" id="runState" role="status" aria-live="polite">run is live · review safe</p></div>
+      </footer>
+    </main>
+
+    <script>
+      (() => {
+        const taskRows = Array.from(document.querySelectorAll('[data-task-id]'));
+        const filterInput = document.querySelector('#taskFilter');
+        const filterStatus = document.querySelector('#filterStatus');
+        const taskCount = document.querySelector('#taskCount');
+        const pauseButton = document.querySelector('#pauseIndex');
+        const agentState = document.querySelector('#agentState');
+        const carrierSignal = document.querySelector('#carrierSignal');
+        const runState = document.querySelector('#runState');
+        const detail = {
+          status: document.querySelector('#recordStatus'),
+          title: document.querySelector('#recordTitle'),
+          objective: document.querySelector('#recordObjective'),
+          owner: document.querySelector('#recordOwner'),
+          route: document.querySelector('#recordRoute'),
+          signal: document.querySelector('#recordSignal'),
+          mark: document.querySelector('#routeMark'),
+          notes: document.querySelector('#recordNotes'),
+          next: document.querySelector('#recordNext'),
+        };
+
+        const taskDetails = {
+          anchor: { status: 'Active work order', title: 'Anchor contradiction map', objective: 'Keep source claims attached to their provenance while the registry is being sifted. The selected route is the lead agent\'s current handoff surface.', owner: 'Lead / night desk', route: '62% mapped', signal: '14:21:44Z', mark: 'junction / A—B', next: 'Open the cross-check route when the registry pass closes; do not merge the held claims yet.', notes: [['184 source records attached', 'Registry sweep has a stable owner and immutable route IDs.'], ['11 contradiction flags held', 'Two claims share a citation but diverge in stated date.'], ['One decision still needs a human', 'The red mark is a consequence signal, not a failed run.']] },
+          registry: { status: 'Active worker route', title: 'Sift source registry', objective: 'Normalize the source register into stable records without erasing the original citation shape or custody note.', owner: 'LUNA-01 / registry', route: '184 records', signal: '14:20:51Z', mark: 'junction / A—1', next: 'Finish the last 36 records, then release the contradiction set to cross-check.', notes: [['Registry IDs are stable', 'Each source keeps its original locator and ingest timestamp.'], ['Scope is bounded', '184 records are inside this run; no external source fetch is implied.'], ['Worker receipt verified', 'S-026 carries model, policy, and route metadata.']] },
+          contradictions: { status: 'Active worker route', title: 'Mark contradiction set', objective: 'Separate conflicts in wording, date, and provenance so the lead can inspect consequence rather than absorb a blended summary.', owner: 'LUNA-02 / compare', route: '11 flags', signal: '14:19:37Z', mark: 'junction / B—2', next: 'Keep the two date conflicts held until provenance cross-check returns.', notes: [['11 flags are classified', 'Date, wording, and provenance each have a distinct reason code.'], ['Two flags share a citation', 'The route remains open because the date evidence diverges.'], ['No synthesis merged', 'Claim boundaries remain intact while review is pending.']] },
+          crosscheck: { status: 'Queued handoff', title: 'Cross-check provenance', objective: 'Verify the two held citation routes against their source records once the contradiction worker closes its pass.', owner: 'LUNA-03 / queued', route: 'waiting on flags', signal: '14:18:03Z', mark: 'junction / B—3', next: 'Wait for the contradiction worker; do not start a parallel merge.', notes: [['Dependency is explicit', 'The queue is downstream of the 11-flag contradiction pass.'], ['Capacity is reserved', 'One of four slots remains available for this route.'], ['Start condition is known', 'Two citation/date conflicts must be present before launch.']] },
+          synthesis: { status: 'Active work order', title: 'Prepare synthesis plate', objective: 'Turn verified findings into a compact evidence plate while keeping unresolved routes visible to the operator.', owner: 'Lead / synthesis', route: '3 findings held', signal: '14:16:12Z', mark: 'junction / C—1', next: 'Keep the plate in draft until the owner review checkpoint clears.', notes: [['Three findings are staged', 'Each finding links back to a selected source route.'], ['Open routes remain visible', 'Draft status prevents a false completion signal.'], ['Output is bounded', 'No new claim is authored by the plate itself.']] },
+          claimset: { status: 'Queued handoff', title: 'Bound claim set', objective: 'Attach confidence and evidence boundaries to the staged findings before the plate can move to review.', owner: 'LUNA-01 / claims', route: 'evidence gate', signal: '14:13:29Z', mark: 'junction / C—2', next: 'Start after synthesis plate emits the three staged finding IDs.', notes: [['Evidence gate is closed', 'The worker has no permission to widen the source set.'], ['Three findings are waiting', 'Input is held until the synthesis draft is stable.'], ['Claim labels are defined', 'Illustrative values cannot pass this gate as evidence.']] },
+          review: { status: 'Operator hold', title: 'Owner review checkpoint', objective: 'Resolve the one route exception that changes the consequence of the current handoff before any archive action.', owner: 'Operator / required', route: 'one exception', signal: '14:11:06Z', mark: 'junction / C—3', next: 'Review the red exception, then choose resume or hold with the route note attached.', notes: [['One exception is visible', 'The signal is a consequence marker, not a transport error.'], ['Owner action is required', 'A worker cannot close this checkpoint on its own.'], ['Archive is downstream', 'No final receipt is generated while the hold remains.']] },
+          archive: { status: 'Queued system route', title: 'Archive verified run', objective: 'Seal the verified session receipts and selected evidence routes after the human checkpoint is resolved.', owner: 'System / archive', route: 'after decision', signal: '14:06:22Z', mark: 'junction / D—1', next: 'Wait for the review checkpoint and the final claim-boundary check.', notes: [['Archive path is reserved', 'The system has a destination but no completion authority yet.'], ['27 receipts are available', 'Verified session count is stable for this synthetic run.'], ['Run remains open', 'Archive cannot close a route with a live consequence marker.']] },
+        };
+
+        function renderTask(id) {
+          const item = taskDetails[id] || taskDetails.anchor;
+          taskRows.forEach((row) => row.setAttribute('aria-current', row.dataset.taskId === id ? 'true' : 'false'));
+          detail.status.textContent = item.status;
+          detail.title.textContent = item.title;
+          detail.objective.textContent = item.objective;
+          detail.owner.textContent = item.owner;
+          detail.route.textContent = item.route;
+          detail.signal.textContent = item.signal;
+          detail.mark.textContent = item.mark;
+          detail.next.textContent = item.next;
+          detail.notes.innerHTML = item.notes.map(([title, copy]) => `<li><strong>${title}</strong><span>${copy}</span></li>`).join('');
+        }
+
+        function filterTasks() {
+          const query = filterInput.value.trim().toLowerCase();
+          let visible = 0;
+          taskRows.forEach((row) => {
+            const match = !query || row.textContent.toLowerCase().includes(query);
+            row.hidden = !match;
+            if (match) visible += 1;
+          });
+          taskCount.textContent = String(visible).padStart(2, '0');
+          filterStatus.textContent = query ? `${visible} record${visible === 1 ? '' : 's'} match “${query}”` : 'All eight records visible';
+        }
+
+        taskRows.forEach((row) => row.addEventListener('click', () => renderTask(row.dataset.taskId)));
+        filterInput.addEventListener('input', filterTasks);
+        pauseButton.addEventListener('click', () => {
+          const paused = document.body.dataset.paused === 'true';
+          document.body.dataset.paused = String(!paused);
+          pauseButton.dataset.paused = String(!paused);
+          pauseButton.setAttribute('aria-pressed', String(!paused));
+          pauseButton.textContent = paused ? 'Pause run' : 'Resume run';
+          agentState.textContent = paused ? 'three on carrier' : 'three held';
+          carrierSignal.textContent = paused ? 'carrier on line' : 'carrier held';
+          runState.textContent = paused ? 'run is live · review safe' : 'run is paused · review safe';
+        });
+      })();
+    </script>
+  </body>
+</html>

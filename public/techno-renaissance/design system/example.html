@@ -1,0 +1,351 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <meta name="theme-color" content="#101CFF" />
+  <title>Machine Renaissance — HTML example</title>
+  <style>
+    :root {
+      --void: #07080c;
+      --cobalt: #101cff;
+      --cobalt-deep: #0008c4;
+      --white: #f7f7fa;
+      --stone: #f2f3f6;
+      --paper: #fbfbfc;
+      --ink: #12141a;
+      --quiet: #3c4048;
+      --rule: #d4d6db;
+      --ok: #1b5c3a;
+      --warn: #8a4a16;
+      --display: Palatino, "Palatino Linotype", "Iowan Old Style", "Book Antiqua", "Times New Roman", serif;
+      --sans: "Avenir Next", Avenir, "Helvetica Neue", Helvetica, Arial, sans-serif;
+      --mono: ui-monospace, "SFMono-Regular", Menlo, Consolas, monospace;
+    }
+    * { box-sizing: border-box; }
+    html, body { margin: 0; background: var(--void); color: var(--white); }
+    body {
+      font-family: var(--sans);
+      font-size: 14px;
+      line-height: 1.45;
+      min-height: 100vh;
+    }
+    button { appearance: none; border-radius: 0; font: inherit; cursor: pointer; }
+    .flag {
+      padding: 6px 20px;
+      border-bottom: 1px solid rgba(247,247,250,.12);
+      font-family: var(--mono);
+      font-size: 10px;
+      letter-spacing: .18em;
+      text-transform: uppercase;
+      color: rgba(247,247,250,.55);
+    }
+    .wrap {
+      display: grid;
+      grid-template-columns: 168px minmax(0, 1fr) 280px;
+      grid-template-rows: auto minmax(280px, 1fr) auto auto;
+      min-height: calc(100vh - 29px);
+    }
+    .rail {
+      grid-column: 1;
+      grid-row: 1 / 4;
+      padding: 20px 14px;
+      border-right: 1px solid rgba(247,247,250,.12);
+    }
+    .rail__mark {
+      font-size: 9px;
+      letter-spacing: .28em;
+      text-transform: uppercase;
+      opacity: .62;
+    }
+    .rail__brand {
+      font-family: var(--display);
+      font-size: 28px;
+      line-height: .8;
+      letter-spacing: -.04em;
+      margin: 6px 0 28px;
+    }
+    .rail dt {
+      font-size: 9px;
+      letter-spacing: .22em;
+      text-transform: uppercase;
+      opacity: .5;
+      margin-top: 16px;
+    }
+    .rail dd { margin: 4px 0 0; }
+    .rail .q { font-family: var(--display); font-size: 16px; letter-spacing: -.02em; line-height: 1.2; }
+
+    .head {
+      grid-column: 2;
+      grid-row: 1;
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-end;
+      gap: 16px;
+      padding: 16px 18px 10px;
+    }
+    .kicker {
+      font-size: 10px;
+      letter-spacing: .28em;
+      text-transform: uppercase;
+      color: rgba(247,247,250,.5);
+    }
+    h1 {
+      margin: 4px 0 0;
+      font-family: var(--display);
+      font-size: clamp(28px, 3.4vw, 44px);
+      font-weight: 400;
+      line-height: .9;
+      letter-spacing: -.03em;
+    }
+    .toolbar { display: flex; gap: 8px; flex-wrap: wrap; }
+    .btn-void {
+      min-height: 32px;
+      padding: 6px 10px;
+      background: transparent;
+      color: var(--white);
+      border: 1px solid rgba(247,247,250,.35);
+    }
+    .btn-void.is-on { background: var(--white); color: var(--ink); border-color: var(--white); }
+
+    .plate {
+      grid-column: 2;
+      grid-row: 2;
+      position: relative;
+      margin: 0 18px 16px;
+      min-height: 280px;
+      background: var(--cobalt);
+      border: 1px solid var(--cobalt);
+      overflow: hidden;
+    }
+    .plate svg { position: absolute; inset: 0; width: 100%; height: 100%; }
+    .rib { fill: none; stroke: #f7f7fa; stroke-width: 1; stroke-opacity: .28; }
+    .inscribe {
+      position: relative;
+      z-index: 1;
+      margin: 0;
+      padding: 36px 16px 0;
+      font-size: 13px;
+      font-weight: 500;
+      letter-spacing: .34em;
+      text-transform: uppercase;
+      text-align: center;
+    }
+    .strata {
+      position: relative;
+      z-index: 1;
+      padding: 28px 24px 20px 72px;
+      display: grid;
+      gap: 18px;
+    }
+    .row {
+      display: grid;
+      grid-template-columns: 72px 1fr;
+      gap: 12px;
+      align-items: baseline;
+      margin-left: -72px;
+    }
+    .row .s {
+      font-size: 9px;
+      letter-spacing: .16em;
+      text-transform: uppercase;
+      opacity: .62;
+    }
+    .mark { font-family: var(--mono); font-size: 10px; opacity: .7; }
+    .mark b { font-family: var(--sans); font-weight: 400; font-size: 13px; color: var(--white); }
+    .tick { position: absolute; width: 10px; height: 10px; }
+    .tick::before, .tick::after { content: ""; position: absolute; background: var(--white); }
+    .tick::before { width: 10px; height: 1px; top: 4.5px; }
+    .tick::after { width: 1px; height: 10px; left: 4.5px; }
+    .tick--tl { top: -5px; left: -5px; }
+    .tick--tr { top: -5px; right: -5px; }
+    .tick--bl { bottom: -5px; left: -5px; }
+    .tick--br { bottom: -5px; right: -5px; }
+
+    .folio {
+      grid-column: 3;
+      grid-row: 1 / 4;
+      background: var(--paper);
+      color: var(--ink);
+      padding: 16px;
+      border-left: 1px solid rgba(247,247,250,.12);
+    }
+    .folio .role {
+      font-size: 10px;
+      letter-spacing: .22em;
+      text-transform: uppercase;
+      color: var(--quiet);
+    }
+    .folio h2 {
+      margin: 6px 0 16px;
+      font-family: var(--display);
+      font-size: 26px;
+      font-weight: 400;
+      letter-spacing: -.03em;
+    }
+    .folio dt {
+      font-size: 9px;
+      letter-spacing: .16em;
+      text-transform: uppercase;
+      color: var(--quiet);
+      margin-top: 12px;
+    }
+    .folio dd { margin: 3px 0 0; }
+
+    .ledger {
+      grid-column: 2 / 4;
+      grid-row: 3;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: 16px;
+      padding: 12px 18px;
+      background: var(--stone);
+      color: var(--ink);
+    }
+    .gens { display: flex; gap: 6px; }
+    .gens button {
+      min-height: 32px;
+      padding: 6px 12px;
+      border: 1px solid var(--ink);
+      background: transparent;
+      color: var(--ink);
+      font-family: var(--mono);
+      font-size: 11px;
+    }
+    .gens button[aria-current="true"] { background: var(--ink); color: var(--stone); }
+    .ledger p { margin: 8px 0 0; font-size: 12px; color: var(--quiet); }
+    .acts { display: grid; gap: 8px; min-width: 168px; }
+    .btn-ink {
+      min-height: 40px;
+      padding: 8px 12px;
+      background: var(--ink);
+      color: var(--white);
+      border: 1px solid var(--ink);
+    }
+    .btn-quiet {
+      min-height: 40px;
+      padding: 8px 12px;
+      background: transparent;
+      color: var(--ink);
+      border: 1px solid var(--ink);
+    }
+
+    .swatches {
+      grid-column: 1 / 4;
+      grid-row: 4;
+      display: grid;
+      grid-template-columns: repeat(6, 1fr);
+      border-top: 1px solid rgba(247,247,250,.12);
+    }
+    .swatches i {
+      display: block;
+      min-height: 56px;
+    }
+    .swatches span {
+      display: block;
+      padding: 8px 10px 12px;
+      font-family: var(--mono);
+      font-size: 10px;
+      letter-spacing: .08em;
+      background: var(--void);
+    }
+
+    @media (max-width: 900px) {
+      .wrap { display: flex; flex-direction: column; }
+      .folio { border-left: 0; border-top: 1px solid var(--rule); }
+      .swatches { grid-template-columns: repeat(3, 1fr); }
+    }
+  </style>
+</head>
+<body>
+  <p class="flag">Illustrative example · Machine Renaissance tokens applied · not a live AOS run</p>
+
+  <div class="wrap">
+    <aside class="rail">
+      <div class="rail__mark">Plate III</div>
+      <div class="rail__brand">AOS</div>
+      <dl>
+        <dt>Research question</dt>
+        <dd class="q">How should AOS inherit a worker mutation after a failed evidence pass?</dd>
+        <dt>Generation</dt>
+        <dd>GEN 01 · Execution gate</dd>
+        <dt>Run state</dt>
+        <dd>under evaluation · running</dd>
+      </dl>
+    </aside>
+
+    <header class="head">
+      <div>
+        <div class="kicker">Genealogy of intelligence</div>
+        <h1>Lineage of Minds</h1>
+      </div>
+      <div class="toolbar">
+        <button class="btn-void" type="button">Pause run</button>
+        <button class="btn-void is-on" type="button">Focus</button>
+        <button class="btn-void" type="button">Details</button>
+      </div>
+    </header>
+
+    <section class="plate" aria-label="Cobalt field">
+      <span class="tick tick--tl"></span>
+      <span class="tick tick--tr"></span>
+      <span class="tick tick--bl"></span>
+      <span class="tick tick--br"></span>
+      <svg viewBox="0 0 980 280" preserveAspectRatio="none" aria-hidden="true">
+        <path class="rib" d="M 20 20 C 260 70, 720 70, 960 20" />
+        <path class="rib" d="M 20 70 C 260 130, 720 130, 960 70" />
+        <path class="rib" d="M 20 120 C 260 190, 720 190, 960 120" />
+        <path class="rib" d="M 20 170 C 260 250, 720 250, 960 170" />
+        <path class="rib" d="M 20 220 C 260 300, 720 300, 960 220" />
+      </svg>
+      <p class="inscribe">Inherit after evidence</p>
+      <div class="strata">
+        <div class="row"><span class="s">Goal</span><span class="mark">01 · Objective &nbsp; <b>Inherit mutations only after evidence</b></span></div>
+        <div class="row"><span class="s">Lead</span><span class="mark">02 · Planner &nbsp; <b>fable-aos</b></span></div>
+        <div class="row"><span class="s">Workers</span><span class="mark">07 · Execution manager &nbsp; <b>grok46-cursor-aos</b></span></div>
+        <div class="row"><span class="s">Change</span><span class="mark">10 · Decision &nbsp; <b>Inherit GEN 01 or roll back</b></span></div>
+      </div>
+    </section>
+
+    <aside class="folio">
+      <div class="role">GEN 01 · worker</div>
+      <h2>grok46-cursor-aos</h2>
+      <dl>
+        <dt>Role</dt>
+        <dd>Execution manager</dd>
+        <dt>Exact model</dt>
+        <dd>cursor-grok-4.6-high</dd>
+        <dt>Present task</dt>
+        <dd>Hold the review gate. Report blockers. Do not merge unreviewed UI.</dd>
+        <dt>Last inherited change</dt>
+        <dd>Inserted by mutation</dd>
+      </dl>
+    </aside>
+
+    <footer class="ledger">
+      <div>
+        <div class="gens">
+          <button type="button">GEN 00</button>
+          <button type="button" aria-current="true">GEN 01</button>
+          <button type="button">GEN 02</button>
+        </div>
+        <p>Candidate vs GEN 00 · Mutations stop for evidence review · 1.18× · rollback GEN 00</p>
+      </div>
+      <div class="acts">
+        <button class="btn-ink" type="button">Review mutation</button>
+        <button class="btn-quiet" type="button">Reset demo</button>
+      </div>
+    </footer>
+
+    <div class="swatches" aria-label="Palette">
+      <div><i style="background:#07080C"></i><span>void #07080C</span></div>
+      <div><i style="background:#101CFF"></i><span>cobalt #101CFF</span></div>
+      <div><i style="background:#F7F7FA"></i><span>white #F7F7FA</span></div>
+      <div><i style="background:#FBFBFC"></i><span>paper #FBFBFC</span></div>
+      <div><i style="background:#F2F3F6"></i><span>stone #F2F3F6</span></div>
+      <div><i style="background:#12141A"></i><span>ink #12141A</span></div>
+    </div>
+  </div>
+</body>
+</html>

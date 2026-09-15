@@ -1,0 +1,3790 @@
+{
+  "version": 1,
+  "projects": [
+    {
+      "id": "prj_db94e0a0e0",
+      "name": "Local research",
+      "createdAt": "2026-09-13T05:36:38.931Z",
+      "maxConcurrency": 2,
+      "maxRetries": 1,
+      "retentionDays": 30
+    }
+  ],
+  "goals": [
+    {
+      "id": "gol_e9db93ad36",
+      "projectId": "prj_db94e0a0e0",
+      "createdAt": "2026-09-13T05:38:15.470Z",
+      "status": "planned",
+      "prompt": "Determine whether delayed feedback destabilises bidirectional nerve-interface coupling, and propose the next experiment. Success is a bounded claim with explicit uncertainty. Scope excludes clinical deployment.",
+      "contextPaths": [],
+      "ambiguities": [
+        {
+          "code": "sources",
+          "severity": "material",
+          "detail": "No sources or context files were supplied."
+        }
+      ],
+      "questions": [
+        {
+          "id": "q_6be3df0100",
+          "code": "sources",
+          "prompt": "Which documents, datasets, or prior runs should bound the evidence?",
+          "answer": null
+        }
+      ],
+      "plan": {
+        "title": "Determine whether delayed feedback destabilises bidirectional nerve-interface coupling, and p...",
+        "ambiguities": [
+          {
+            "code": "sources",
+            "severity": "material",
+            "detail": "No sources or context files were supplied."
+          }
+        ],
+        "branches": [
+          {
+            "key": "primary",
+            "title": "Primary analysis",
+            "summary": "Extract the strongest supported claim and its limits from the stated objective."
+          },
+          {
+            "key": "independent",
+            "title": "Independent check",
+            "summary": "Reproduce the claim from a second angle and record disagreements."
+          },
+          {
+            "key": "mechanism",
+            "title": "Mechanism review",
+            "summary": "Compare candidate mechanisms and name the conditions under which each fails."
+          }
+        ],
+        "tasks": [
+          {
+            "id": "tsk_ee79b5a179",
+            "parentId": null,
+            "title": "Interpret objective",
+            "kind": "intake",
+            "summary": "Store the prompt, ambiguities, and the reviewable work plan.",
+            "branch": "root",
+            "worker": "local",
+            "requiresApproval": false,
+            "dependencyPolicy": "all_succeeded",
+            "maxRetries": 1,
+            "optional": false
+          },
+          {
+            "id": "tsk_801b9418a7",
+            "parentId": "tsk_ee79b5a179",
+            "title": "Primary analysis",
+            "kind": "research",
+            "summary": "Extract the strongest supported claim and its limits from the stated objective.",
+            "branch": "primary",
+            "worker": "local",
+            "requiresApproval": false,
+            "dependencyPolicy": "all_succeeded",
+            "maxRetries": 1,
+            "optional": false
+          },
+          {
+            "id": "tsk_a72a0694b5",
+            "parentId": "tsk_ee79b5a179",
+            "title": "Independent check",
+            "kind": "research",
+            "summary": "Reproduce the claim from a second angle and record disagreements.",
+            "branch": "independent",
+            "worker": "local",
+            "requiresApproval": false,
+            "dependencyPolicy": "all_succeeded",
+            "maxRetries": 1,
+            "optional": false
+          },
+          {
+            "id": "tsk_41d5d76705",
+            "parentId": "tsk_ee79b5a179",
+            "title": "Mechanism review",
+            "kind": "research",
+            "summary": "Compare candidate mechanisms and name the conditions under which each fails.",
+            "branch": "mechanism",
+            "worker": "local",
+            "requiresApproval": false,
+            "dependencyPolicy": "all_succeeded",
+            "maxRetries": 1,
+            "optional": false
+          },
+          {
+            "id": "tsk_bdfe7d7a7b",
+            "parentId": "tsk_ee79b5a179",
+            "title": "Adversarial check",
+            "kind": "critique",
+            "summary": "Test the highest-leverage objection against the branch findings.",
+            "branch": "critique",
+            "worker": "local",
+            "requiresApproval": false,
+            "dependencyPolicy": "all_terminal",
+            "maxRetries": 1,
+            "optional": false
+          },
+          {
+            "id": "tsk_0d9d57c6f9",
+            "parentId": "tsk_ee79b5a179",
+            "title": "Synthesize decision",
+            "kind": "synthesis",
+            "summary": "Combine evidence into a decision record with provenance.",
+            "branch": "root",
+            "worker": "local",
+            "requiresApproval": false,
+            "dependencyPolicy": "all_terminal",
+            "maxRetries": 1,
+            "optional": false
+          },
+          {
+            "id": "tsk_2d6b07c72e",
+            "parentId": "tsk_ee79b5a179",
+            "title": "Write retrospective",
+            "kind": "retrospective",
+            "summary": "Record what failed, why, and a proposed improvement. Proposal-only until approved.",
+            "branch": "root",
+            "worker": "local",
+            "requiresApproval": false,
+            "dependencyPolicy": "all_terminal",
+            "maxRetries": 1,
+            "optional": false
+          },
+          {
+            "id": "tsk_907cb65c97",
+            "parentId": "tsk_2d6b07c72e",
+            "title": "Apply improvement proposal",
+            "kind": "adopt",
+            "summary": "Approval gate. No self-modification until an operator accepts the proposal.",
+            "branch": "root",
+            "worker": "local",
+            "requiresApproval": true,
+            "dependencyPolicy": "all_succeeded",
+            "maxRetries": 1,
+            "optional": false
+          }
+        ],
+        "dependencies": [
+          {
+            "id": "dep_51505a714c",
+            "taskId": "tsk_801b9418a7",
+            "dependsOnTaskId": "tsk_ee79b5a179"
+          },
+          {
+            "id": "dep_bc2ca686c2",
+            "taskId": "tsk_a72a0694b5",
+            "dependsOnTaskId": "tsk_ee79b5a179"
+          },
+          {
+            "id": "dep_c11231ac41",
+            "taskId": "tsk_41d5d76705",
+            "dependsOnTaskId": "tsk_ee79b5a179"
+          },
+          {
+            "id": "dep_988c19e853",
+            "taskId": "tsk_bdfe7d7a7b",
+            "dependsOnTaskId": "tsk_801b9418a7"
+          },
+          {
+            "id": "dep_ebc8d82fca",
+            "taskId": "tsk_bdfe7d7a7b",
+            "dependsOnTaskId": "tsk_a72a0694b5"
+          },
+          {
+            "id": "dep_a8e136b60f",
+            "taskId": "tsk_bdfe7d7a7b",
+            "dependsOnTaskId": "tsk_41d5d76705"
+          },
+          {
+            "id": "dep_d0933f1cd3",
+            "taskId": "tsk_0d9d57c6f9",
+            "dependsOnTaskId": "tsk_bdfe7d7a7b"
+          },
+          {
+            "id": "dep_b285496667",
+            "taskId": "tsk_2d6b07c72e",
+            "dependsOnTaskId": "tsk_0d9d57c6f9"
+          },
+          {
+            "id": "dep_1ddd88ec26",
+            "taskId": "tsk_907cb65c97",
+            "dependsOnTaskId": "tsk_2d6b07c72e"
+          }
+        ]
+      }
+    },
+    {
+      "id": "gol_3b1c8283d4",
+      "projectId": "prj_db94e0a0e0",
+      "createdAt": "2026-09-13T05:56:56.330Z",
+      "status": "planned",
+      "prompt": "Verify local deterministic orchestration. Success is one persisted decision and retrospective. Scope excludes external providers and network calls.",
+      "contextPaths": [],
+      "ambiguities": [
+        {
+          "code": "sources",
+          "severity": "material",
+          "detail": "No sources or context files were supplied."
+        }
+      ],
+      "questions": [
+        {
+          "id": "q_cb8033efdd",
+          "code": "sources",
+          "prompt": "Which documents, datasets, or prior runs should bound the evidence?",
+          "answer": null
+        }
+      ],
+      "plan": {
+        "title": "Verify local deterministic orchestration. Success is one persisted decision and retrospective...",
+        "ambiguities": [
+          {
+            "code": "sources",
+            "severity": "material",
+            "detail": "No sources or context files were supplied."
+          }
+        ],
+        "branches": [
+          {
+            "key": "primary",
+            "title": "Primary analysis",
+            "summary": "Extract the strongest supported claim and its limits from the stated objective."
+          },
+          {
+            "key": "independent",
+            "title": "Independent check",
+            "summary": "Reproduce the claim from a second angle and record disagreements."
+          },
+          {
+            "key": "experiment",
+            "title": "Next experiment",
+            "summary": "Propose the cheapest test that would change the current conclusion."
+          }
+        ],
+        "tasks": [
+          {
+            "id": "tsk_80166cbf07",
+            "parentId": null,
+            "title": "Interpret objective",
+            "kind": "intake",
+            "summary": "Store the prompt, ambiguities, and the reviewable work plan.",
+            "branch": "root",
+            "worker": "local",
+            "requiresApproval": false,
+            "dependencyPolicy": "all_succeeded",
+            "maxRetries": 1,
+            "optional": false
+          },
+          {
+            "id": "tsk_e3ee41a6f6",
+            "parentId": "tsk_80166cbf07",
+            "title": "Primary analysis",
+            "kind": "research",
+            "summary": "Extract the strongest supported claim and its limits from the stated objective.",
+            "branch": "primary",
+            "worker": "local",
+            "requiresApproval": false,
+            "dependencyPolicy": "all_succeeded",
+            "maxRetries": 1,
+            "optional": false
+          },
+          {
+            "id": "tsk_60357409d4",
+            "parentId": "tsk_80166cbf07",
+            "title": "Independent check",
+            "kind": "research",
+            "summary": "Reproduce the claim from a second angle and record disagreements.",
+            "branch": "independent",
+            "worker": "local",
+            "requiresApproval": false,
+            "dependencyPolicy": "all_succeeded",
+            "maxRetries": 1,
+            "optional": false
+          },
+          {
+            "id": "tsk_f68fd4758f",
+            "parentId": "tsk_80166cbf07",
+            "title": "Next experiment",
+            "kind": "research",
+            "summary": "Propose the cheapest test that would change the current conclusion.",
+            "branch": "experiment",
+            "worker": "local",
+            "requiresApproval": false,
+            "dependencyPolicy": "all_succeeded",
+            "maxRetries": 1,
+            "optional": false
+          },
+          {
+            "id": "tsk_681a328187",
+            "parentId": "tsk_80166cbf07",
+            "title": "Adversarial check",
+            "kind": "critique",
+            "summary": "Test the highest-leverage objection against the branch findings.",
+            "branch": "critique",
+            "worker": "local",
+            "requiresApproval": false,
+            "dependencyPolicy": "all_terminal",
+            "maxRetries": 1,
+            "optional": false
+          },
+          {
+            "id": "tsk_e3ecfa070f",
+            "parentId": "tsk_80166cbf07",
+            "title": "Synthesize decision",
+            "kind": "synthesis",
+            "summary": "Combine evidence into a decision record with provenance.",
+            "branch": "root",
+            "worker": "local",
+            "requiresApproval": false,
+            "dependencyPolicy": "all_terminal",
+            "maxRetries": 1,
+            "optional": false
+          },
+          {
+            "id": "tsk_bbc35e492d",
+            "parentId": "tsk_80166cbf07",
+            "title": "Write retrospective",
+            "kind": "retrospective",
+            "summary": "Record what failed, why, and a proposed improvement. Proposal-only until approved.",
+            "branch": "root",
+            "worker": "local",
+            "requiresApproval": false,
+            "dependencyPolicy": "all_terminal",
+            "maxRetries": 1,
+            "optional": false
+          },
+          {
+            "id": "tsk_f5e4ebec41",
+            "parentId": "tsk_bbc35e492d",
+            "title": "Apply improvement proposal",
+            "kind": "adopt",
+            "summary": "Approval gate. No self-modification until an operator accepts the proposal.",
+            "branch": "root",
+            "worker": "local",
+            "requiresApproval": true,
+            "dependencyPolicy": "all_succeeded",
+            "maxRetries": 1,
+            "optional": false
+          }
+        ],
+        "dependencies": [
+          {
+            "id": "dep_98889c8674",
+            "taskId": "tsk_e3ee41a6f6",
+            "dependsOnTaskId": "tsk_80166cbf07"
+          },
+          {
+            "id": "dep_b3f2d52dec",
+            "taskId": "tsk_60357409d4",
+            "dependsOnTaskId": "tsk_80166cbf07"
+          },
+          {
+            "id": "dep_5b3234749f",
+            "taskId": "tsk_f68fd4758f",
+            "dependsOnTaskId": "tsk_80166cbf07"
+          },
+          {
+            "id": "dep_5b750d933b",
+            "taskId": "tsk_681a328187",
+            "dependsOnTaskId": "tsk_e3ee41a6f6"
+          },
+          {
+            "id": "dep_98f2bf2da3",
+            "taskId": "tsk_681a328187",
+            "dependsOnTaskId": "tsk_60357409d4"
+          },
+          {
+            "id": "dep_bcc210301f",
+            "taskId": "tsk_681a328187",
+            "dependsOnTaskId": "tsk_f68fd4758f"
+          },
+          {
+            "id": "dep_aef28f5c6b",
+            "taskId": "tsk_e3ecfa070f",
+            "dependsOnTaskId": "tsk_681a328187"
+          },
+          {
+            "id": "dep_8b9e7ff3ae",
+            "taskId": "tsk_bbc35e492d",
+            "dependsOnTaskId": "tsk_e3ecfa070f"
+          },
+          {
+            "id": "dep_f55ab4b077",
+            "taskId": "tsk_f5e4ebec41",
+            "dependsOnTaskId": "tsk_bbc35e492d"
+          }
+        ]
+      }
+    },
+    {
+      "id": "gol_3597019611",
+      "projectId": "prj_db94e0a0e0",
+      "createdAt": "2026-09-13T05:57:56.547Z",
+      "status": "planned",
+      "prompt": "Determine whether delayed feedback destabilises bidirectional coupling. Success is a bounded claim. Scope excludes clinical trials.",
+      "contextPaths": [],
+      "ambiguities": [
+        {
+          "code": "sources",
+          "severity": "material",
+          "detail": "No sources or context files were supplied."
+        }
+      ],
+      "questions": [
+        {
+          "id": "q_ee84f37558",
+          "code": "sources",
+          "prompt": "Which documents, datasets, or prior runs should bound the evidence?",
+          "answer": null
+        }
+      ],
+      "plan": {
+        "title": "Determine whether delayed feedback destabilises bidirectional coupling. Success is a bounded ...",
+        "ambiguities": [
+          {
+            "code": "sources",
+            "severity": "material",
+            "detail": "No sources or context files were supplied."
+          }
+        ],
+        "branches": [
+          {
+            "key": "primary",
+            "title": "Primary analysis",
+            "summary": "Extract the strongest supported claim and its limits from the stated objective."
+          },
+          {
+            "key": "independent",
+            "title": "Independent check",
+            "summary": "Reproduce the claim from a second angle and record disagreements."
+          },
+          {
+            "key": "mechanism",
+            "title": "Mechanism review",
+            "summary": "Compare candidate mechanisms and name the conditions under which each fails."
+          }
+        ],
+        "tasks": [
+          {
+            "id": "tsk_bff1308952",
+            "parentId": null,
+            "title": "Interpret objective",
+            "kind": "intake",
+            "summary": "Store the prompt, ambiguities, and the reviewable work plan.",
+            "branch": "root",
+            "worker": "local",
+            "requiresApproval": false,
+            "dependencyPolicy": "all_succeeded",
+            "maxRetries": 1,
+            "optional": false
+          },
+          {
+            "id": "tsk_28f10663ec",
+            "parentId": "tsk_bff1308952",
+            "title": "Primary analysis",
+            "kind": "research",
+            "summary": "Extract the strongest supported claim and its limits from the stated objective.",
+            "branch": "primary",
+            "worker": "local",
+            "requiresApproval": false,
+            "dependencyPolicy": "all_succeeded",
+            "maxRetries": 1,
+            "optional": false
+          },
+          {
+            "id": "tsk_aa1b3a10c1",
+            "parentId": "tsk_bff1308952",
+            "title": "Independent check",
+            "kind": "research",
+            "summary": "Reproduce the claim from a second angle and record disagreements.",
+            "branch": "independent",
+            "worker": "local",
+            "requiresApproval": false,
+            "dependencyPolicy": "all_succeeded",
+            "maxRetries": 1,
+            "optional": false
+          },
+          {
+            "id": "tsk_0e851281f1",
+            "parentId": "tsk_bff1308952",
+            "title": "Mechanism review",
+            "kind": "research",
+            "summary": "Compare candidate mechanisms and name the conditions under which each fails.",
+            "branch": "mechanism",
+            "worker": "local",
+            "requiresApproval": false,
+            "dependencyPolicy": "all_succeeded",
+            "maxRetries": 1,
+            "optional": false
+          },
+          {
+            "id": "tsk_9903f43632",
+            "parentId": "tsk_bff1308952",
+            "title": "Adversarial check",
+            "kind": "critique",
+            "summary": "Test the highest-leverage objection against the branch findings.",
+            "branch": "critique",
+            "worker": "local",
+            "requiresApproval": false,
+            "dependencyPolicy": "all_terminal",
+            "maxRetries": 1,
+            "optional": false
+          },
+          {
+            "id": "tsk_4647b152ec",
+            "parentId": "tsk_bff1308952",
+            "title": "Synthesize decision",
+            "kind": "synthesis",
+            "summary": "Combine evidence into a decision record with provenance.",
+            "branch": "root",
+            "worker": "local",
+            "requiresApproval": false,
+            "dependencyPolicy": "all_terminal",
+            "maxRetries": 1,
+            "optional": false
+          },
+          {
+            "id": "tsk_6d011e97be",
+            "parentId": "tsk_bff1308952",
+            "title": "Write retrospective",
+            "kind": "retrospective",
+            "summary": "Record what failed, why, and a proposed improvement. Proposal-only until approved.",
+            "branch": "root",
+            "worker": "local",
+            "requiresApproval": false,
+            "dependencyPolicy": "all_terminal",
+            "maxRetries": 1,
+            "optional": false
+          },
+          {
+            "id": "tsk_d8c7e32f1f",
+            "parentId": "tsk_6d011e97be",
+            "title": "Apply improvement proposal",
+            "kind": "adopt",
+            "summary": "Approval gate. No self-modification until an operator accepts the proposal.",
+            "branch": "root",
+            "worker": "local",
+            "requiresApproval": true,
+            "dependencyPolicy": "all_succeeded",
+            "maxRetries": 1,
+            "optional": false
+          }
+        ],
+        "dependencies": [
+          {
+            "id": "dep_a863b17530",
+            "taskId": "tsk_28f10663ec",
+            "dependsOnTaskId": "tsk_bff1308952"
+          },
+          {
+            "id": "dep_77a7c44292",
+            "taskId": "tsk_aa1b3a10c1",
+            "dependsOnTaskId": "tsk_bff1308952"
+          },
+          {
+            "id": "dep_0972ded186",
+            "taskId": "tsk_0e851281f1",
+            "dependsOnTaskId": "tsk_bff1308952"
+          },
+          {
+            "id": "dep_df69fd32b4",
+            "taskId": "tsk_9903f43632",
+            "dependsOnTaskId": "tsk_28f10663ec"
+          },
+          {
+            "id": "dep_08c7b539a4",
+            "taskId": "tsk_9903f43632",
+            "dependsOnTaskId": "tsk_aa1b3a10c1"
+          },
+          {
+            "id": "dep_7a5939f58c",
+            "taskId": "tsk_9903f43632",
+            "dependsOnTaskId": "tsk_0e851281f1"
+          },
+          {
+            "id": "dep_f9cb4cccf7",
+            "taskId": "tsk_4647b152ec",
+            "dependsOnTaskId": "tsk_9903f43632"
+          },
+          {
+            "id": "dep_ecffdcd29f",
+            "taskId": "tsk_6d011e97be",
+            "dependsOnTaskId": "tsk_4647b152ec"
+          },
+          {
+            "id": "dep_f77efa9f3b",
+            "taskId": "tsk_d8c7e32f1f",
+            "dependsOnTaskId": "tsk_6d011e97be"
+          }
+        ]
+      }
+    }
+  ],
+  "runs": [
+    {
+      "id": "run_25cab09193",
+      "projectId": "prj_db94e0a0e0",
+      "goalId": "gol_e9db93ad36",
+      "status": "completed",
+      "createdAt": "2026-09-13T05:38:15.534Z",
+      "updatedAt": "2026-09-13T05:38:15.859Z",
+      "startedAt": "2026-09-13T05:38:15.534Z",
+      "endedAt": "2026-09-13T05:38:15.859Z",
+      "objective": "Determine whether delayed feedback destabilises bidirectional nerve-interface coupling, and propose the next experiment. Success is a bounded claim with explicit uncertainty. Scope excludes clinical deployment.",
+      "maxConcurrency": 2
+    },
+    {
+      "id": "run_a98a8c6007",
+      "projectId": "prj_db94e0a0e0",
+      "goalId": "gol_3b1c8283d4",
+      "status": "awaiting_approval",
+      "createdAt": "2026-09-13T05:57:02.338Z",
+      "updatedAt": "2026-09-13T05:57:02.358Z",
+      "startedAt": "2026-09-13T05:57:02.338Z",
+      "endedAt": null,
+      "objective": "Verify local deterministic orchestration. Success is one persisted decision and retrospective. Scope excludes external providers and network calls.",
+      "maxConcurrency": 2
+    },
+    {
+      "id": "run_a71f8d84f5",
+      "projectId": "prj_db94e0a0e0",
+      "goalId": "gol_3597019611",
+      "status": "awaiting_approval",
+      "createdAt": "2026-09-13T05:57:58.560Z",
+      "updatedAt": "2026-09-13T05:57:58.576Z",
+      "startedAt": "2026-09-13T05:57:58.560Z",
+      "endedAt": null,
+      "objective": "Determine whether delayed feedback destabilises bidirectional coupling. Success is a bounded claim. Scope excludes clinical trials.",
+      "maxConcurrency": 2
+    }
+  ],
+  "tasks": [
+    {
+      "id": "tsk_b7cf217418",
+      "parentId": null,
+      "title": "Interpret objective",
+      "kind": "intake",
+      "summary": "Store the prompt, ambiguities, and the reviewable work plan.",
+      "branch": "root",
+      "worker": "local",
+      "requiresApproval": false,
+      "dependencyPolicy": "all_succeeded",
+      "maxRetries": 1,
+      "optional": false,
+      "runId": "run_25cab09193",
+      "projectId": "prj_db94e0a0e0",
+      "goalId": "gol_e9db93ad36",
+      "status": "succeeded",
+      "attempts": 1,
+      "agentId": "agt_c13f6d72db",
+      "workspace": "/Users/anon5376/Projects/Agentic Orchestration System/.aos/workspaces/run_25cab09193/tsk_b7cf217418",
+      "output": {
+        "summary": "Stored the original prompt and the reviewable plan.",
+        "artifacts": [
+          "interpretation.json"
+        ]
+      },
+      "error": null,
+      "startedAt": "2026-09-13T05:38:15.600Z",
+      "endedAt": "2026-09-13T05:38:15.601Z"
+    },
+    {
+      "id": "tsk_f121025618",
+      "parentId": "tsk_b7cf217418",
+      "title": "Primary analysis",
+      "kind": "research",
+      "summary": "Extract the strongest supported claim and its limits from the stated objective.",
+      "branch": "primary",
+      "worker": "local",
+      "requiresApproval": false,
+      "dependencyPolicy": "all_succeeded",
+      "maxRetries": 1,
+      "optional": false,
+      "runId": "run_25cab09193",
+      "projectId": "prj_db94e0a0e0",
+      "goalId": "gol_e9db93ad36",
+      "status": "succeeded",
+      "attempts": 1,
+      "agentId": "agt_6341df82ef",
+      "workspace": "/Users/anon5376/Projects/Agentic Orchestration System/.aos/workspaces/run_25cab09193/tsk_f121025618",
+      "output": {
+        "summary": "Primary analysis: a bounded reading of the objective is internally consistent under the stated assumptions.",
+        "artifacts": [
+          "finding.json"
+        ]
+      },
+      "error": null,
+      "startedAt": "2026-09-13T05:38:15.601Z",
+      "endedAt": "2026-09-13T05:38:15.602Z"
+    },
+    {
+      "id": "tsk_65964151ee",
+      "parentId": "tsk_b7cf217418",
+      "title": "Independent check",
+      "kind": "research",
+      "summary": "Reproduce the claim from a second angle and record disagreements.",
+      "branch": "independent",
+      "worker": "local",
+      "requiresApproval": false,
+      "dependencyPolicy": "all_succeeded",
+      "maxRetries": 1,
+      "optional": false,
+      "runId": "run_25cab09193",
+      "projectId": "prj_db94e0a0e0",
+      "goalId": "gol_e9db93ad36",
+      "status": "succeeded",
+      "attempts": 1,
+      "agentId": "agt_64f744784d",
+      "workspace": "/Users/anon5376/Projects/Agentic Orchestration System/.aos/workspaces/run_25cab09193/tsk_65964151ee",
+      "output": {
+        "summary": "Independent check: a bounded reading of the objective is internally consistent under the stated assumptions.",
+        "artifacts": [
+          "finding.json"
+        ]
+      },
+      "error": null,
+      "startedAt": "2026-09-13T05:38:15.602Z",
+      "endedAt": "2026-09-13T05:38:15.603Z"
+    },
+    {
+      "id": "tsk_ff9663818a",
+      "parentId": "tsk_b7cf217418",
+      "title": "Mechanism review",
+      "kind": "research",
+      "summary": "Compare candidate mechanisms and name the conditions under which each fails.",
+      "branch": "mechanism",
+      "worker": "local",
+      "requiresApproval": false,
+      "dependencyPolicy": "all_succeeded",
+      "maxRetries": 1,
+      "optional": false,
+      "runId": "run_25cab09193",
+      "projectId": "prj_db94e0a0e0",
+      "goalId": "gol_e9db93ad36",
+      "status": "succeeded",
+      "attempts": 1,
+      "agentId": "agt_848021ded2",
+      "workspace": "/Users/anon5376/Projects/Agentic Orchestration System/.aos/workspaces/run_25cab09193/tsk_ff9663818a",
+      "output": {
+        "summary": "Mechanism review: a bounded reading of the objective is internally consistent under the stated assumptions.",
+        "artifacts": [
+          "finding.json"
+        ]
+      },
+      "error": null,
+      "startedAt": "2026-09-13T05:38:15.603Z",
+      "endedAt": "2026-09-13T05:38:15.603Z"
+    },
+    {
+      "id": "tsk_bcb23053e4",
+      "parentId": "tsk_b7cf217418",
+      "title": "Adversarial check",
+      "kind": "critique",
+      "summary": "Test the highest-leverage objection against the branch findings.",
+      "branch": "critique",
+      "worker": "local",
+      "requiresApproval": false,
+      "dependencyPolicy": "all_terminal",
+      "maxRetries": 1,
+      "optional": false,
+      "runId": "run_25cab09193",
+      "projectId": "prj_db94e0a0e0",
+      "goalId": "gol_e9db93ad36",
+      "status": "succeeded",
+      "attempts": 1,
+      "agentId": "agt_dcddc681f6",
+      "workspace": "/Users/anon5376/Projects/Agentic Orchestration System/.aos/workspaces/run_25cab09193/tsk_bcb23053e4",
+      "output": {
+        "summary": "An unmatched boundary condition remains: the current evidence does not test the claim under a shifted timing or source constraint.",
+        "artifacts": [
+          "critique.json"
+        ]
+      },
+      "error": null,
+      "startedAt": "2026-09-13T05:38:15.603Z",
+      "endedAt": "2026-09-13T05:38:15.604Z"
+    },
+    {
+      "id": "tsk_b49bf3bcdd",
+      "parentId": "tsk_b7cf217418",
+      "title": "Synthesize decision",
+      "kind": "synthesis",
+      "summary": "Combine evidence into a decision record with provenance.",
+      "branch": "root",
+      "worker": "local",
+      "requiresApproval": false,
+      "dependencyPolicy": "all_terminal",
+      "maxRetries": 1,
+      "optional": false,
+      "runId": "run_25cab09193",
+      "projectId": "prj_db94e0a0e0",
+      "goalId": "gol_e9db93ad36",
+      "status": "succeeded",
+      "attempts": 1,
+      "agentId": "agt_02bc49309f",
+      "workspace": "/Users/anon5376/Projects/Agentic Orchestration System/.aos/workspaces/run_25cab09193/tsk_b49bf3bcdd",
+      "output": {
+        "summary": "Primary analysis: a bounded reading of the objective is internally consistent under the stated assumptions.",
+        "artifacts": [
+          "decision.json"
+        ]
+      },
+      "error": null,
+      "startedAt": "2026-09-13T05:38:15.604Z",
+      "endedAt": "2026-09-13T05:38:15.604Z"
+    },
+    {
+      "id": "tsk_ff710d1ae9",
+      "parentId": "tsk_b7cf217418",
+      "title": "Write retrospective",
+      "kind": "retrospective",
+      "summary": "Record what failed, why, and a proposed improvement. Proposal-only until approved.",
+      "branch": "root",
+      "worker": "local",
+      "requiresApproval": false,
+      "dependencyPolicy": "all_terminal",
+      "maxRetries": 1,
+      "optional": false,
+      "runId": "run_25cab09193",
+      "projectId": "prj_db94e0a0e0",
+      "goalId": "gol_e9db93ad36",
+      "status": "succeeded",
+      "attempts": 1,
+      "agentId": "agt_5868803219",
+      "workspace": "/Users/anon5376/Projects/Agentic Orchestration System/.aos/workspaces/run_25cab09193/tsk_ff710d1ae9",
+      "output": {
+        "summary": "No task failed. Remaining uncertainty is an unmatched boundary condition in the evidence.",
+        "artifacts": [
+          "retrospective.json"
+        ]
+      },
+      "error": null,
+      "startedAt": "2026-09-13T05:38:15.604Z",
+      "endedAt": "2026-09-13T05:38:15.605Z"
+    },
+    {
+      "id": "tsk_05e4a2a423",
+      "parentId": "tsk_ff710d1ae9",
+      "title": "Apply improvement proposal",
+      "kind": "adopt",
+      "summary": "Approval gate. No self-modification until an operator accepts the proposal.",
+      "branch": "root",
+      "worker": "local",
+      "requiresApproval": true,
+      "dependencyPolicy": "all_succeeded",
+      "maxRetries": 1,
+      "optional": false,
+      "runId": "run_25cab09193",
+      "projectId": "prj_db94e0a0e0",
+      "goalId": "gol_e9db93ad36",
+      "status": "succeeded",
+      "attempts": 1,
+      "agentId": "agt_5a4f7a12fd",
+      "workspace": "/Users/anon5376/Projects/Agentic Orchestration System/.aos/workspaces/run_25cab09193/tsk_05e4a2a423",
+      "output": {
+        "summary": "Applied policy maxConcurrency=2",
+        "artifacts": [
+          "adoption.json"
+        ]
+      },
+      "error": null,
+      "startedAt": "2026-09-13T05:38:15.858Z",
+      "endedAt": "2026-09-13T05:38:15.858Z"
+    },
+    {
+      "id": "tsk_ccd98ac5c0",
+      "parentId": null,
+      "title": "Interpret objective",
+      "kind": "intake",
+      "summary": "Store the prompt, ambiguities, and the reviewable work plan.",
+      "branch": "root",
+      "worker": "local",
+      "requiresApproval": false,
+      "dependencyPolicy": "all_succeeded",
+      "maxRetries": 1,
+      "optional": false,
+      "runId": "run_a98a8c6007",
+      "projectId": "prj_db94e0a0e0",
+      "goalId": "gol_3b1c8283d4",
+      "status": "succeeded",
+      "attempts": 1,
+      "agentId": "agt_319807be74",
+      "workspace": "/Users/anon5376/Projects/Agentic Orchestration System/.aos/workspaces/run_a98a8c6007/tsk_ccd98ac5c0",
+      "output": {
+        "summary": "Stored the original prompt and the reviewable plan.",
+        "artifacts": [
+          "interpretation.json"
+        ]
+      },
+      "error": null,
+      "startedAt": "2026-09-13T05:57:02.353Z",
+      "endedAt": "2026-09-13T05:57:02.354Z"
+    },
+    {
+      "id": "tsk_b5db6d6fbd",
+      "parentId": "tsk_ccd98ac5c0",
+      "title": "Primary analysis",
+      "kind": "research",
+      "summary": "Extract the strongest supported claim and its limits from the stated objective.",
+      "branch": "primary",
+      "worker": "local",
+      "requiresApproval": false,
+      "dependencyPolicy": "all_succeeded",
+      "maxRetries": 1,
+      "optional": false,
+      "runId": "run_a98a8c6007",
+      "projectId": "prj_db94e0a0e0",
+      "goalId": "gol_3b1c8283d4",
+      "status": "succeeded",
+      "attempts": 1,
+      "agentId": "agt_75c562a84c",
+      "workspace": "/Users/anon5376/Projects/Agentic Orchestration System/.aos/workspaces/run_a98a8c6007/tsk_b5db6d6fbd",
+      "output": {
+        "summary": "Primary analysis: a bounded reading of the objective is internally consistent under the stated assumptions.",
+        "artifacts": [
+          "finding.json"
+        ]
+      },
+      "error": null,
+      "startedAt": "2026-09-13T05:57:02.355Z",
+      "endedAt": "2026-09-13T05:57:02.356Z"
+    },
+    {
+      "id": "tsk_0e0e14030e",
+      "parentId": "tsk_ccd98ac5c0",
+      "title": "Independent check",
+      "kind": "research",
+      "summary": "Reproduce the claim from a second angle and record disagreements.",
+      "branch": "independent",
+      "worker": "local",
+      "requiresApproval": false,
+      "dependencyPolicy": "all_succeeded",
+      "maxRetries": 1,
+      "optional": false,
+      "runId": "run_a98a8c6007",
+      "projectId": "prj_db94e0a0e0",
+      "goalId": "gol_3b1c8283d4",
+      "status": "succeeded",
+      "attempts": 1,
+      "agentId": "agt_38b7f9395a",
+      "workspace": "/Users/anon5376/Projects/Agentic Orchestration System/.aos/workspaces/run_a98a8c6007/tsk_0e0e14030e",
+      "output": {
+        "summary": "Independent check: a bounded reading of the objective is internally consistent under the stated assumptions.",
+        "artifacts": [
+          "finding.json"
+        ]
+      },
+      "error": null,
+      "startedAt": "2026-09-13T05:57:02.355Z",
+      "endedAt": "2026-09-13T05:57:02.356Z"
+    },
+    {
+      "id": "tsk_a1c4a2e42e",
+      "parentId": "tsk_ccd98ac5c0",
+      "title": "Next experiment",
+      "kind": "research",
+      "summary": "Propose the cheapest test that would change the current conclusion.",
+      "branch": "experiment",
+      "worker": "local",
+      "requiresApproval": false,
+      "dependencyPolicy": "all_succeeded",
+      "maxRetries": 1,
+      "optional": false,
+      "runId": "run_a98a8c6007",
+      "projectId": "prj_db94e0a0e0",
+      "goalId": "gol_3b1c8283d4",
+      "status": "succeeded",
+      "attempts": 1,
+      "agentId": "agt_f181c2d714",
+      "workspace": "/Users/anon5376/Projects/Agentic Orchestration System/.aos/workspaces/run_a98a8c6007/tsk_a1c4a2e42e",
+      "output": {
+        "summary": "Next experiment: a bounded reading of the objective is internally consistent under the stated assumptions.",
+        "artifacts": [
+          "finding.json"
+        ]
+      },
+      "error": null,
+      "startedAt": "2026-09-13T05:57:02.356Z",
+      "endedAt": "2026-09-13T05:57:02.356Z"
+    },
+    {
+      "id": "tsk_5dd2935e0b",
+      "parentId": "tsk_ccd98ac5c0",
+      "title": "Adversarial check",
+      "kind": "critique",
+      "summary": "Test the highest-leverage objection against the branch findings.",
+      "branch": "critique",
+      "worker": "local",
+      "requiresApproval": false,
+      "dependencyPolicy": "all_terminal",
+      "maxRetries": 1,
+      "optional": false,
+      "runId": "run_a98a8c6007",
+      "projectId": "prj_db94e0a0e0",
+      "goalId": "gol_3b1c8283d4",
+      "status": "succeeded",
+      "attempts": 1,
+      "agentId": "agt_0b398f442e",
+      "workspace": "/Users/anon5376/Projects/Agentic Orchestration System/.aos/workspaces/run_a98a8c6007/tsk_5dd2935e0b",
+      "output": {
+        "summary": "An unmatched boundary condition remains: the current evidence does not test the claim under a shifted timing or source constraint.",
+        "artifacts": [
+          "critique.json"
+        ]
+      },
+      "error": null,
+      "startedAt": "2026-09-13T05:57:02.357Z",
+      "endedAt": "2026-09-13T05:57:02.357Z"
+    },
+    {
+      "id": "tsk_5f70890a25",
+      "parentId": "tsk_ccd98ac5c0",
+      "title": "Synthesize decision",
+      "kind": "synthesis",
+      "summary": "Combine evidence into a decision record with provenance.",
+      "branch": "root",
+      "worker": "local",
+      "requiresApproval": false,
+      "dependencyPolicy": "all_terminal",
+      "maxRetries": 1,
+      "optional": false,
+      "runId": "run_a98a8c6007",
+      "projectId": "prj_db94e0a0e0",
+      "goalId": "gol_3b1c8283d4",
+      "status": "succeeded",
+      "attempts": 1,
+      "agentId": "agt_00190e8f26",
+      "workspace": "/Users/anon5376/Projects/Agentic Orchestration System/.aos/workspaces/run_a98a8c6007/tsk_5f70890a25",
+      "output": {
+        "summary": "Primary analysis: a bounded reading of the objective is internally consistent under the stated assumptions.",
+        "artifacts": [
+          "decision.json"
+        ]
+      },
+      "error": null,
+      "startedAt": "2026-09-13T05:57:02.357Z",
+      "endedAt": "2026-09-13T05:57:02.357Z"
+    },
+    {
+      "id": "tsk_6907f846ec",
+      "parentId": "tsk_ccd98ac5c0",
+      "title": "Write retrospective",
+      "kind": "retrospective",
+      "summary": "Record what failed, why, and a proposed improvement. Proposal-only until approved.",
+      "branch": "root",
+      "worker": "local",
+      "requiresApproval": false,
+      "dependencyPolicy": "all_terminal",
+      "maxRetries": 1,
+      "optional": false,
+      "runId": "run_a98a8c6007",
+      "projectId": "prj_db94e0a0e0",
+      "goalId": "gol_3b1c8283d4",
+      "status": "succeeded",
+      "attempts": 1,
+      "agentId": "agt_5aa73ff0d1",
+      "workspace": "/Users/anon5376/Projects/Agentic Orchestration System/.aos/workspaces/run_a98a8c6007/tsk_6907f846ec",
+      "output": {
+        "summary": "No task failed. Remaining uncertainty is an unmatched boundary condition in the evidence.",
+        "artifacts": [
+          "retrospective.json"
+        ]
+      },
+      "error": null,
+      "startedAt": "2026-09-13T05:57:02.358Z",
+      "endedAt": "2026-09-13T05:57:02.358Z"
+    },
+    {
+      "id": "tsk_961b8ffaa3",
+      "parentId": "tsk_6907f846ec",
+      "title": "Apply improvement proposal",
+      "kind": "adopt",
+      "summary": "Approval gate. No self-modification until an operator accepts the proposal.",
+      "branch": "root",
+      "worker": "local",
+      "requiresApproval": true,
+      "dependencyPolicy": "all_succeeded",
+      "maxRetries": 1,
+      "optional": false,
+      "runId": "run_a98a8c6007",
+      "projectId": "prj_db94e0a0e0",
+      "goalId": "gol_3b1c8283d4",
+      "status": "awaiting_approval",
+      "attempts": 0,
+      "agentId": "agt_1e2c84733b",
+      "workspace": null,
+      "output": null,
+      "error": null,
+      "startedAt": null,
+      "endedAt": null
+    },
+    {
+      "id": "tsk_f790be2a96",
+      "parentId": null,
+      "title": "Interpret objective",
+      "kind": "intake",
+      "summary": "Store the prompt, ambiguities, and the reviewable work plan.",
+      "branch": "root",
+      "worker": "local",
+      "requiresApproval": false,
+      "dependencyPolicy": "all_succeeded",
+      "maxRetries": 1,
+      "optional": false,
+      "runId": "run_a71f8d84f5",
+      "projectId": "prj_db94e0a0e0",
+      "goalId": "gol_3597019611",
+      "status": "succeeded",
+      "attempts": 1,
+      "agentId": "agt_15fcaf4b67",
+      "workspace": "/Users/anon5376/Projects/Agentic Orchestration System/.aos/workspaces/run_a71f8d84f5/tsk_f790be2a96",
+      "output": {
+        "summary": "Stored the original prompt and the reviewable plan.",
+        "artifacts": [
+          "interpretation.json"
+        ]
+      },
+      "error": null,
+      "startedAt": "2026-09-13T05:57:58.571Z",
+      "endedAt": "2026-09-13T05:57:58.572Z"
+    },
+    {
+      "id": "tsk_80c35fe35d",
+      "parentId": "tsk_f790be2a96",
+      "title": "Primary analysis",
+      "kind": "research",
+      "summary": "Extract the strongest supported claim and its limits from the stated objective.",
+      "branch": "primary",
+      "worker": "local",
+      "requiresApproval": false,
+      "dependencyPolicy": "all_succeeded",
+      "maxRetries": 1,
+      "optional": false,
+      "runId": "run_a71f8d84f5",
+      "projectId": "prj_db94e0a0e0",
+      "goalId": "gol_3597019611",
+      "status": "succeeded",
+      "attempts": 1,
+      "agentId": "agt_d91a1c1626",
+      "workspace": "/Users/anon5376/Projects/Agentic Orchestration System/.aos/workspaces/run_a71f8d84f5/tsk_80c35fe35d",
+      "output": {
+        "summary": "Primary analysis: a bounded reading of the objective is internally consistent under the stated assumptions.",
+        "artifacts": [
+          "finding.json"
+        ]
+      },
+      "error": null,
+      "startedAt": "2026-09-13T05:57:58.572Z",
+      "endedAt": "2026-09-13T05:57:58.573Z"
+    },
+    {
+      "id": "tsk_2b4f12fae6",
+      "parentId": "tsk_f790be2a96",
+      "title": "Independent check",
+      "kind": "research",
+      "summary": "Reproduce the claim from a second angle and record disagreements.",
+      "branch": "independent",
+      "worker": "local",
+      "requiresApproval": false,
+      "dependencyPolicy": "all_succeeded",
+      "maxRetries": 1,
+      "optional": false,
+      "runId": "run_a71f8d84f5",
+      "projectId": "prj_db94e0a0e0",
+      "goalId": "gol_3597019611",
+      "status": "succeeded",
+      "attempts": 1,
+      "agentId": "agt_862ff296ee",
+      "workspace": "/Users/anon5376/Projects/Agentic Orchestration System/.aos/workspaces/run_a71f8d84f5/tsk_2b4f12fae6",
+      "output": {
+        "summary": "Independent check: a bounded reading of the objective is internally consistent under the stated assumptions.",
+        "artifacts": [
+          "finding.json"
+        ]
+      },
+      "error": null,
+      "startedAt": "2026-09-13T05:57:58.573Z",
+      "endedAt": "2026-09-13T05:57:58.573Z"
+    },
+    {
+      "id": "tsk_9d3cd860cc",
+      "parentId": "tsk_f790be2a96",
+      "title": "Mechanism review",
+      "kind": "research",
+      "summary": "Compare candidate mechanisms and name the conditions under which each fails.",
+      "branch": "mechanism",
+      "worker": "local",
+      "requiresApproval": false,
+      "dependencyPolicy": "all_succeeded",
+      "maxRetries": 1,
+      "optional": false,
+      "runId": "run_a71f8d84f5",
+      "projectId": "prj_db94e0a0e0",
+      "goalId": "gol_3597019611",
+      "status": "succeeded",
+      "attempts": 1,
+      "agentId": "agt_a7babe8076",
+      "workspace": "/Users/anon5376/Projects/Agentic Orchestration System/.aos/workspaces/run_a71f8d84f5/tsk_9d3cd860cc",
+      "output": {
+        "summary": "Mechanism review: a bounded reading of the objective is internally consistent under the stated assumptions.",
+        "artifacts": [
+          "finding.json"
+        ]
+      },
+      "error": null,
+      "startedAt": "2026-09-13T05:57:58.573Z",
+      "endedAt": "2026-09-13T05:57:58.574Z"
+    },
+    {
+      "id": "tsk_f28eca9e66",
+      "parentId": "tsk_f790be2a96",
+      "title": "Adversarial check",
+      "kind": "critique",
+      "summary": "Test the highest-leverage objection against the branch findings.",
+      "branch": "critique",
+      "worker": "local",
+      "requiresApproval": false,
+      "dependencyPolicy": "all_terminal",
+      "maxRetries": 1,
+      "optional": false,
+      "runId": "run_a71f8d84f5",
+      "projectId": "prj_db94e0a0e0",
+      "goalId": "gol_3597019611",
+      "status": "succeeded",
+      "attempts": 1,
+      "agentId": "agt_192a33d73c",
+      "workspace": "/Users/anon5376/Projects/Agentic Orchestration System/.aos/workspaces/run_a71f8d84f5/tsk_f28eca9e66",
+      "output": {
+        "summary": "An unmatched boundary condition remains: the current evidence does not test the claim under a shifted timing or source constraint.",
+        "artifacts": [
+          "critique.json"
+        ]
+      },
+      "error": null,
+      "startedAt": "2026-09-13T05:57:58.574Z",
+      "endedAt": "2026-09-13T05:57:58.575Z"
+    },
+    {
+      "id": "tsk_6a5786811e",
+      "parentId": "tsk_f790be2a96",
+      "title": "Synthesize decision",
+      "kind": "synthesis",
+      "summary": "Combine evidence into a decision record with provenance.",
+      "branch": "root",
+      "worker": "local",
+      "requiresApproval": false,
+      "dependencyPolicy": "all_terminal",
+      "maxRetries": 1,
+      "optional": false,
+      "runId": "run_a71f8d84f5",
+      "projectId": "prj_db94e0a0e0",
+      "goalId": "gol_3597019611",
+      "status": "succeeded",
+      "attempts": 1,
+      "agentId": "agt_067a04566d",
+      "workspace": "/Users/anon5376/Projects/Agentic Orchestration System/.aos/workspaces/run_a71f8d84f5/tsk_6a5786811e",
+      "output": {
+        "summary": "Primary analysis: a bounded reading of the objective is internally consistent under the stated assumptions.",
+        "artifacts": [
+          "decision.json"
+        ]
+      },
+      "error": null,
+      "startedAt": "2026-09-13T05:57:58.575Z",
+      "endedAt": "2026-09-13T05:57:58.575Z"
+    },
+    {
+      "id": "tsk_d70a00dfa1",
+      "parentId": "tsk_f790be2a96",
+      "title": "Write retrospective",
+      "kind": "retrospective",
+      "summary": "Record what failed, why, and a proposed improvement. Proposal-only until approved.",
+      "branch": "root",
+      "worker": "local",
+      "requiresApproval": false,
+      "dependencyPolicy": "all_terminal",
+      "maxRetries": 1,
+      "optional": false,
+      "runId": "run_a71f8d84f5",
+      "projectId": "prj_db94e0a0e0",
+      "goalId": "gol_3597019611",
+      "status": "succeeded",
+      "attempts": 1,
+      "agentId": "agt_08fb2997ca",
+      "workspace": "/Users/anon5376/Projects/Agentic Orchestration System/.aos/workspaces/run_a71f8d84f5/tsk_d70a00dfa1",
+      "output": {
+        "summary": "No task failed. Remaining uncertainty is an unmatched boundary condition in the evidence.",
+        "artifacts": [
+          "retrospective.json"
+        ]
+      },
+      "error": null,
+      "startedAt": "2026-09-13T05:57:58.575Z",
+      "endedAt": "2026-09-13T05:57:58.576Z"
+    },
+    {
+      "id": "tsk_05c0906d89",
+      "parentId": "tsk_d70a00dfa1",
+      "title": "Apply improvement proposal",
+      "kind": "adopt",
+      "summary": "Approval gate. No self-modification until an operator accepts the proposal.",
+      "branch": "root",
+      "worker": "local",
+      "requiresApproval": true,
+      "dependencyPolicy": "all_succeeded",
+      "maxRetries": 1,
+      "optional": false,
+      "runId": "run_a71f8d84f5",
+      "projectId": "prj_db94e0a0e0",
+      "goalId": "gol_3597019611",
+      "status": "awaiting_approval",
+      "attempts": 0,
+      "agentId": "agt_33e243f556",
+      "workspace": null,
+      "output": null,
+      "error": null,
+      "startedAt": null,
+      "endedAt": null
+    }
+  ],
+  "agents": [
+    {
+      "id": "agt_c13f6d72db",
+      "projectId": "prj_db94e0a0e0",
+      "runId": "run_25cab09193",
+      "taskId": "tsk_b7cf217418",
+      "name": "Interpret objective",
+      "role": "intake",
+      "provider": "local",
+      "status": "complete",
+      "workspace": "/Users/anon5376/Projects/Agentic Orchestration System/.aos/workspaces/run_25cab09193/tsk_b7cf217418"
+    },
+    {
+      "id": "agt_6341df82ef",
+      "projectId": "prj_db94e0a0e0",
+      "runId": "run_25cab09193",
+      "taskId": "tsk_f121025618",
+      "name": "Primary analysis",
+      "role": "research",
+      "provider": "local",
+      "status": "complete",
+      "workspace": "/Users/anon5376/Projects/Agentic Orchestration System/.aos/workspaces/run_25cab09193/tsk_f121025618"
+    },
+    {
+      "id": "agt_64f744784d",
+      "projectId": "prj_db94e0a0e0",
+      "runId": "run_25cab09193",
+      "taskId": "tsk_65964151ee",
+      "name": "Independent check",
+      "role": "research",
+      "provider": "local",
+      "status": "complete",
+      "workspace": "/Users/anon5376/Projects/Agentic Orchestration System/.aos/workspaces/run_25cab09193/tsk_65964151ee"
+    },
+    {
+      "id": "agt_848021ded2",
+      "projectId": "prj_db94e0a0e0",
+      "runId": "run_25cab09193",
+      "taskId": "tsk_ff9663818a",
+      "name": "Mechanism review",
+      "role": "research",
+      "provider": "local",
+      "status": "complete",
+      "workspace": "/Users/anon5376/Projects/Agentic Orchestration System/.aos/workspaces/run_25cab09193/tsk_ff9663818a"
+    },
+    {
+      "id": "agt_dcddc681f6",
+      "projectId": "prj_db94e0a0e0",
+      "runId": "run_25cab09193",
+      "taskId": "tsk_bcb23053e4",
+      "name": "Adversarial check",
+      "role": "critique",
+      "provider": "local",
+      "status": "complete",
+      "workspace": "/Users/anon5376/Projects/Agentic Orchestration System/.aos/workspaces/run_25cab09193/tsk_bcb23053e4"
+    },
+    {
+      "id": "agt_02bc49309f",
+      "projectId": "prj_db94e0a0e0",
+      "runId": "run_25cab09193",
+      "taskId": "tsk_b49bf3bcdd",
+      "name": "Synthesize decision",
+      "role": "synthesis",
+      "provider": "local",
+      "status": "complete",
+      "workspace": "/Users/anon5376/Projects/Agentic Orchestration System/.aos/workspaces/run_25cab09193/tsk_b49bf3bcdd"
+    },
+    {
+      "id": "agt_5868803219",
+      "projectId": "prj_db94e0a0e0",
+      "runId": "run_25cab09193",
+      "taskId": "tsk_ff710d1ae9",
+      "name": "Write retrospective",
+      "role": "retrospective",
+      "provider": "local",
+      "status": "complete",
+      "workspace": "/Users/anon5376/Projects/Agentic Orchestration System/.aos/workspaces/run_25cab09193/tsk_ff710d1ae9"
+    },
+    {
+      "id": "agt_5a4f7a12fd",
+      "projectId": "prj_db94e0a0e0",
+      "runId": "run_25cab09193",
+      "taskId": "tsk_05e4a2a423",
+      "name": "Apply improvement proposal",
+      "role": "adopt",
+      "provider": "local",
+      "status": "complete",
+      "workspace": "/Users/anon5376/Projects/Agentic Orchestration System/.aos/workspaces/run_25cab09193/tsk_05e4a2a423"
+    },
+    {
+      "id": "agt_319807be74",
+      "projectId": "prj_db94e0a0e0",
+      "runId": "run_a98a8c6007",
+      "taskId": "tsk_ccd98ac5c0",
+      "name": "Interpret objective",
+      "role": "intake",
+      "provider": "local",
+      "status": "complete",
+      "workspace": "/Users/anon5376/Projects/Agentic Orchestration System/.aos/workspaces/run_a98a8c6007/tsk_ccd98ac5c0"
+    },
+    {
+      "id": "agt_75c562a84c",
+      "projectId": "prj_db94e0a0e0",
+      "runId": "run_a98a8c6007",
+      "taskId": "tsk_b5db6d6fbd",
+      "name": "Primary analysis",
+      "role": "research",
+      "provider": "local",
+      "status": "complete",
+      "workspace": "/Users/anon5376/Projects/Agentic Orchestration System/.aos/workspaces/run_a98a8c6007/tsk_b5db6d6fbd"
+    },
+    {
+      "id": "agt_38b7f9395a",
+      "projectId": "prj_db94e0a0e0",
+      "runId": "run_a98a8c6007",
+      "taskId": "tsk_0e0e14030e",
+      "name": "Independent check",
+      "role": "research",
+      "provider": "local",
+      "status": "complete",
+      "workspace": "/Users/anon5376/Projects/Agentic Orchestration System/.aos/workspaces/run_a98a8c6007/tsk_0e0e14030e"
+    },
+    {
+      "id": "agt_f181c2d714",
+      "projectId": "prj_db94e0a0e0",
+      "runId": "run_a98a8c6007",
+      "taskId": "tsk_a1c4a2e42e",
+      "name": "Next experiment",
+      "role": "research",
+      "provider": "local",
+      "status": "complete",
+      "workspace": "/Users/anon5376/Projects/Agentic Orchestration System/.aos/workspaces/run_a98a8c6007/tsk_a1c4a2e42e"
+    },
+    {
+      "id": "agt_0b398f442e",
+      "projectId": "prj_db94e0a0e0",
+      "runId": "run_a98a8c6007",
+      "taskId": "tsk_5dd2935e0b",
+      "name": "Adversarial check",
+      "role": "critique",
+      "provider": "local",
+      "status": "complete",
+      "workspace": "/Users/anon5376/Projects/Agentic Orchestration System/.aos/workspaces/run_a98a8c6007/tsk_5dd2935e0b"
+    },
+    {
+      "id": "agt_00190e8f26",
+      "projectId": "prj_db94e0a0e0",
+      "runId": "run_a98a8c6007",
+      "taskId": "tsk_5f70890a25",
+      "name": "Synthesize decision",
+      "role": "synthesis",
+      "provider": "local",
+      "status": "complete",
+      "workspace": "/Users/anon5376/Projects/Agentic Orchestration System/.aos/workspaces/run_a98a8c6007/tsk_5f70890a25"
+    },
+    {
+      "id": "agt_5aa73ff0d1",
+      "projectId": "prj_db94e0a0e0",
+      "runId": "run_a98a8c6007",
+      "taskId": "tsk_6907f846ec",
+      "name": "Write retrospective",
+      "role": "retrospective",
+      "provider": "local",
+      "status": "complete",
+      "workspace": "/Users/anon5376/Projects/Agentic Orchestration System/.aos/workspaces/run_a98a8c6007/tsk_6907f846ec"
+    },
+    {
+      "id": "agt_1e2c84733b",
+      "projectId": "prj_db94e0a0e0",
+      "runId": "run_a98a8c6007",
+      "taskId": "tsk_961b8ffaa3",
+      "name": "Apply improvement proposal",
+      "role": "adopt",
+      "provider": "local",
+      "status": "queued",
+      "workspace": null
+    },
+    {
+      "id": "agt_15fcaf4b67",
+      "projectId": "prj_db94e0a0e0",
+      "runId": "run_a71f8d84f5",
+      "taskId": "tsk_f790be2a96",
+      "name": "Interpret objective",
+      "role": "intake",
+      "provider": "local",
+      "status": "complete",
+      "workspace": "/Users/anon5376/Projects/Agentic Orchestration System/.aos/workspaces/run_a71f8d84f5/tsk_f790be2a96"
+    },
+    {
+      "id": "agt_d91a1c1626",
+      "projectId": "prj_db94e0a0e0",
+      "runId": "run_a71f8d84f5",
+      "taskId": "tsk_80c35fe35d",
+      "name": "Primary analysis",
+      "role": "research",
+      "provider": "local",
+      "status": "complete",
+      "workspace": "/Users/anon5376/Projects/Agentic Orchestration System/.aos/workspaces/run_a71f8d84f5/tsk_80c35fe35d"
+    },
+    {
+      "id": "agt_862ff296ee",
+      "projectId": "prj_db94e0a0e0",
+      "runId": "run_a71f8d84f5",
+      "taskId": "tsk_2b4f12fae6",
+      "name": "Independent check",
+      "role": "research",
+      "provider": "local",
+      "status": "complete",
+      "workspace": "/Users/anon5376/Projects/Agentic Orchestration System/.aos/workspaces/run_a71f8d84f5/tsk_2b4f12fae6"
+    },
+    {
+      "id": "agt_a7babe8076",
+      "projectId": "prj_db94e0a0e0",
+      "runId": "run_a71f8d84f5",
+      "taskId": "tsk_9d3cd860cc",
+      "name": "Mechanism review",
+      "role": "research",
+      "provider": "local",
+      "status": "complete",
+      "workspace": "/Users/anon5376/Projects/Agentic Orchestration System/.aos/workspaces/run_a71f8d84f5/tsk_9d3cd860cc"
+    },
+    {
+      "id": "agt_192a33d73c",
+      "projectId": "prj_db94e0a0e0",
+      "runId": "run_a71f8d84f5",
+      "taskId": "tsk_f28eca9e66",
+      "name": "Adversarial check",
+      "role": "critique",
+      "provider": "local",
+      "status": "complete",
+      "workspace": "/Users/anon5376/Projects/Agentic Orchestration System/.aos/workspaces/run_a71f8d84f5/tsk_f28eca9e66"
+    },
+    {
+      "id": "agt_067a04566d",
+      "projectId": "prj_db94e0a0e0",
+      "runId": "run_a71f8d84f5",
+      "taskId": "tsk_6a5786811e",
+      "name": "Synthesize decision",
+      "role": "synthesis",
+      "provider": "local",
+      "status": "complete",
+      "workspace": "/Users/anon5376/Projects/Agentic Orchestration System/.aos/workspaces/run_a71f8d84f5/tsk_6a5786811e"
+    },
+    {
+      "id": "agt_08fb2997ca",
+      "projectId": "prj_db94e0a0e0",
+      "runId": "run_a71f8d84f5",
+      "taskId": "tsk_d70a00dfa1",
+      "name": "Write retrospective",
+      "role": "retrospective",
+      "provider": "local",
+      "status": "complete",
+      "workspace": "/Users/anon5376/Projects/Agentic Orchestration System/.aos/workspaces/run_a71f8d84f5/tsk_d70a00dfa1"
+    },
+    {
+      "id": "agt_33e243f556",
+      "projectId": "prj_db94e0a0e0",
+      "runId": "run_a71f8d84f5",
+      "taskId": "tsk_05c0906d89",
+      "name": "Apply improvement proposal",
+      "role": "adopt",
+      "provider": "local",
+      "status": "queued",
+      "workspace": null
+    }
+  ],
+  "dependencies": [
+    {
+      "id": "dep_fa78fea601",
+      "runId": "run_25cab09193",
+      "taskId": "tsk_f121025618",
+      "dependsOnTaskId": "tsk_b7cf217418"
+    },
+    {
+      "id": "dep_faf7076f7b",
+      "runId": "run_25cab09193",
+      "taskId": "tsk_65964151ee",
+      "dependsOnTaskId": "tsk_b7cf217418"
+    },
+    {
+      "id": "dep_69e7f0d680",
+      "runId": "run_25cab09193",
+      "taskId": "tsk_ff9663818a",
+      "dependsOnTaskId": "tsk_b7cf217418"
+    },
+    {
+      "id": "dep_3a018ea8dc",
+      "runId": "run_25cab09193",
+      "taskId": "tsk_bcb23053e4",
+      "dependsOnTaskId": "tsk_f121025618"
+    },
+    {
+      "id": "dep_482e2d29ff",
+      "runId": "run_25cab09193",
+      "taskId": "tsk_bcb23053e4",
+      "dependsOnTaskId": "tsk_65964151ee"
+    },
+    {
+      "id": "dep_b59b975c88",
+      "runId": "run_25cab09193",
+      "taskId": "tsk_bcb23053e4",
+      "dependsOnTaskId": "tsk_ff9663818a"
+    },
+    {
+      "id": "dep_d1e6d24547",
+      "runId": "run_25cab09193",
+      "taskId": "tsk_b49bf3bcdd",
+      "dependsOnTaskId": "tsk_bcb23053e4"
+    },
+    {
+      "id": "dep_2294b0f7bc",
+      "runId": "run_25cab09193",
+      "taskId": "tsk_ff710d1ae9",
+      "dependsOnTaskId": "tsk_b49bf3bcdd"
+    },
+    {
+      "id": "dep_33bedcf69e",
+      "runId": "run_25cab09193",
+      "taskId": "tsk_05e4a2a423",
+      "dependsOnTaskId": "tsk_ff710d1ae9"
+    },
+    {
+      "id": "dep_d157aaf969",
+      "runId": "run_a98a8c6007",
+      "taskId": "tsk_b5db6d6fbd",
+      "dependsOnTaskId": "tsk_ccd98ac5c0"
+    },
+    {
+      "id": "dep_86a4558032",
+      "runId": "run_a98a8c6007",
+      "taskId": "tsk_0e0e14030e",
+      "dependsOnTaskId": "tsk_ccd98ac5c0"
+    },
+    {
+      "id": "dep_cced0f18f9",
+      "runId": "run_a98a8c6007",
+      "taskId": "tsk_a1c4a2e42e",
+      "dependsOnTaskId": "tsk_ccd98ac5c0"
+    },
+    {
+      "id": "dep_0640de0e99",
+      "runId": "run_a98a8c6007",
+      "taskId": "tsk_5dd2935e0b",
+      "dependsOnTaskId": "tsk_b5db6d6fbd"
+    },
+    {
+      "id": "dep_f864267065",
+      "runId": "run_a98a8c6007",
+      "taskId": "tsk_5dd2935e0b",
+      "dependsOnTaskId": "tsk_0e0e14030e"
+    },
+    {
+      "id": "dep_f38007138e",
+      "runId": "run_a98a8c6007",
+      "taskId": "tsk_5dd2935e0b",
+      "dependsOnTaskId": "tsk_a1c4a2e42e"
+    },
+    {
+      "id": "dep_45cd99cc3a",
+      "runId": "run_a98a8c6007",
+      "taskId": "tsk_5f70890a25",
+      "dependsOnTaskId": "tsk_5dd2935e0b"
+    },
+    {
+      "id": "dep_2dfe49ba15",
+      "runId": "run_a98a8c6007",
+      "taskId": "tsk_6907f846ec",
+      "dependsOnTaskId": "tsk_5f70890a25"
+    },
+    {
+      "id": "dep_b311928945",
+      "runId": "run_a98a8c6007",
+      "taskId": "tsk_961b8ffaa3",
+      "dependsOnTaskId": "tsk_6907f846ec"
+    },
+    {
+      "id": "dep_8e7e8961c7",
+      "runId": "run_a71f8d84f5",
+      "taskId": "tsk_80c35fe35d",
+      "dependsOnTaskId": "tsk_f790be2a96"
+    },
+    {
+      "id": "dep_4e1c23f902",
+      "runId": "run_a71f8d84f5",
+      "taskId": "tsk_2b4f12fae6",
+      "dependsOnTaskId": "tsk_f790be2a96"
+    },
+    {
+      "id": "dep_9bfe2e2124",
+      "runId": "run_a71f8d84f5",
+      "taskId": "tsk_9d3cd860cc",
+      "dependsOnTaskId": "tsk_f790be2a96"
+    },
+    {
+      "id": "dep_33952ab645",
+      "runId": "run_a71f8d84f5",
+      "taskId": "tsk_f28eca9e66",
+      "dependsOnTaskId": "tsk_80c35fe35d"
+    },
+    {
+      "id": "dep_eff6d4110d",
+      "runId": "run_a71f8d84f5",
+      "taskId": "tsk_f28eca9e66",
+      "dependsOnTaskId": "tsk_2b4f12fae6"
+    },
+    {
+      "id": "dep_b76bf5dc2b",
+      "runId": "run_a71f8d84f5",
+      "taskId": "tsk_f28eca9e66",
+      "dependsOnTaskId": "tsk_9d3cd860cc"
+    },
+    {
+      "id": "dep_192179da94",
+      "runId": "run_a71f8d84f5",
+      "taskId": "tsk_6a5786811e",
+      "dependsOnTaskId": "tsk_f28eca9e66"
+    },
+    {
+      "id": "dep_36ecfb6255",
+      "runId": "run_a71f8d84f5",
+      "taskId": "tsk_d70a00dfa1",
+      "dependsOnTaskId": "tsk_6a5786811e"
+    },
+    {
+      "id": "dep_6e239878d2",
+      "runId": "run_a71f8d84f5",
+      "taskId": "tsk_05c0906d89",
+      "dependsOnTaskId": "tsk_d70a00dfa1"
+    }
+  ],
+  "evidence": [
+    {
+      "id": "evd_0c3da15dd7",
+      "projectId": "prj_db94e0a0e0",
+      "runId": "run_25cab09193",
+      "taskId": "tsk_f121025618",
+      "createdAt": "2026-09-13T05:38:15.602Z",
+      "type": "supported",
+      "claim": "Primary analysis: a bounded reading of the objective is internally consistent under the stated assumptions.",
+      "confidence": 0.77,
+      "sources": [
+        {
+          "id": "PROMPT",
+          "path": "goal.prompt"
+        }
+      ],
+      "provenance": {
+        "worker": "local",
+        "agentId": "agt_6341df82ef",
+        "workspace": "/Users/anon5376/Projects/Agentic Orchestration System/.aos/workspaces/run_25cab09193/tsk_f121025618",
+        "artifact": "finding.json"
+      }
+    },
+    {
+      "id": "evd_048d1ede5b",
+      "projectId": "prj_db94e0a0e0",
+      "runId": "run_25cab09193",
+      "taskId": "tsk_65964151ee",
+      "createdAt": "2026-09-13T05:38:15.602Z",
+      "type": "supported",
+      "claim": "Independent check: a bounded reading of the objective is internally consistent under the stated assumptions.",
+      "confidence": 0.51,
+      "sources": [
+        {
+          "id": "PROMPT",
+          "path": "goal.prompt"
+        }
+      ],
+      "provenance": {
+        "worker": "local",
+        "agentId": "agt_64f744784d",
+        "workspace": "/Users/anon5376/Projects/Agentic Orchestration System/.aos/workspaces/run_25cab09193/tsk_65964151ee",
+        "artifact": "finding.json"
+      }
+    },
+    {
+      "id": "evd_45501c8944",
+      "projectId": "prj_db94e0a0e0",
+      "runId": "run_25cab09193",
+      "taskId": "tsk_ff9663818a",
+      "createdAt": "2026-09-13T05:38:15.603Z",
+      "type": "supported",
+      "claim": "Mechanism review: a bounded reading of the objective is internally consistent under the stated assumptions.",
+      "confidence": 0.79,
+      "sources": [
+        {
+          "id": "PROMPT",
+          "path": "goal.prompt"
+        }
+      ],
+      "provenance": {
+        "worker": "local",
+        "agentId": "agt_848021ded2",
+        "workspace": "/Users/anon5376/Projects/Agentic Orchestration System/.aos/workspaces/run_25cab09193/tsk_ff9663818a",
+        "artifact": "finding.json"
+      }
+    },
+    {
+      "id": "evd_2687a12d7d",
+      "projectId": "prj_db94e0a0e0",
+      "runId": "run_25cab09193",
+      "taskId": "tsk_bcb23053e4",
+      "createdAt": "2026-09-13T05:38:15.604Z",
+      "type": "conflict",
+      "claim": "An unmatched boundary condition remains: the current evidence does not test the claim under a shifted timing or source constraint.",
+      "confidence": 0.57,
+      "sources": [
+        {
+          "id": "BRANCH-CROSS",
+          "path": "workspace/findings"
+        }
+      ],
+      "provenance": {
+        "worker": "local",
+        "agentId": "agt_dcddc681f6",
+        "workspace": "/Users/anon5376/Projects/Agentic Orchestration System/.aos/workspaces/run_25cab09193/tsk_bcb23053e4",
+        "artifact": "critique.json"
+      }
+    },
+    {
+      "id": "evd_647ba9d812",
+      "projectId": "prj_db94e0a0e0",
+      "runId": "run_a98a8c6007",
+      "taskId": "tsk_b5db6d6fbd",
+      "createdAt": "2026-09-13T05:57:02.355Z",
+      "type": "supported",
+      "claim": "Primary analysis: a bounded reading of the objective is internally consistent under the stated assumptions.",
+      "confidence": 0.79,
+      "sources": [
+        {
+          "id": "PROMPT",
+          "path": "goal.prompt"
+        }
+      ],
+      "provenance": {
+        "worker": "local",
+        "agentId": "agt_75c562a84c",
+        "workspace": "/Users/anon5376/Projects/Agentic Orchestration System/.aos/workspaces/run_a98a8c6007/tsk_b5db6d6fbd",
+        "artifact": "finding.json"
+      }
+    },
+    {
+      "id": "evd_d75686897b",
+      "projectId": "prj_db94e0a0e0",
+      "runId": "run_a98a8c6007",
+      "taskId": "tsk_0e0e14030e",
+      "createdAt": "2026-09-13T05:57:02.356Z",
+      "type": "supported",
+      "claim": "Independent check: a bounded reading of the objective is internally consistent under the stated assumptions.",
+      "confidence": 0.75,
+      "sources": [
+        {
+          "id": "PROMPT",
+          "path": "goal.prompt"
+        }
+      ],
+      "provenance": {
+        "worker": "local",
+        "agentId": "agt_38b7f9395a",
+        "workspace": "/Users/anon5376/Projects/Agentic Orchestration System/.aos/workspaces/run_a98a8c6007/tsk_0e0e14030e",
+        "artifact": "finding.json"
+      }
+    },
+    {
+      "id": "evd_76291d6662",
+      "projectId": "prj_db94e0a0e0",
+      "runId": "run_a98a8c6007",
+      "taskId": "tsk_a1c4a2e42e",
+      "createdAt": "2026-09-13T05:57:02.356Z",
+      "type": "supported",
+      "claim": "Next experiment: a bounded reading of the objective is internally consistent under the stated assumptions.",
+      "confidence": 0.45,
+      "sources": [
+        {
+          "id": "PROMPT",
+          "path": "goal.prompt"
+        }
+      ],
+      "provenance": {
+        "worker": "local",
+        "agentId": "agt_f181c2d714",
+        "workspace": "/Users/anon5376/Projects/Agentic Orchestration System/.aos/workspaces/run_a98a8c6007/tsk_a1c4a2e42e",
+        "artifact": "finding.json"
+      }
+    },
+    {
+      "id": "evd_114523b97d",
+      "projectId": "prj_db94e0a0e0",
+      "runId": "run_a98a8c6007",
+      "taskId": "tsk_5dd2935e0b",
+      "createdAt": "2026-09-13T05:57:02.357Z",
+      "type": "conflict",
+      "claim": "An unmatched boundary condition remains: the current evidence does not test the claim under a shifted timing or source constraint.",
+      "confidence": 0.44,
+      "sources": [
+        {
+          "id": "BRANCH-CROSS",
+          "path": "workspace/findings"
+        }
+      ],
+      "provenance": {
+        "worker": "local",
+        "agentId": "agt_0b398f442e",
+        "workspace": "/Users/anon5376/Projects/Agentic Orchestration System/.aos/workspaces/run_a98a8c6007/tsk_5dd2935e0b",
+        "artifact": "critique.json"
+      }
+    },
+    {
+      "id": "evd_08f750381a",
+      "projectId": "prj_db94e0a0e0",
+      "runId": "run_a71f8d84f5",
+      "taskId": "tsk_80c35fe35d",
+      "createdAt": "2026-09-13T05:57:58.573Z",
+      "type": "supported",
+      "claim": "Primary analysis: a bounded reading of the objective is internally consistent under the stated assumptions.",
+      "confidence": 0.64,
+      "sources": [
+        {
+          "id": "PROMPT",
+          "path": "goal.prompt"
+        }
+      ],
+      "provenance": {
+        "worker": "local",
+        "agentId": "agt_d91a1c1626",
+        "workspace": "/Users/anon5376/Projects/Agentic Orchestration System/.aos/workspaces/run_a71f8d84f5/tsk_80c35fe35d",
+        "artifact": "finding.json"
+      }
+    },
+    {
+      "id": "evd_10e2ab28b8",
+      "projectId": "prj_db94e0a0e0",
+      "runId": "run_a71f8d84f5",
+      "taskId": "tsk_2b4f12fae6",
+      "createdAt": "2026-09-13T05:57:58.573Z",
+      "type": "supported",
+      "claim": "Independent check: a bounded reading of the objective is internally consistent under the stated assumptions.",
+      "confidence": 0.54,
+      "sources": [
+        {
+          "id": "PROMPT",
+          "path": "goal.prompt"
+        }
+      ],
+      "provenance": {
+        "worker": "local",
+        "agentId": "agt_862ff296ee",
+        "workspace": "/Users/anon5376/Projects/Agentic Orchestration System/.aos/workspaces/run_a71f8d84f5/tsk_2b4f12fae6",
+        "artifact": "finding.json"
+      }
+    },
+    {
+      "id": "evd_bbafff5b71",
+      "projectId": "prj_db94e0a0e0",
+      "runId": "run_a71f8d84f5",
+      "taskId": "tsk_9d3cd860cc",
+      "createdAt": "2026-09-13T05:57:58.574Z",
+      "type": "supported",
+      "claim": "Mechanism review: a bounded reading of the objective is internally consistent under the stated assumptions.",
+      "confidence": 0.72,
+      "sources": [
+        {
+          "id": "PROMPT",
+          "path": "goal.prompt"
+        }
+      ],
+      "provenance": {
+        "worker": "local",
+        "agentId": "agt_a7babe8076",
+        "workspace": "/Users/anon5376/Projects/Agentic Orchestration System/.aos/workspaces/run_a71f8d84f5/tsk_9d3cd860cc",
+        "artifact": "finding.json"
+      }
+    },
+    {
+      "id": "evd_2a28aabc28",
+      "projectId": "prj_db94e0a0e0",
+      "runId": "run_a71f8d84f5",
+      "taskId": "tsk_f28eca9e66",
+      "createdAt": "2026-09-13T05:57:58.575Z",
+      "type": "conflict",
+      "claim": "An unmatched boundary condition remains: the current evidence does not test the claim under a shifted timing or source constraint.",
+      "confidence": 0.64,
+      "sources": [
+        {
+          "id": "BRANCH-CROSS",
+          "path": "workspace/findings"
+        }
+      ],
+      "provenance": {
+        "worker": "local",
+        "agentId": "agt_192a33d73c",
+        "workspace": "/Users/anon5376/Projects/Agentic Orchestration System/.aos/workspaces/run_a71f8d84f5/tsk_f28eca9e66",
+        "artifact": "critique.json"
+      }
+    }
+  ],
+  "decisions": [
+    {
+      "id": "dec_c97560af52",
+      "projectId": "prj_db94e0a0e0",
+      "runId": "run_25cab09193",
+      "taskId": "tsk_b49bf3bcdd",
+      "createdAt": "2026-09-13T05:38:15.604Z",
+      "conclusion": "Primary analysis: a bounded reading of the objective is internally consistent under the stated assumptions.",
+      "objection": "An unmatched boundary condition remains: the current evidence does not test the claim under a shifted timing or source constraint.",
+      "confidence": 0.6900000000000001,
+      "evidenceIds": [
+        "evd_0c3da15dd7",
+        "evd_048d1ede5b",
+        "evd_45501c8944",
+        "evd_2687a12d7d"
+      ],
+      "checks": [
+        {
+          "name": "Evidence present",
+          "status": "pass"
+        },
+        {
+          "name": "Independent objection",
+          "status": "open"
+        },
+        {
+          "name": "Provenance",
+          "status": "pass"
+        }
+      ]
+    },
+    {
+      "id": "dec_c41472cb77",
+      "projectId": "prj_db94e0a0e0",
+      "runId": "run_a98a8c6007",
+      "taskId": "tsk_5f70890a25",
+      "createdAt": "2026-09-13T05:57:02.357Z",
+      "conclusion": "Primary analysis: a bounded reading of the objective is internally consistent under the stated assumptions.",
+      "objection": "An unmatched boundary condition remains: the current evidence does not test the claim under a shifted timing or source constraint.",
+      "confidence": 0.6633333333333333,
+      "evidenceIds": [
+        "evd_647ba9d812",
+        "evd_d75686897b",
+        "evd_76291d6662",
+        "evd_114523b97d"
+      ],
+      "checks": [
+        {
+          "name": "Evidence present",
+          "status": "pass"
+        },
+        {
+          "name": "Independent objection",
+          "status": "open"
+        },
+        {
+          "name": "Provenance",
+          "status": "pass"
+        }
+      ]
+    },
+    {
+      "id": "dec_5334771633",
+      "projectId": "prj_db94e0a0e0",
+      "runId": "run_a71f8d84f5",
+      "taskId": "tsk_6a5786811e",
+      "createdAt": "2026-09-13T05:57:58.575Z",
+      "conclusion": "Primary analysis: a bounded reading of the objective is internally consistent under the stated assumptions.",
+      "objection": "An unmatched boundary condition remains: the current evidence does not test the claim under a shifted timing or source constraint.",
+      "confidence": 0.6333333333333334,
+      "evidenceIds": [
+        "evd_08f750381a",
+        "evd_10e2ab28b8",
+        "evd_bbafff5b71",
+        "evd_2a28aabc28"
+      ],
+      "checks": [
+        {
+          "name": "Evidence present",
+          "status": "pass"
+        },
+        {
+          "name": "Independent objection",
+          "status": "open"
+        },
+        {
+          "name": "Provenance",
+          "status": "pass"
+        }
+      ]
+    }
+  ],
+  "policies": [
+    {
+      "id": "pol_d0b59d9a40",
+      "projectId": "prj_db94e0a0e0",
+      "createdAt": "2026-09-13T05:36:38.932Z",
+      "name": "Evidence before synthesis",
+      "scope": "run",
+      "state": "enforced",
+      "detail": "Synthesis waits until research branches are terminal and records provenance."
+    },
+    {
+      "id": "pol_aff0df9694",
+      "projectId": "prj_db94e0a0e0",
+      "createdAt": "2026-09-13T05:36:38.932Z",
+      "name": "No automatic adoption",
+      "scope": "project",
+      "state": "enforced",
+      "detail": "Improvement proposals require an explicit approve or reject. Default is proposal-only."
+    },
+    {
+      "id": "pol_7efea654d2",
+      "projectId": "prj_db94e0a0e0",
+      "createdAt": "2026-09-13T05:36:38.932Z",
+      "name": "Local-first workers",
+      "scope": "global",
+      "state": "enforced",
+      "detail": "Acceptance uses the deterministic local worker. Live providers are typed boundaries and are not invoked unless enabled."
+    }
+  ],
+  "retrospectives": [
+    {
+      "id": "rtr_af62f918f1",
+      "projectId": "prj_db94e0a0e0",
+      "runId": "run_25cab09193",
+      "taskId": "tsk_ff710d1ae9",
+      "createdAt": "2026-09-13T05:38:15.604Z",
+      "whatFailed": "No task failed. Remaining uncertainty is an unmatched boundary condition in the evidence.",
+      "why": "The deterministic local worker completed, but the critique still found an untested constraint.",
+      "shouldImprove": "Stop expanding a branch when the critique repeats the same unmatched constraint.",
+      "proposalId": "prp_868c4b1e4a",
+      "retries": 0,
+      "failedTaskIds": []
+    },
+    {
+      "id": "rtr_18fa355d78",
+      "projectId": "prj_db94e0a0e0",
+      "runId": "run_a98a8c6007",
+      "taskId": "tsk_6907f846ec",
+      "createdAt": "2026-09-13T05:57:02.358Z",
+      "whatFailed": "No task failed. Remaining uncertainty is an unmatched boundary condition in the evidence.",
+      "why": "The deterministic local worker completed, but the critique still found an untested constraint.",
+      "shouldImprove": "Stop expanding a branch when the critique repeats the same unmatched constraint.",
+      "proposalId": "prp_498248a348",
+      "retries": 0,
+      "failedTaskIds": []
+    },
+    {
+      "id": "rtr_c8c4dbfaf9",
+      "projectId": "prj_db94e0a0e0",
+      "runId": "run_a71f8d84f5",
+      "taskId": "tsk_d70a00dfa1",
+      "createdAt": "2026-09-13T05:57:58.575Z",
+      "whatFailed": "No task failed. Remaining uncertainty is an unmatched boundary condition in the evidence.",
+      "why": "The deterministic local worker completed, but the critique still found an untested constraint.",
+      "shouldImprove": "Stop expanding a branch when the critique repeats the same unmatched constraint.",
+      "proposalId": "prp_295f1920cd",
+      "retries": 0,
+      "failedTaskIds": []
+    }
+  ],
+  "proposals": [
+    {
+      "id": "prp_868c4b1e4a",
+      "projectId": "prj_db94e0a0e0",
+      "runId": "run_25cab09193",
+      "createdAt": "2026-09-13T05:38:15.604Z",
+      "status": "approved",
+      "decidedAt": "2026-09-13T05:38:15.856Z",
+      "type": "policy",
+      "title": "Cap unproductive branch expansion",
+      "change": "Stop expanding a branch when the critique repeats the same unmatched constraint.",
+      "payload": {
+        "key": "maxConcurrency",
+        "value": 2
+      },
+      "selfModification": false,
+      "applied": true
+    },
+    {
+      "id": "prp_498248a348",
+      "projectId": "prj_db94e0a0e0",
+      "runId": "run_a98a8c6007",
+      "createdAt": "2026-09-13T05:57:02.358Z",
+      "status": "proposed",
+      "decidedAt": null,
+      "type": "policy",
+      "title": "Cap unproductive branch expansion",
+      "change": "Stop expanding a branch when the critique repeats the same unmatched constraint.",
+      "payload": {
+        "key": "maxConcurrency",
+        "value": 2
+      },
+      "selfModification": false
+    },
+    {
+      "id": "prp_295f1920cd",
+      "projectId": "prj_db94e0a0e0",
+      "runId": "run_a71f8d84f5",
+      "createdAt": "2026-09-13T05:57:58.575Z",
+      "status": "proposed",
+      "decidedAt": null,
+      "type": "policy",
+      "title": "Cap unproductive branch expansion",
+      "change": "Stop expanding a branch when the critique repeats the same unmatched constraint.",
+      "payload": {
+        "key": "maxConcurrency",
+        "value": 2
+      },
+      "selfModification": false
+    }
+  ],
+  "providers": [
+    {
+      "id": "local",
+      "name": "Deterministic local worker",
+      "kind": "local",
+      "auth": {
+        "type": "none",
+        "secretEnv": null,
+        "session": null
+      },
+      "liveAuthSupported": true,
+      "liveExecutionEnabled": true,
+      "configured": true,
+      "secretPresent": false,
+      "note": "Offline worker used for acceptance. No credentials."
+    },
+    {
+      "id": "codex",
+      "name": "Codex",
+      "kind": "cli_session",
+      "auth": {
+        "type": "cli_session",
+        "secretEnv": null,
+        "session": "codex-cli"
+      },
+      "liveAuthSupported": true,
+      "liveExecutionEnabled": false,
+      "configured": false,
+      "secretPresent": false,
+      "note": "Supported live auth is a Codex CLI account session. AOS does not store or print that session. Live execution is not invoked in this MVP."
+    },
+    {
+      "id": "claude",
+      "name": "Claude Code",
+      "kind": "cli_session",
+      "auth": {
+        "type": "cli_session",
+        "secretEnv": null,
+        "session": "claude-cli"
+      },
+      "liveAuthSupported": true,
+      "liveExecutionEnabled": false,
+      "configured": false,
+      "secretPresent": false,
+      "note": "Supported live auth is a Claude Code CLI account session. AOS does not store or print that session. Live execution is not invoked in this MVP."
+    },
+    {
+      "id": "grok",
+      "name": "Grok",
+      "kind": "api_key",
+      "auth": {
+        "type": "api_key",
+        "secretEnv": "XAI_API_KEY",
+        "session": null
+      },
+      "liveAuthSupported": true,
+      "liveExecutionEnabled": false,
+      "configured": false,
+      "secretPresent": false,
+      "note": "API key via XAI_API_KEY. The value is never stored or printed. Live Grok calls are not invoked in this MVP."
+    },
+    {
+      "id": "command",
+      "name": "Generic command worker",
+      "kind": "command",
+      "auth": {
+        "type": "none",
+        "secretEnv": null,
+        "session": null
+      },
+      "liveAuthSupported": true,
+      "liveExecutionEnabled": true,
+      "configured": true,
+      "secretPresent": false,
+      "note": "Runs an operator-supplied command inside the task workspace. No command is attached by default."
+    },
+    {
+      "id": "api",
+      "name": "Generic HTTP worker",
+      "kind": "api_key",
+      "auth": {
+        "type": "unsupported_oauth",
+        "secretEnv": null,
+        "session": null
+      },
+      "liveAuthSupported": false,
+      "liveExecutionEnabled": false,
+      "configured": false,
+      "secretPresent": false,
+      "note": "Unsupported live auth: OAuth/account login for arbitrary HTTP APIs is not implemented. Typed boundary only."
+    }
+  ],
+  "events": [
+    {
+      "id": "evt_77a5976f3c",
+      "ts": "2026-09-13T05:36:38.932Z",
+      "type": "project.created",
+      "projectId": "prj_db94e0a0e0",
+      "runId": null,
+      "taskId": null,
+      "actor": "engine",
+      "payload": {
+        "name": "Local research"
+      }
+    },
+    {
+      "id": "evt_8271c1d938",
+      "ts": "2026-09-13T05:38:15.470Z",
+      "type": "goal.created",
+      "projectId": "prj_db94e0a0e0",
+      "runId": null,
+      "taskId": null,
+      "actor": "engine",
+      "payload": {
+        "goalId": "gol_e9db93ad36",
+        "ambiguityCount": 1,
+        "taskCount": 8
+      }
+    },
+    {
+      "id": "evt_0ed11594f9",
+      "ts": "2026-09-13T05:38:15.470Z",
+      "type": "plan.created",
+      "projectId": "prj_db94e0a0e0",
+      "runId": null,
+      "taskId": null,
+      "actor": "engine",
+      "payload": {
+        "goalId": "gol_e9db93ad36",
+        "title": "Determine whether delayed feedback destabilises bidirectional nerve-interface coupling, and p..."
+      }
+    },
+    {
+      "id": "evt_88f59f0068",
+      "ts": "2026-09-13T05:38:15.534Z",
+      "type": "task.ready",
+      "projectId": "prj_db94e0a0e0",
+      "runId": "run_25cab09193",
+      "taskId": "tsk_b7cf217418",
+      "actor": "engine",
+      "payload": {}
+    },
+    {
+      "id": "evt_c1319cada4",
+      "ts": "2026-09-13T05:38:15.534Z",
+      "type": "run.started",
+      "projectId": "prj_db94e0a0e0",
+      "runId": "run_25cab09193",
+      "taskId": null,
+      "actor": "engine",
+      "payload": {
+        "goalId": "gol_e9db93ad36"
+      }
+    },
+    {
+      "id": "evt_67eca75db7",
+      "ts": "2026-09-13T05:38:15.600Z",
+      "type": "worker.dispatched",
+      "projectId": "prj_db94e0a0e0",
+      "runId": "run_25cab09193",
+      "taskId": "tsk_b7cf217418",
+      "actor": "engine",
+      "payload": {
+        "worker": "local",
+        "attempt": 1
+      }
+    },
+    {
+      "id": "evt_eb98891d4c",
+      "ts": "2026-09-13T05:38:15.600Z",
+      "type": "task.started",
+      "projectId": "prj_db94e0a0e0",
+      "runId": "run_25cab09193",
+      "taskId": "tsk_b7cf217418",
+      "actor": "engine",
+      "payload": {}
+    },
+    {
+      "id": "evt_24d7de7369",
+      "ts": "2026-09-13T05:38:15.601Z",
+      "type": "task.completed",
+      "projectId": "prj_db94e0a0e0",
+      "runId": "run_25cab09193",
+      "taskId": "tsk_b7cf217418",
+      "actor": "engine",
+      "payload": {
+        "summary": "Stored the original prompt and the reviewable plan."
+      }
+    },
+    {
+      "id": "evt_7057904bb8",
+      "ts": "2026-09-13T05:38:15.601Z",
+      "type": "task.ready",
+      "projectId": "prj_db94e0a0e0",
+      "runId": "run_25cab09193",
+      "taskId": "tsk_f121025618",
+      "actor": "engine",
+      "payload": {}
+    },
+    {
+      "id": "evt_2c8d476df7",
+      "ts": "2026-09-13T05:38:15.601Z",
+      "type": "task.ready",
+      "projectId": "prj_db94e0a0e0",
+      "runId": "run_25cab09193",
+      "taskId": "tsk_65964151ee",
+      "actor": "engine",
+      "payload": {}
+    },
+    {
+      "id": "evt_e76e5b15ab",
+      "ts": "2026-09-13T05:38:15.601Z",
+      "type": "task.ready",
+      "projectId": "prj_db94e0a0e0",
+      "runId": "run_25cab09193",
+      "taskId": "tsk_ff9663818a",
+      "actor": "engine",
+      "payload": {}
+    },
+    {
+      "id": "evt_7541b1eaf7",
+      "ts": "2026-09-13T05:38:15.602Z",
+      "type": "worker.dispatched",
+      "projectId": "prj_db94e0a0e0",
+      "runId": "run_25cab09193",
+      "taskId": "tsk_f121025618",
+      "actor": "engine",
+      "payload": {
+        "worker": "local",
+        "attempt": 1
+      }
+    },
+    {
+      "id": "evt_f24555f212",
+      "ts": "2026-09-13T05:38:15.602Z",
+      "type": "task.started",
+      "projectId": "prj_db94e0a0e0",
+      "runId": "run_25cab09193",
+      "taskId": "tsk_f121025618",
+      "actor": "engine",
+      "payload": {}
+    },
+    {
+      "id": "evt_f1c6823101",
+      "ts": "2026-09-13T05:38:15.602Z",
+      "type": "evidence.recorded",
+      "projectId": "prj_db94e0a0e0",
+      "runId": "run_25cab09193",
+      "taskId": "tsk_f121025618",
+      "actor": "engine",
+      "payload": {
+        "evidenceId": "evd_0c3da15dd7"
+      }
+    },
+    {
+      "id": "evt_80690b40e2",
+      "ts": "2026-09-13T05:38:15.602Z",
+      "type": "worker.dispatched",
+      "projectId": "prj_db94e0a0e0",
+      "runId": "run_25cab09193",
+      "taskId": "tsk_65964151ee",
+      "actor": "engine",
+      "payload": {
+        "worker": "local",
+        "attempt": 1
+      }
+    },
+    {
+      "id": "evt_1b66d72239",
+      "ts": "2026-09-13T05:38:15.602Z",
+      "type": "task.started",
+      "projectId": "prj_db94e0a0e0",
+      "runId": "run_25cab09193",
+      "taskId": "tsk_65964151ee",
+      "actor": "engine",
+      "payload": {}
+    },
+    {
+      "id": "evt_1e16d1bdaf",
+      "ts": "2026-09-13T05:38:15.602Z",
+      "type": "evidence.recorded",
+      "projectId": "prj_db94e0a0e0",
+      "runId": "run_25cab09193",
+      "taskId": "tsk_65964151ee",
+      "actor": "engine",
+      "payload": {
+        "evidenceId": "evd_048d1ede5b"
+      }
+    },
+    {
+      "id": "evt_b0d9ff527c",
+      "ts": "2026-09-13T05:38:15.602Z",
+      "type": "task.completed",
+      "projectId": "prj_db94e0a0e0",
+      "runId": "run_25cab09193",
+      "taskId": "tsk_f121025618",
+      "actor": "engine",
+      "payload": {
+        "summary": "Primary analysis: a bounded reading of the objective is internally consistent under the stated assumptions."
+      }
+    },
+    {
+      "id": "evt_c74018bb29",
+      "ts": "2026-09-13T05:38:15.603Z",
+      "type": "task.completed",
+      "projectId": "prj_db94e0a0e0",
+      "runId": "run_25cab09193",
+      "taskId": "tsk_65964151ee",
+      "actor": "engine",
+      "payload": {
+        "summary": "Independent check: a bounded reading of the objective is internally consistent under the stated assumptions."
+      }
+    },
+    {
+      "id": "evt_3b182c45c0",
+      "ts": "2026-09-13T05:38:15.603Z",
+      "type": "worker.dispatched",
+      "projectId": "prj_db94e0a0e0",
+      "runId": "run_25cab09193",
+      "taskId": "tsk_ff9663818a",
+      "actor": "engine",
+      "payload": {
+        "worker": "local",
+        "attempt": 1
+      }
+    },
+    {
+      "id": "evt_8b9684a898",
+      "ts": "2026-09-13T05:38:15.603Z",
+      "type": "task.started",
+      "projectId": "prj_db94e0a0e0",
+      "runId": "run_25cab09193",
+      "taskId": "tsk_ff9663818a",
+      "actor": "engine",
+      "payload": {}
+    },
+    {
+      "id": "evt_17afb933bb",
+      "ts": "2026-09-13T05:38:15.603Z",
+      "type": "evidence.recorded",
+      "projectId": "prj_db94e0a0e0",
+      "runId": "run_25cab09193",
+      "taskId": "tsk_ff9663818a",
+      "actor": "engine",
+      "payload": {
+        "evidenceId": "evd_45501c8944"
+      }
+    },
+    {
+      "id": "evt_3e6d1be485",
+      "ts": "2026-09-13T05:38:15.603Z",
+      "type": "task.completed",
+      "projectId": "prj_db94e0a0e0",
+      "runId": "run_25cab09193",
+      "taskId": "tsk_ff9663818a",
+      "actor": "engine",
+      "payload": {
+        "summary": "Mechanism review: a bounded reading of the objective is internally consistent under the stated assumptions."
+      }
+    },
+    {
+      "id": "evt_20d26db3ab",
+      "ts": "2026-09-13T05:38:15.603Z",
+      "type": "task.ready",
+      "projectId": "prj_db94e0a0e0",
+      "runId": "run_25cab09193",
+      "taskId": "tsk_bcb23053e4",
+      "actor": "engine",
+      "payload": {}
+    },
+    {
+      "id": "evt_2a5d38a382",
+      "ts": "2026-09-13T05:38:15.603Z",
+      "type": "worker.dispatched",
+      "projectId": "prj_db94e0a0e0",
+      "runId": "run_25cab09193",
+      "taskId": "tsk_bcb23053e4",
+      "actor": "engine",
+      "payload": {
+        "worker": "local",
+        "attempt": 1
+      }
+    },
+    {
+      "id": "evt_c924e770c9",
+      "ts": "2026-09-13T05:38:15.603Z",
+      "type": "task.started",
+      "projectId": "prj_db94e0a0e0",
+      "runId": "run_25cab09193",
+      "taskId": "tsk_bcb23053e4",
+      "actor": "engine",
+      "payload": {}
+    },
+    {
+      "id": "evt_3ff70d830d",
+      "ts": "2026-09-13T05:38:15.604Z",
+      "type": "evidence.recorded",
+      "projectId": "prj_db94e0a0e0",
+      "runId": "run_25cab09193",
+      "taskId": "tsk_bcb23053e4",
+      "actor": "engine",
+      "payload": {
+        "evidenceId": "evd_2687a12d7d"
+      }
+    },
+    {
+      "id": "evt_6ff8648b5f",
+      "ts": "2026-09-13T05:38:15.604Z",
+      "type": "task.completed",
+      "projectId": "prj_db94e0a0e0",
+      "runId": "run_25cab09193",
+      "taskId": "tsk_bcb23053e4",
+      "actor": "engine",
+      "payload": {
+        "summary": "An unmatched boundary condition remains: the current evidence does not test the claim under a shifted timing or source constraint."
+      }
+    },
+    {
+      "id": "evt_2f41bb96a1",
+      "ts": "2026-09-13T05:38:15.604Z",
+      "type": "task.ready",
+      "projectId": "prj_db94e0a0e0",
+      "runId": "run_25cab09193",
+      "taskId": "tsk_b49bf3bcdd",
+      "actor": "engine",
+      "payload": {}
+    },
+    {
+      "id": "evt_752c212a2d",
+      "ts": "2026-09-13T05:38:15.604Z",
+      "type": "worker.dispatched",
+      "projectId": "prj_db94e0a0e0",
+      "runId": "run_25cab09193",
+      "taskId": "tsk_b49bf3bcdd",
+      "actor": "engine",
+      "payload": {
+        "worker": "local",
+        "attempt": 1
+      }
+    },
+    {
+      "id": "evt_6b1878bff3",
+      "ts": "2026-09-13T05:38:15.604Z",
+      "type": "task.started",
+      "projectId": "prj_db94e0a0e0",
+      "runId": "run_25cab09193",
+      "taskId": "tsk_b49bf3bcdd",
+      "actor": "engine",
+      "payload": {}
+    },
+    {
+      "id": "evt_ce74f8d7f0",
+      "ts": "2026-09-13T05:38:15.604Z",
+      "type": "decision.recorded",
+      "projectId": "prj_db94e0a0e0",
+      "runId": "run_25cab09193",
+      "taskId": "tsk_b49bf3bcdd",
+      "actor": "engine",
+      "payload": {
+        "decisionId": "dec_c97560af52"
+      }
+    },
+    {
+      "id": "evt_2adb00e168",
+      "ts": "2026-09-13T05:38:15.604Z",
+      "type": "task.completed",
+      "projectId": "prj_db94e0a0e0",
+      "runId": "run_25cab09193",
+      "taskId": "tsk_b49bf3bcdd",
+      "actor": "engine",
+      "payload": {
+        "summary": "Primary analysis: a bounded reading of the objective is internally consistent under the stated assumptions."
+      }
+    },
+    {
+      "id": "evt_bdf2f220d5",
+      "ts": "2026-09-13T05:38:15.604Z",
+      "type": "task.ready",
+      "projectId": "prj_db94e0a0e0",
+      "runId": "run_25cab09193",
+      "taskId": "tsk_ff710d1ae9",
+      "actor": "engine",
+      "payload": {}
+    },
+    {
+      "id": "evt_c427b35527",
+      "ts": "2026-09-13T05:38:15.604Z",
+      "type": "worker.dispatched",
+      "projectId": "prj_db94e0a0e0",
+      "runId": "run_25cab09193",
+      "taskId": "tsk_ff710d1ae9",
+      "actor": "engine",
+      "payload": {
+        "worker": "local",
+        "attempt": 1
+      }
+    },
+    {
+      "id": "evt_bf6da87ba3",
+      "ts": "2026-09-13T05:38:15.604Z",
+      "type": "task.started",
+      "projectId": "prj_db94e0a0e0",
+      "runId": "run_25cab09193",
+      "taskId": "tsk_ff710d1ae9",
+      "actor": "engine",
+      "payload": {}
+    },
+    {
+      "id": "evt_aab8399246",
+      "ts": "2026-09-13T05:38:15.604Z",
+      "type": "retrospective.recorded",
+      "projectId": "prj_db94e0a0e0",
+      "runId": "run_25cab09193",
+      "taskId": "tsk_ff710d1ae9",
+      "actor": "engine",
+      "payload": {
+        "retroId": "rtr_af62f918f1"
+      }
+    },
+    {
+      "id": "evt_7e7f2f35b1",
+      "ts": "2026-09-13T05:38:15.605Z",
+      "type": "proposal.created",
+      "projectId": "prj_db94e0a0e0",
+      "runId": "run_25cab09193",
+      "taskId": null,
+      "actor": "engine",
+      "payload": {
+        "proposalId": "prp_868c4b1e4a"
+      }
+    },
+    {
+      "id": "evt_8d360d1e92",
+      "ts": "2026-09-13T05:38:15.605Z",
+      "type": "task.completed",
+      "projectId": "prj_db94e0a0e0",
+      "runId": "run_25cab09193",
+      "taskId": "tsk_ff710d1ae9",
+      "actor": "engine",
+      "payload": {
+        "summary": "No task failed. Remaining uncertainty is an unmatched boundary condition in the evidence."
+      }
+    },
+    {
+      "id": "evt_fdec85098a",
+      "ts": "2026-09-13T05:38:15.605Z",
+      "type": "task.approval_required",
+      "projectId": "prj_db94e0a0e0",
+      "runId": "run_25cab09193",
+      "taskId": "tsk_05e4a2a423",
+      "actor": "engine",
+      "payload": {}
+    },
+    {
+      "id": "evt_8102847f3a",
+      "ts": "2026-09-13T05:38:15.856Z",
+      "type": "proposal.approved",
+      "projectId": "prj_db94e0a0e0",
+      "runId": "run_25cab09193",
+      "taskId": null,
+      "actor": "engine",
+      "payload": {
+        "proposalId": "prp_868c4b1e4a",
+        "applied": false
+      }
+    },
+    {
+      "id": "evt_c31a4cf11d",
+      "ts": "2026-09-13T05:38:15.856Z",
+      "type": "task.approved",
+      "projectId": "prj_db94e0a0e0",
+      "runId": "run_25cab09193",
+      "taskId": "tsk_05e4a2a423",
+      "actor": "engine",
+      "payload": {}
+    },
+    {
+      "id": "evt_beb9ea00bd",
+      "ts": "2026-09-13T05:38:15.858Z",
+      "type": "worker.dispatched",
+      "projectId": "prj_db94e0a0e0",
+      "runId": "run_25cab09193",
+      "taskId": "tsk_05e4a2a423",
+      "actor": "engine",
+      "payload": {
+        "worker": "local",
+        "attempt": 1
+      }
+    },
+    {
+      "id": "evt_70f2bf4411",
+      "ts": "2026-09-13T05:38:15.858Z",
+      "type": "task.started",
+      "projectId": "prj_db94e0a0e0",
+      "runId": "run_25cab09193",
+      "taskId": "tsk_05e4a2a423",
+      "actor": "engine",
+      "payload": {}
+    },
+    {
+      "id": "evt_b36d63a857",
+      "ts": "2026-09-13T05:38:15.858Z",
+      "type": "proposal.applied",
+      "projectId": "prj_db94e0a0e0",
+      "runId": "run_25cab09193",
+      "taskId": null,
+      "actor": "engine",
+      "payload": {
+        "proposalId": "prp_868c4b1e4a",
+        "key": "maxConcurrency"
+      }
+    },
+    {
+      "id": "evt_41a9e827b4",
+      "ts": "2026-09-13T05:38:15.858Z",
+      "type": "task.completed",
+      "projectId": "prj_db94e0a0e0",
+      "runId": "run_25cab09193",
+      "taskId": "tsk_05e4a2a423",
+      "actor": "engine",
+      "payload": {
+        "summary": "Applied policy maxConcurrency=2"
+      }
+    },
+    {
+      "id": "evt_b1cdba63ac",
+      "ts": "2026-09-13T05:38:15.859Z",
+      "type": "run.completed",
+      "projectId": "prj_db94e0a0e0",
+      "runId": "run_25cab09193",
+      "taskId": null,
+      "actor": "engine",
+      "payload": {}
+    },
+    {
+      "id": "evt_766474bca3",
+      "ts": "2026-09-13T05:56:56.330Z",
+      "type": "goal.created",
+      "projectId": "prj_db94e0a0e0",
+      "runId": null,
+      "taskId": null,
+      "actor": "engine",
+      "payload": {
+        "goalId": "gol_3b1c8283d4",
+        "ambiguityCount": 1,
+        "taskCount": 8
+      }
+    },
+    {
+      "id": "evt_d26c6c108d",
+      "ts": "2026-09-13T05:56:56.330Z",
+      "type": "plan.created",
+      "projectId": "prj_db94e0a0e0",
+      "runId": null,
+      "taskId": null,
+      "actor": "engine",
+      "payload": {
+        "goalId": "gol_3b1c8283d4",
+        "title": "Verify local deterministic orchestration. Success is one persisted decision and retrospective..."
+      }
+    },
+    {
+      "id": "evt_d9153765f5",
+      "ts": "2026-09-13T05:57:02.338Z",
+      "type": "task.ready",
+      "projectId": "prj_db94e0a0e0",
+      "runId": "run_a98a8c6007",
+      "taskId": "tsk_ccd98ac5c0",
+      "actor": "engine",
+      "payload": {}
+    },
+    {
+      "id": "evt_4e5ccd0b65",
+      "ts": "2026-09-13T05:57:02.339Z",
+      "type": "run.started",
+      "projectId": "prj_db94e0a0e0",
+      "runId": "run_a98a8c6007",
+      "taskId": null,
+      "actor": "engine",
+      "payload": {
+        "goalId": "gol_3b1c8283d4"
+      }
+    },
+    {
+      "id": "evt_e70fa4586e",
+      "ts": "2026-09-13T05:57:02.353Z",
+      "type": "worker.dispatched",
+      "projectId": "prj_db94e0a0e0",
+      "runId": "run_a98a8c6007",
+      "taskId": "tsk_ccd98ac5c0",
+      "actor": "engine",
+      "payload": {
+        "worker": "local",
+        "attempt": 1
+      }
+    },
+    {
+      "id": "evt_22e8708f51",
+      "ts": "2026-09-13T05:57:02.353Z",
+      "type": "task.started",
+      "projectId": "prj_db94e0a0e0",
+      "runId": "run_a98a8c6007",
+      "taskId": "tsk_ccd98ac5c0",
+      "actor": "engine",
+      "payload": {}
+    },
+    {
+      "id": "evt_da58ce3f79",
+      "ts": "2026-09-13T05:57:02.354Z",
+      "type": "task.completed",
+      "projectId": "prj_db94e0a0e0",
+      "runId": "run_a98a8c6007",
+      "taskId": "tsk_ccd98ac5c0",
+      "actor": "engine",
+      "payload": {
+        "summary": "Stored the original prompt and the reviewable plan."
+      }
+    },
+    {
+      "id": "evt_2892d43629",
+      "ts": "2026-09-13T05:57:02.354Z",
+      "type": "task.ready",
+      "projectId": "prj_db94e0a0e0",
+      "runId": "run_a98a8c6007",
+      "taskId": "tsk_b5db6d6fbd",
+      "actor": "engine",
+      "payload": {}
+    },
+    {
+      "id": "evt_1abac83687",
+      "ts": "2026-09-13T05:57:02.354Z",
+      "type": "task.ready",
+      "projectId": "prj_db94e0a0e0",
+      "runId": "run_a98a8c6007",
+      "taskId": "tsk_0e0e14030e",
+      "actor": "engine",
+      "payload": {}
+    },
+    {
+      "id": "evt_8bbaf47cc2",
+      "ts": "2026-09-13T05:57:02.355Z",
+      "type": "task.ready",
+      "projectId": "prj_db94e0a0e0",
+      "runId": "run_a98a8c6007",
+      "taskId": "tsk_a1c4a2e42e",
+      "actor": "engine",
+      "payload": {}
+    },
+    {
+      "id": "evt_3fa9792336",
+      "ts": "2026-09-13T05:57:02.355Z",
+      "type": "worker.dispatched",
+      "projectId": "prj_db94e0a0e0",
+      "runId": "run_a98a8c6007",
+      "taskId": "tsk_b5db6d6fbd",
+      "actor": "engine",
+      "payload": {
+        "worker": "local",
+        "attempt": 1
+      }
+    },
+    {
+      "id": "evt_2c5673e8fa",
+      "ts": "2026-09-13T05:57:02.355Z",
+      "type": "task.started",
+      "projectId": "prj_db94e0a0e0",
+      "runId": "run_a98a8c6007",
+      "taskId": "tsk_b5db6d6fbd",
+      "actor": "engine",
+      "payload": {}
+    },
+    {
+      "id": "evt_7474e21d38",
+      "ts": "2026-09-13T05:57:02.355Z",
+      "type": "evidence.recorded",
+      "projectId": "prj_db94e0a0e0",
+      "runId": "run_a98a8c6007",
+      "taskId": "tsk_b5db6d6fbd",
+      "actor": "engine",
+      "payload": {
+        "evidenceId": "evd_647ba9d812"
+      }
+    },
+    {
+      "id": "evt_1bc98ddf46",
+      "ts": "2026-09-13T05:57:02.356Z",
+      "type": "worker.dispatched",
+      "projectId": "prj_db94e0a0e0",
+      "runId": "run_a98a8c6007",
+      "taskId": "tsk_0e0e14030e",
+      "actor": "engine",
+      "payload": {
+        "worker": "local",
+        "attempt": 1
+      }
+    },
+    {
+      "id": "evt_e941bdf83a",
+      "ts": "2026-09-13T05:57:02.356Z",
+      "type": "task.started",
+      "projectId": "prj_db94e0a0e0",
+      "runId": "run_a98a8c6007",
+      "taskId": "tsk_0e0e14030e",
+      "actor": "engine",
+      "payload": {}
+    },
+    {
+      "id": "evt_baeace9a5b",
+      "ts": "2026-09-13T05:57:02.356Z",
+      "type": "evidence.recorded",
+      "projectId": "prj_db94e0a0e0",
+      "runId": "run_a98a8c6007",
+      "taskId": "tsk_0e0e14030e",
+      "actor": "engine",
+      "payload": {
+        "evidenceId": "evd_d75686897b"
+      }
+    },
+    {
+      "id": "evt_feab452a7b",
+      "ts": "2026-09-13T05:57:02.356Z",
+      "type": "task.completed",
+      "projectId": "prj_db94e0a0e0",
+      "runId": "run_a98a8c6007",
+      "taskId": "tsk_b5db6d6fbd",
+      "actor": "engine",
+      "payload": {
+        "summary": "Primary analysis: a bounded reading of the objective is internally consistent under the stated assumptions."
+      }
+    },
+    {
+      "id": "evt_871ce7c1a5",
+      "ts": "2026-09-13T05:57:02.356Z",
+      "type": "task.completed",
+      "projectId": "prj_db94e0a0e0",
+      "runId": "run_a98a8c6007",
+      "taskId": "tsk_0e0e14030e",
+      "actor": "engine",
+      "payload": {
+        "summary": "Independent check: a bounded reading of the objective is internally consistent under the stated assumptions."
+      }
+    },
+    {
+      "id": "evt_d03aeea094",
+      "ts": "2026-09-13T05:57:02.356Z",
+      "type": "worker.dispatched",
+      "projectId": "prj_db94e0a0e0",
+      "runId": "run_a98a8c6007",
+      "taskId": "tsk_a1c4a2e42e",
+      "actor": "engine",
+      "payload": {
+        "worker": "local",
+        "attempt": 1
+      }
+    },
+    {
+      "id": "evt_80ed843128",
+      "ts": "2026-09-13T05:57:02.356Z",
+      "type": "task.started",
+      "projectId": "prj_db94e0a0e0",
+      "runId": "run_a98a8c6007",
+      "taskId": "tsk_a1c4a2e42e",
+      "actor": "engine",
+      "payload": {}
+    },
+    {
+      "id": "evt_aef8ca73a0",
+      "ts": "2026-09-13T05:57:02.356Z",
+      "type": "evidence.recorded",
+      "projectId": "prj_db94e0a0e0",
+      "runId": "run_a98a8c6007",
+      "taskId": "tsk_a1c4a2e42e",
+      "actor": "engine",
+      "payload": {
+        "evidenceId": "evd_76291d6662"
+      }
+    },
+    {
+      "id": "evt_68a5c91e3f",
+      "ts": "2026-09-13T05:57:02.356Z",
+      "type": "task.completed",
+      "projectId": "prj_db94e0a0e0",
+      "runId": "run_a98a8c6007",
+      "taskId": "tsk_a1c4a2e42e",
+      "actor": "engine",
+      "payload": {
+        "summary": "Next experiment: a bounded reading of the objective is internally consistent under the stated assumptions."
+      }
+    },
+    {
+      "id": "evt_28a91f2f35",
+      "ts": "2026-09-13T05:57:02.356Z",
+      "type": "task.ready",
+      "projectId": "prj_db94e0a0e0",
+      "runId": "run_a98a8c6007",
+      "taskId": "tsk_5dd2935e0b",
+      "actor": "engine",
+      "payload": {}
+    },
+    {
+      "id": "evt_6abadeb100",
+      "ts": "2026-09-13T05:57:02.357Z",
+      "type": "worker.dispatched",
+      "projectId": "prj_db94e0a0e0",
+      "runId": "run_a98a8c6007",
+      "taskId": "tsk_5dd2935e0b",
+      "actor": "engine",
+      "payload": {
+        "worker": "local",
+        "attempt": 1
+      }
+    },
+    {
+      "id": "evt_999b51dda9",
+      "ts": "2026-09-13T05:57:02.357Z",
+      "type": "task.started",
+      "projectId": "prj_db94e0a0e0",
+      "runId": "run_a98a8c6007",
+      "taskId": "tsk_5dd2935e0b",
+      "actor": "engine",
+      "payload": {}
+    },
+    {
+      "id": "evt_0e307cb348",
+      "ts": "2026-09-13T05:57:02.357Z",
+      "type": "evidence.recorded",
+      "projectId": "prj_db94e0a0e0",
+      "runId": "run_a98a8c6007",
+      "taskId": "tsk_5dd2935e0b",
+      "actor": "engine",
+      "payload": {
+        "evidenceId": "evd_114523b97d"
+      }
+    },
+    {
+      "id": "evt_692bc0de0c",
+      "ts": "2026-09-13T05:57:02.357Z",
+      "type": "task.completed",
+      "projectId": "prj_db94e0a0e0",
+      "runId": "run_a98a8c6007",
+      "taskId": "tsk_5dd2935e0b",
+      "actor": "engine",
+      "payload": {
+        "summary": "An unmatched boundary condition remains: the current evidence does not test the claim under a shifted timing or source constraint."
+      }
+    },
+    {
+      "id": "evt_f358fa15c3",
+      "ts": "2026-09-13T05:57:02.357Z",
+      "type": "task.ready",
+      "projectId": "prj_db94e0a0e0",
+      "runId": "run_a98a8c6007",
+      "taskId": "tsk_5f70890a25",
+      "actor": "engine",
+      "payload": {}
+    },
+    {
+      "id": "evt_5ea25abd34",
+      "ts": "2026-09-13T05:57:02.357Z",
+      "type": "worker.dispatched",
+      "projectId": "prj_db94e0a0e0",
+      "runId": "run_a98a8c6007",
+      "taskId": "tsk_5f70890a25",
+      "actor": "engine",
+      "payload": {
+        "worker": "local",
+        "attempt": 1
+      }
+    },
+    {
+      "id": "evt_62737060f0",
+      "ts": "2026-09-13T05:57:02.357Z",
+      "type": "task.started",
+      "projectId": "prj_db94e0a0e0",
+      "runId": "run_a98a8c6007",
+      "taskId": "tsk_5f70890a25",
+      "actor": "engine",
+      "payload": {}
+    },
+    {
+      "id": "evt_2394da3913",
+      "ts": "2026-09-13T05:57:02.357Z",
+      "type": "decision.recorded",
+      "projectId": "prj_db94e0a0e0",
+      "runId": "run_a98a8c6007",
+      "taskId": "tsk_5f70890a25",
+      "actor": "engine",
+      "payload": {
+        "decisionId": "dec_c41472cb77"
+      }
+    },
+    {
+      "id": "evt_4141ba8b8d",
+      "ts": "2026-09-13T05:57:02.357Z",
+      "type": "task.completed",
+      "projectId": "prj_db94e0a0e0",
+      "runId": "run_a98a8c6007",
+      "taskId": "tsk_5f70890a25",
+      "actor": "engine",
+      "payload": {
+        "summary": "Primary analysis: a bounded reading of the objective is internally consistent under the stated assumptions."
+      }
+    },
+    {
+      "id": "evt_d3a373cfc5",
+      "ts": "2026-09-13T05:57:02.358Z",
+      "type": "task.ready",
+      "projectId": "prj_db94e0a0e0",
+      "runId": "run_a98a8c6007",
+      "taskId": "tsk_6907f846ec",
+      "actor": "engine",
+      "payload": {}
+    },
+    {
+      "id": "evt_f8c9f7c282",
+      "ts": "2026-09-13T05:57:02.358Z",
+      "type": "worker.dispatched",
+      "projectId": "prj_db94e0a0e0",
+      "runId": "run_a98a8c6007",
+      "taskId": "tsk_6907f846ec",
+      "actor": "engine",
+      "payload": {
+        "worker": "local",
+        "attempt": 1
+      }
+    },
+    {
+      "id": "evt_5f5bb6e3ca",
+      "ts": "2026-09-13T05:57:02.358Z",
+      "type": "task.started",
+      "projectId": "prj_db94e0a0e0",
+      "runId": "run_a98a8c6007",
+      "taskId": "tsk_6907f846ec",
+      "actor": "engine",
+      "payload": {}
+    },
+    {
+      "id": "evt_fe92ab2bec",
+      "ts": "2026-09-13T05:57:02.358Z",
+      "type": "retrospective.recorded",
+      "projectId": "prj_db94e0a0e0",
+      "runId": "run_a98a8c6007",
+      "taskId": "tsk_6907f846ec",
+      "actor": "engine",
+      "payload": {
+        "retroId": "rtr_18fa355d78"
+      }
+    },
+    {
+      "id": "evt_3213a32ee2",
+      "ts": "2026-09-13T05:57:02.358Z",
+      "type": "proposal.created",
+      "projectId": "prj_db94e0a0e0",
+      "runId": "run_a98a8c6007",
+      "taskId": null,
+      "actor": "engine",
+      "payload": {
+        "proposalId": "prp_498248a348"
+      }
+    },
+    {
+      "id": "evt_f5e2fe939d",
+      "ts": "2026-09-13T05:57:02.358Z",
+      "type": "task.completed",
+      "projectId": "prj_db94e0a0e0",
+      "runId": "run_a98a8c6007",
+      "taskId": "tsk_6907f846ec",
+      "actor": "engine",
+      "payload": {
+        "summary": "No task failed. Remaining uncertainty is an unmatched boundary condition in the evidence."
+      }
+    },
+    {
+      "id": "evt_7a7c4f43db",
+      "ts": "2026-09-13T05:57:02.358Z",
+      "type": "task.approval_required",
+      "projectId": "prj_db94e0a0e0",
+      "runId": "run_a98a8c6007",
+      "taskId": "tsk_961b8ffaa3",
+      "actor": "engine",
+      "payload": {}
+    },
+    {
+      "id": "evt_6b806da1e7",
+      "ts": "2026-09-13T05:57:56.547Z",
+      "type": "goal.created",
+      "projectId": "prj_db94e0a0e0",
+      "runId": null,
+      "taskId": null,
+      "actor": "engine",
+      "payload": {
+        "goalId": "gol_3597019611",
+        "ambiguityCount": 1,
+        "taskCount": 8
+      }
+    },
+    {
+      "id": "evt_ecdf478f65",
+      "ts": "2026-09-13T05:57:56.550Z",
+      "type": "plan.created",
+      "projectId": "prj_db94e0a0e0",
+      "runId": null,
+      "taskId": null,
+      "actor": "engine",
+      "payload": {
+        "goalId": "gol_3597019611",
+        "title": "Determine whether delayed feedback destabilises bidirectional coupling. Success is a bounded ..."
+      }
+    },
+    {
+      "id": "evt_6f066e3f96",
+      "ts": "2026-09-13T05:57:58.560Z",
+      "type": "task.ready",
+      "projectId": "prj_db94e0a0e0",
+      "runId": "run_a71f8d84f5",
+      "taskId": "tsk_f790be2a96",
+      "actor": "engine",
+      "payload": {}
+    },
+    {
+      "id": "evt_13738b7a5d",
+      "ts": "2026-09-13T05:57:58.560Z",
+      "type": "run.started",
+      "projectId": "prj_db94e0a0e0",
+      "runId": "run_a71f8d84f5",
+      "taskId": null,
+      "actor": "engine",
+      "payload": {
+        "goalId": "gol_3597019611"
+      }
+    },
+    {
+      "id": "evt_6d3218d347",
+      "ts": "2026-09-13T05:57:58.571Z",
+      "type": "worker.dispatched",
+      "projectId": "prj_db94e0a0e0",
+      "runId": "run_a71f8d84f5",
+      "taskId": "tsk_f790be2a96",
+      "actor": "engine",
+      "payload": {
+        "worker": "local",
+        "attempt": 1
+      }
+    },
+    {
+      "id": "evt_346c2d343b",
+      "ts": "2026-09-13T05:57:58.572Z",
+      "type": "task.started",
+      "projectId": "prj_db94e0a0e0",
+      "runId": "run_a71f8d84f5",
+      "taskId": "tsk_f790be2a96",
+      "actor": "engine",
+      "payload": {}
+    },
+    {
+      "id": "evt_2b9830735d",
+      "ts": "2026-09-13T05:57:58.572Z",
+      "type": "task.completed",
+      "projectId": "prj_db94e0a0e0",
+      "runId": "run_a71f8d84f5",
+      "taskId": "tsk_f790be2a96",
+      "actor": "engine",
+      "payload": {
+        "summary": "Stored the original prompt and the reviewable plan."
+      }
+    },
+    {
+      "id": "evt_1a4a27a5ea",
+      "ts": "2026-09-13T05:57:58.572Z",
+      "type": "task.ready",
+      "projectId": "prj_db94e0a0e0",
+      "runId": "run_a71f8d84f5",
+      "taskId": "tsk_80c35fe35d",
+      "actor": "engine",
+      "payload": {}
+    },
+    {
+      "id": "evt_ecd36db4c9",
+      "ts": "2026-09-13T05:57:58.572Z",
+      "type": "task.ready",
+      "projectId": "prj_db94e0a0e0",
+      "runId": "run_a71f8d84f5",
+      "taskId": "tsk_2b4f12fae6",
+      "actor": "engine",
+      "payload": {}
+    },
+    {
+      "id": "evt_a53de5bf53",
+      "ts": "2026-09-13T05:57:58.572Z",
+      "type": "task.ready",
+      "projectId": "prj_db94e0a0e0",
+      "runId": "run_a71f8d84f5",
+      "taskId": "tsk_9d3cd860cc",
+      "actor": "engine",
+      "payload": {}
+    },
+    {
+      "id": "evt_3d957210dc",
+      "ts": "2026-09-13T05:57:58.572Z",
+      "type": "worker.dispatched",
+      "projectId": "prj_db94e0a0e0",
+      "runId": "run_a71f8d84f5",
+      "taskId": "tsk_80c35fe35d",
+      "actor": "engine",
+      "payload": {
+        "worker": "local",
+        "attempt": 1
+      }
+    },
+    {
+      "id": "evt_0b0e89daf2",
+      "ts": "2026-09-13T05:57:58.572Z",
+      "type": "task.started",
+      "projectId": "prj_db94e0a0e0",
+      "runId": "run_a71f8d84f5",
+      "taskId": "tsk_80c35fe35d",
+      "actor": "engine",
+      "payload": {}
+    },
+    {
+      "id": "evt_5b790394e2",
+      "ts": "2026-09-13T05:57:58.573Z",
+      "type": "evidence.recorded",
+      "projectId": "prj_db94e0a0e0",
+      "runId": "run_a71f8d84f5",
+      "taskId": "tsk_80c35fe35d",
+      "actor": "engine",
+      "payload": {
+        "evidenceId": "evd_08f750381a"
+      }
+    },
+    {
+      "id": "evt_8f3dabb06f",
+      "ts": "2026-09-13T05:57:58.573Z",
+      "type": "worker.dispatched",
+      "projectId": "prj_db94e0a0e0",
+      "runId": "run_a71f8d84f5",
+      "taskId": "tsk_2b4f12fae6",
+      "actor": "engine",
+      "payload": {
+        "worker": "local",
+        "attempt": 1
+      }
+    },
+    {
+      "id": "evt_4a7b14f280",
+      "ts": "2026-09-13T05:57:58.573Z",
+      "type": "task.started",
+      "projectId": "prj_db94e0a0e0",
+      "runId": "run_a71f8d84f5",
+      "taskId": "tsk_2b4f12fae6",
+      "actor": "engine",
+      "payload": {}
+    },
+    {
+      "id": "evt_224fb05560",
+      "ts": "2026-09-13T05:57:58.573Z",
+      "type": "evidence.recorded",
+      "projectId": "prj_db94e0a0e0",
+      "runId": "run_a71f8d84f5",
+      "taskId": "tsk_2b4f12fae6",
+      "actor": "engine",
+      "payload": {
+        "evidenceId": "evd_10e2ab28b8"
+      }
+    },
+    {
+      "id": "evt_1ea71197a0",
+      "ts": "2026-09-13T05:57:58.573Z",
+      "type": "task.completed",
+      "projectId": "prj_db94e0a0e0",
+      "runId": "run_a71f8d84f5",
+      "taskId": "tsk_80c35fe35d",
+      "actor": "engine",
+      "payload": {
+        "summary": "Primary analysis: a bounded reading of the objective is internally consistent under the stated assumptions."
+      }
+    },
+    {
+      "id": "evt_7fd5777d3c",
+      "ts": "2026-09-13T05:57:58.573Z",
+      "type": "task.completed",
+      "projectId": "prj_db94e0a0e0",
+      "runId": "run_a71f8d84f5",
+      "taskId": "tsk_2b4f12fae6",
+      "actor": "engine",
+      "payload": {
+        "summary": "Independent check: a bounded reading of the objective is internally consistent under the stated assumptions."
+      }
+    },
+    {
+      "id": "evt_328d8edfdc",
+      "ts": "2026-09-13T05:57:58.574Z",
+      "type": "worker.dispatched",
+      "projectId": "prj_db94e0a0e0",
+      "runId": "run_a71f8d84f5",
+      "taskId": "tsk_9d3cd860cc",
+      "actor": "engine",
+      "payload": {
+        "worker": "local",
+        "attempt": 1
+      }
+    },
+    {
+      "id": "evt_b4b1bc2a7d",
+      "ts": "2026-09-13T05:57:58.574Z",
+      "type": "task.started",
+      "projectId": "prj_db94e0a0e0",
+      "runId": "run_a71f8d84f5",
+      "taskId": "tsk_9d3cd860cc",
+      "actor": "engine",
+      "payload": {}
+    },
+    {
+      "id": "evt_244ead5697",
+      "ts": "2026-09-13T05:57:58.574Z",
+      "type": "evidence.recorded",
+      "projectId": "prj_db94e0a0e0",
+      "runId": "run_a71f8d84f5",
+      "taskId": "tsk_9d3cd860cc",
+      "actor": "engine",
+      "payload": {
+        "evidenceId": "evd_bbafff5b71"
+      }
+    },
+    {
+      "id": "evt_cb490688d0",
+      "ts": "2026-09-13T05:57:58.574Z",
+      "type": "task.completed",
+      "projectId": "prj_db94e0a0e0",
+      "runId": "run_a71f8d84f5",
+      "taskId": "tsk_9d3cd860cc",
+      "actor": "engine",
+      "payload": {
+        "summary": "Mechanism review: a bounded reading of the objective is internally consistent under the stated assumptions."
+      }
+    },
+    {
+      "id": "evt_bbd5b29b94",
+      "ts": "2026-09-13T05:57:58.574Z",
+      "type": "task.ready",
+      "projectId": "prj_db94e0a0e0",
+      "runId": "run_a71f8d84f5",
+      "taskId": "tsk_f28eca9e66",
+      "actor": "engine",
+      "payload": {}
+    },
+    {
+      "id": "evt_84fb9fe1dd",
+      "ts": "2026-09-13T05:57:58.574Z",
+      "type": "worker.dispatched",
+      "projectId": "prj_db94e0a0e0",
+      "runId": "run_a71f8d84f5",
+      "taskId": "tsk_f28eca9e66",
+      "actor": "engine",
+      "payload": {
+        "worker": "local",
+        "attempt": 1
+      }
+    },
+    {
+      "id": "evt_ab8441e42d",
+      "ts": "2026-09-13T05:57:58.574Z",
+      "type": "task.started",
+      "projectId": "prj_db94e0a0e0",
+      "runId": "run_a71f8d84f5",
+      "taskId": "tsk_f28eca9e66",
+      "actor": "engine",
+      "payload": {}
+    },
+    {
+      "id": "evt_ea85931610",
+      "ts": "2026-09-13T05:57:58.575Z",
+      "type": "evidence.recorded",
+      "projectId": "prj_db94e0a0e0",
+      "runId": "run_a71f8d84f5",
+      "taskId": "tsk_f28eca9e66",
+      "actor": "engine",
+      "payload": {
+        "evidenceId": "evd_2a28aabc28"
+      }
+    },
+    {
+      "id": "evt_abe3fdb0a3",
+      "ts": "2026-09-13T05:57:58.575Z",
+      "type": "task.completed",
+      "projectId": "prj_db94e0a0e0",
+      "runId": "run_a71f8d84f5",
+      "taskId": "tsk_f28eca9e66",
+      "actor": "engine",
+      "payload": {
+        "summary": "An unmatched boundary condition remains: the current evidence does not test the claim under a shifted timing or source constraint."
+      }
+    },
+    {
+      "id": "evt_caee156995",
+      "ts": "2026-09-13T05:57:58.575Z",
+      "type": "task.ready",
+      "projectId": "prj_db94e0a0e0",
+      "runId": "run_a71f8d84f5",
+      "taskId": "tsk_6a5786811e",
+      "actor": "engine",
+      "payload": {}
+    },
+    {
+      "id": "evt_3b13bdd52c",
+      "ts": "2026-09-13T05:57:58.575Z",
+      "type": "worker.dispatched",
+      "projectId": "prj_db94e0a0e0",
+      "runId": "run_a71f8d84f5",
+      "taskId": "tsk_6a5786811e",
+      "actor": "engine",
+      "payload": {
+        "worker": "local",
+        "attempt": 1
+      }
+    },
+    {
+      "id": "evt_a6f6c9764e",
+      "ts": "2026-09-13T05:57:58.575Z",
+      "type": "task.started",
+      "projectId": "prj_db94e0a0e0",
+      "runId": "run_a71f8d84f5",
+      "taskId": "tsk_6a5786811e",
+      "actor": "engine",
+      "payload": {}
+    },
+    {
+      "id": "evt_dcf369617a",
+      "ts": "2026-09-13T05:57:58.575Z",
+      "type": "decision.recorded",
+      "projectId": "prj_db94e0a0e0",
+      "runId": "run_a71f8d84f5",
+      "taskId": "tsk_6a5786811e",
+      "actor": "engine",
+      "payload": {
+        "decisionId": "dec_5334771633"
+      }
+    },
+    {
+      "id": "evt_8faa39093e",
+      "ts": "2026-09-13T05:57:58.575Z",
+      "type": "task.completed",
+      "projectId": "prj_db94e0a0e0",
+      "runId": "run_a71f8d84f5",
+      "taskId": "tsk_6a5786811e",
+      "actor": "engine",
+      "payload": {
+        "summary": "Primary analysis: a bounded reading of the objective is internally consistent under the stated assumptions."
+      }
+    },
+    {
+      "id": "evt_c8a5ec8f1e",
+      "ts": "2026-09-13T05:57:58.575Z",
+      "type": "task.ready",
+      "projectId": "prj_db94e0a0e0",
+      "runId": "run_a71f8d84f5",
+      "taskId": "tsk_d70a00dfa1",
+      "actor": "engine",
+      "payload": {}
+    },
+    {
+      "id": "evt_d15a329343",
+      "ts": "2026-09-13T05:57:58.575Z",
+      "type": "worker.dispatched",
+      "projectId": "prj_db94e0a0e0",
+      "runId": "run_a71f8d84f5",
+      "taskId": "tsk_d70a00dfa1",
+      "actor": "engine",
+      "payload": {
+        "worker": "local",
+        "attempt": 1
+      }
+    },
+    {
+      "id": "evt_4b0d14cca8",
+      "ts": "2026-09-13T05:57:58.575Z",
+      "type": "task.started",
+      "projectId": "prj_db94e0a0e0",
+      "runId": "run_a71f8d84f5",
+      "taskId": "tsk_d70a00dfa1",
+      "actor": "engine",
+      "payload": {}
+    },
+    {
+      "id": "evt_18245fac4e",
+      "ts": "2026-09-13T05:57:58.575Z",
+      "type": "retrospective.recorded",
+      "projectId": "prj_db94e0a0e0",
+      "runId": "run_a71f8d84f5",
+      "taskId": "tsk_d70a00dfa1",
+      "actor": "engine",
+      "payload": {
+        "retroId": "rtr_c8c4dbfaf9"
+      }
+    },
+    {
+      "id": "evt_c35a799f2b",
+      "ts": "2026-09-13T05:57:58.575Z",
+      "type": "proposal.created",
+      "projectId": "prj_db94e0a0e0",
+      "runId": "run_a71f8d84f5",
+      "taskId": null,
+      "actor": "engine",
+      "payload": {
+        "proposalId": "prp_295f1920cd"
+      }
+    },
+    {
+      "id": "evt_c74dae54b8",
+      "ts": "2026-09-13T05:57:58.576Z",
+      "type": "task.completed",
+      "projectId": "prj_db94e0a0e0",
+      "runId": "run_a71f8d84f5",
+      "taskId": "tsk_d70a00dfa1",
+      "actor": "engine",
+      "payload": {
+        "summary": "No task failed. Remaining uncertainty is an unmatched boundary condition in the evidence."
+      }
+    },
+    {
+      "id": "evt_b1a14cd0b6",
+      "ts": "2026-09-13T05:57:58.576Z",
+      "type": "task.approval_required",
+      "projectId": "prj_db94e0a0e0",
+      "runId": "run_a71f8d84f5",
+      "taskId": "tsk_05c0906d89",
+      "actor": "engine",
+      "payload": {}
+    }
+  ]
+}

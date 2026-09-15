@@ -1,0 +1,78 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 760" role="img" aria-labelledby="title desc">
+  <title id="title">Functional mutation seam</title>
+  <desc id="desc">A code-native comparison seam between baseline and candidate rules, execution traces, metric deltas, and rollback checkpoints.</desc>
+  <rect width="1200" height="760" fill="#070605"/>
+
+  <g fill="none" stroke-linecap="square" stroke-linejoin="miter">
+    <path d="M34 60h46M34 60v46M1166 60h-46M1166 60v46M34 700h46M34 700v-46M1166 700h-46M1166 700v-46" stroke="#A7A39B" stroke-width="1"/>
+    <path d="M70 126H1130M70 638H1130" stroke="#1A1714"/>
+    <path d="M590 138V620" stroke="#F2F1EC" stroke-width="1" stroke-dasharray="2 8" opacity=".72"/>
+    <path d="M600 138V620" stroke="#FF3B12" stroke-width="2"/>
+
+    <!-- baseline / candidate plates -->
+    <rect x="84" y="168" width="430" height="330" stroke="#A7A39B"/>
+    <rect x="686" y="168" width="430" height="330" stroke="#A7A39B"/>
+    <path d="M84 218H514M686 218H1116" stroke="#1A1714"/>
+    <g fill="#F2F1EC" font-family="'IBM Plex Mono',monospace" font-size="13" letter-spacing="2">
+      <text x="108" y="199">BASELINE / R42</text><text x="710" y="199">CANDIDATE / R43</text>
+    </g>
+
+    <!-- code/rule lanes -->
+    <g stroke="#A7A39B" stroke-width="1" opacity=".86">
+      <path d="M112 246h260M112 273h330M112 300h222M112 327h292M112 354h254M112 381h316M112 408h206M112 435h282"/>
+      <path d="M714 246h236M714 273h322M714 300h196M714 327h276M714 354h248M714 381h308M714 408h218M714 435h284"/>
+    </g>
+    <g stroke="#1A1714" stroke-width="5">
+      <path d="M112 246h36M112 300h58M112 354h24M112 408h44"/>
+      <path d="M714 273h48M714 327h36M714 381h54M714 435h40"/>
+    </g>
+    <g stroke="#FF3B12" stroke-width="2">
+      <path d="M112 327h292M112 381h202"/>
+      <path d="M714 300h196M714 354h248M714 408h218"/>
+    </g>
+
+    <!-- seam diff stitches -->
+    <g stroke="#FF3B12" stroke-width="2">
+      <path d="M514 246H560M514 300H544M514 354H568M514 408H552"/>
+      <path d="M640 273H686M632 327H686M646 381H686M624 435H686"/>
+      <path d="M560 246L640 273M544 300L632 327M568 354L646 381M552 408L624 435"/>
+    </g>
+    <g fill="#FF3B12" stroke="#070605" stroke-width="2">
+      <circle cx="560" cy="246" r="5"/><circle cx="544" cy="300" r="5"/><circle cx="568" cy="354" r="5"/><circle cx="552" cy="408" r="5"/>
+      <circle cx="640" cy="273" r="5"/><circle cx="632" cy="327" r="5"/><circle cx="646" cy="381" r="5"/><circle cx="624" cy="435" r="5"/>
+    </g>
+
+    <!-- execution trace -->
+    <path d="M112 550H1094" stroke="#A7A39B"/>
+    <path d="M112 550L228 550L260 530L346 530L392 572L472 572L520 550L594 550L640 564L722 564L756 538L842 538L900 550L1094 550" stroke="#F2F1EC"/>
+    <path d="M472 572L520 550L594 550L640 564" stroke="#FF3B12" stroke-width="2"/>
+    <g fill="#A7A39B" font-family="'IBM Plex Mono',monospace" font-size="11" letter-spacing="1">
+      <text x="108" y="528">EXECUTION TRACE</text><text x="1006" y="528">T+031</text>
+    </g>
+
+    <!-- checkpoints -->
+    <g fill="#070605" stroke="#F2F1EC" stroke-width="1">
+      <circle cx="190" cy="550" r="8"/><circle cx="392" cy="572" r="8"/><circle cx="594" cy="550" r="8"/><circle cx="842" cy="538" r="8"/><circle cx="1012" cy="550" r="8"/>
+    </g>
+    <g fill="#FF3B12" stroke="#070605" stroke-width="1">
+      <circle cx="594" cy="550" r="4"/><circle cx="842" cy="538" r="4"/>
+    </g>
+
+    <!-- metrics and rollback -->
+    <path d="M84 620H1116" stroke="#1A1714"/>
+    <g stroke="#A7A39B" stroke-width="1">
+      <path d="M112 614v12M312 614v12M512 614v12M712 614v12M912 614v12M1112 614v12"/>
+    </g>
+    <g fill="#F2F1EC" font-family="'IBM Plex Mono',monospace" font-size="11" letter-spacing="1">
+      <text x="108" y="674">RULE DELTA</text><text x="308" y="674">+06</text>
+      <text x="508" y="674">EXEC Δ</text><text x="708" y="674">+18ms</text>
+      <text x="908" y="674">ROLLBACK</text><text x="1010" y="674">R42</text>
+    </g>
+    <path d="M908 650h126" stroke="#FF3B12"/>
+  </g>
+
+  <g fill="#A7A39B" font-family="'IBM Plex Mono',monospace" font-size="11" letter-spacing="1">
+    <text x="86" y="92">MUTATION SEAM / FUNCTIONAL DIFF</text>
+    <text x="970" y="92">STATE / OBSERVE</text>
+  </g>
+</svg>

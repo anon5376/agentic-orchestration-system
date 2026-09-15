@@ -1,0 +1,918 @@
+<!doctype html>
+<!--
+THESIS: AOS is a research instrument that inherits only after review — a plate in a void, not a dashboard.
+OWN-WORLD: Black void, mineral folio, one cobalt interior, Palatino against Avenir, letterspaced inscription, registration ticks.
+STORY: A goal becomes a lead, branches, workers, findings, and a mutation that must be approved or rolled back.
+FIRST VIEWPORT: Void rail; cobalt architectural plate; mineral folio; generation ledger with REVIEW MUTATION.
+FORM: Observatory plate in a void. Not a node graph, not cyberpunk, not festival neon, not cream-editorial cards.
+-->
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <meta name="theme-color" content="#101CFF" />
+  <meta name="color-scheme" content="dark" />
+  <link rel="icon" href="data:,">
+  <title>AOS · Lineage of Minds — illustrative prototype</title>
+  <style>
+    :root {
+      --void: #07080c;
+      --stone: #f2f3f6;
+      --paper: #fbfbfc;
+      --ink: #12141a;
+      --quiet: #3c4048;
+      --rule: #d4d6db;
+      --metal: #8a8680;
+      --cobalt: #101cff;
+      --cobalt-deep: #0008c4;
+      --white: #f7f7fa;
+      --ok: #1b5c3a;
+      --warn: #8a4a16;
+      --font-display: Palatino, "Palatino Linotype", "Iowan Old Style", "Book Antiqua", "Times New Roman", serif;
+      --font-sans: "Avenir Next", Avenir, "Helvetica Neue", Helvetica, Arial, sans-serif;
+      --font-mono: ui-monospace, "SFMono-Regular", Menlo, Consolas, monospace;
+      --rail: 168px;
+      --folio: 280px;
+      --ledger: 136px;
+    }
+
+    *, *::before, *::after { box-sizing: border-box; }
+    html, body { margin: 0; min-width: 320px; background: var(--void); color: var(--white); }
+    html { height: 100%; overflow-x: hidden; }
+    body {
+      height: 100%;
+      display: flex;
+      flex-direction: column;
+      font-family: var(--font-sans);
+      font-size: 14px;
+      line-height: 1.45;
+      -webkit-font-smoothing: antialiased;
+      overflow: hidden;
+    }
+    button, select { font: inherit; color: inherit; }
+    button {
+      appearance: none;
+      border: 1px solid transparent;
+      background: transparent;
+      border-radius: 0;
+      cursor: pointer;
+      padding: 0;
+    }
+    button:disabled { cursor: not-allowed; opacity: .45; }
+    :focus { outline: none; }
+    :focus-visible { outline: 2px solid var(--white); outline-offset: 2px; }
+
+    .skip {
+      position: fixed;
+      width: 1px;
+      height: 1px;
+      overflow: hidden;
+      clip: rect(0 0 0 0);
+    }
+    .skip:focus {
+      width: auto;
+      height: auto;
+      clip: auto;
+      left: 8px;
+      top: 8px;
+      z-index: 40;
+      background: var(--paper);
+      color: var(--ink);
+      padding: 8px 12px;
+    }
+
+    .flag {
+      position: sticky;
+      top: 0;
+      z-index: 12;
+      padding: 5px 16px;
+      background: var(--void);
+      color: rgba(247, 247, 250, .55);
+      font-family: var(--font-mono);
+      font-size: 10px;
+      letter-spacing: .18em;
+      text-transform: uppercase;
+      border-bottom: 1px solid rgba(247, 247, 250, .12);
+    }
+
+    .app {
+      display: grid;
+      grid-template-columns: var(--rail) minmax(0, 1fr) var(--folio);
+      grid-template-rows: minmax(0, 1fr) var(--ledger);
+      flex: 1;
+      height: auto;
+      min-height: 0;
+    }
+    .app.is-focus .folio__hidden,
+    .app.is-focus .rail-epoch { display: none; }
+
+    .rail {
+      grid-row: 1 / -1;
+      display: flex;
+      flex-direction: column;
+      justify-content: flex-start;
+      gap: 28px;
+      padding: 18px 12px 16px;
+      background: var(--void);
+      color: var(--white);
+      border-right: 1px solid rgba(247, 247, 250, .12);
+    }
+    .rail__brand {
+      font-family: var(--font-display);
+      font-size: 28px;
+      line-height: .8;
+      letter-spacing: -.04em;
+    }
+    .rail__mark {
+      font-family: var(--font-sans);
+      font-size: 9px;
+      letter-spacing: .28em;
+      text-transform: uppercase;
+      opacity: .62;
+    }
+    .rail dl { margin: 0; display: grid; gap: 16px; }
+    .rail dt {
+      font-family: var(--font-sans);
+      font-size: 9px;
+      letter-spacing: .22em;
+      text-transform: uppercase;
+      opacity: .5;
+    }
+    .rail dd { margin: 4px 0 0; font-size: 12px; line-height: 1.35; overflow-wrap: anywhere; }
+    .rail__q { font-family: var(--font-display); font-size: 16px; letter-spacing: -.02em; line-height: 1.2; }
+    .rail button, .rail select {
+      width: 100%;
+      min-height: 32px;
+      border: 1px solid rgba(247,247,250,.28);
+      color: var(--white);
+      background: transparent;
+      padding: 6px 8px;
+      text-align: left;
+    }
+    .rail button:hover, .rail select:hover { background: rgba(247,247,250,.08); }
+    .rail select { background: var(--void); }
+
+    .plate {
+      position: relative;
+      grid-row: 1;
+      min-width: 0;
+      min-height: 0;
+      display: flex;
+      flex-direction: column;
+      padding: 12px 16px 8px;
+      background: var(--void);
+    }
+    .plate__head {
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-end;
+      flex-wrap: wrap;
+      gap: 10px 16px;
+      margin-bottom: 8px;
+    }
+    .toolbar {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+      justify-content: flex-end;
+      align-items: center;
+    }
+    .toolbar button,
+    .toolbar select {
+      min-height: 32px;
+      padding: 6px 10px;
+      border: 1px solid rgba(247,247,250,.35);
+      background: transparent;
+      color: var(--white);
+    }
+    .toolbar button:hover,
+    .toolbar select:hover { background: rgba(247,247,250,.08); }
+    .toolbar #btn-focus[aria-pressed="true"],
+    .toolbar #btn-details[aria-pressed="true"] {
+      background: var(--white);
+      color: var(--ink);
+      border-color: var(--white);
+    }
+    .toolbar label { display: none; }
+    @media (min-width: 901px) {
+      #gen-select { display: none; }
+    }
+    .plate__kicker {
+      font-family: var(--font-sans);
+      font-size: 10px;
+      letter-spacing: .28em;
+      text-transform: uppercase;
+      color: rgba(247, 247, 250, .5);
+    }
+    .plate h1 {
+      margin: 4px 0 0;
+      font-family: var(--font-display);
+      font-size: clamp(28px, 3.4vw, 44px);
+      font-weight: 400;
+      line-height: .9;
+      letter-spacing: -.03em;
+      color: var(--white);
+    }
+    .plate__meta {
+      font-family: var(--font-mono);
+      font-size: 10px;
+      color: rgba(247, 247, 250, .48);
+      text-align: right;
+      white-space: pre-line;
+    }
+    .plate__frame {
+      position: relative;
+      flex: 1;
+      min-height: 0;
+      border: 1px solid var(--cobalt);
+      background: var(--cobalt);
+      overflow: hidden;
+    }
+    .plate__inscribe {
+      position: absolute;
+      top: 10px;
+      left: 16px;
+      right: 16px;
+      z-index: 2;
+      margin: 0;
+      font-family: var(--font-sans);
+      font-size: clamp(11px, 1.15vw, 13px);
+      font-weight: 500;
+      letter-spacing: .34em;
+      text-transform: uppercase;
+      text-align: center;
+      color: var(--white);
+      pointer-events: none;
+    }
+    .tick {
+      position: absolute;
+      width: 10px;
+      height: 10px;
+      pointer-events: none;
+      z-index: 3;
+    }
+    .tick::before, .tick::after {
+      content: "";
+      position: absolute;
+      background: var(--white);
+    }
+    .tick::before { width: 10px; height: 1px; top: 4.5px; left: 0; }
+    .tick::after { width: 1px; height: 10px; left: 4.5px; top: 0; }
+    .tick--tl { top: -5px; left: -5px; }
+    .tick--tr { top: -5px; right: -5px; }
+    .tick--bl { bottom: -5px; left: -5px; }
+    .tick--br { bottom: -5px; right: -5px; }
+
+    .plate svg { display: block; width: 100%; height: 100%; }
+    .rib { fill: none; stroke: var(--white); stroke-width: 1; stroke-opacity: .28; }
+    .stratum-label {
+      font-family: var(--font-sans);
+      font-size: 9px;
+      letter-spacing: .16em;
+      text-transform: uppercase;
+      fill: rgba(247, 247, 250, .62);
+    }
+    .node-label { font-family: var(--font-sans); font-size: 12px; fill: var(--white); }
+    .node-code { font-family: var(--font-mono); font-size: 9px; fill: rgba(247, 247, 250, .62); }
+    .hit { cursor: pointer; }
+    .hit:focus { outline: none; }
+    .hit:focus-visible .node-core { stroke: var(--white); stroke-width: 2.5; }
+    .node-core { fill: var(--white); stroke: var(--white); stroke-width: 1; }
+    .node-label.is-selected { font-family: var(--font-display); fill: var(--white); }
+    .stem { fill: none; stroke: var(--white); stroke-width: 1; stroke-opacity: .7; }
+    .band { fill: var(--cobalt-deep); fill-opacity: .35; }
+    .ink-run { fill: none; stroke: var(--white); stroke-width: 1.2; stroke-dasharray: 7 5; stroke-opacity: .85; }
+    .draw { stroke-dasharray: 864; animation: draw-stroke 1.5s cubic-bezier(0.16, 1, 0.3, 1) both; }
+    @keyframes draw-stroke {
+      from { stroke-dashoffset: 864; }
+      to { stroke-dashoffset: 0; }
+    }
+    .app.is-paused .ink-run { display: none; }
+
+    .list { display: none; }
+
+    .folio {
+      grid-row: 1;
+      border-left: 1px solid rgba(247, 247, 250, .12);
+      padding: 14px 16px 12px;
+      background: var(--paper);
+      color: var(--ink);
+      min-width: 0;
+      min-height: 0;
+      overflow: auto;
+    }
+    .folio h2 {
+      margin: 0 0 14px;
+      font-family: var(--font-display);
+      font-size: 26px;
+      font-weight: 400;
+      line-height: 1;
+      letter-spacing: -.03em;
+    }
+    .folio__role {
+      font-family: var(--font-sans);
+      font-size: 10px;
+      letter-spacing: .22em;
+      text-transform: uppercase;
+      color: var(--quiet);
+    }
+    .folio dl { margin: 0; display: grid; gap: 12px; }
+    .folio dt {
+      font-family: var(--font-sans);
+      font-size: 9px;
+      letter-spacing: .16em;
+      text-transform: uppercase;
+      color: var(--quiet);
+    }
+    .folio dd { margin: 3px 0 0; }
+    .folio__hidden[hidden] { display: none !important; }
+    .folio :focus-visible { outline-color: var(--cobalt); }
+
+    .ledger {
+      grid-column: 2 / -1;
+      grid-row: 2;
+      display: grid;
+      grid-template-columns: minmax(0, 1.4fr) auto;
+      gap: 12px;
+      align-items: center;
+      padding: 10px 18px;
+      border-top: 1px solid rgba(247, 247, 250, .12);
+      background: var(--stone);
+      color: var(--ink);
+      min-height: 0;
+    }
+    .ledger table { width: 100%; border-collapse: collapse; }
+    .ledger th, .ledger td {
+      text-align: left;
+      vertical-align: top;
+      padding: 4px 12px 4px 0;
+      font-size: 12px;
+    }
+    .ledger th {
+      font-family: var(--font-sans);
+      font-size: 9px;
+      letter-spacing: .16em;
+      text-transform: uppercase;
+      font-weight: 500;
+      color: var(--quiet);
+    }
+    .ledger__act { display: flex; flex-direction: column; justify-content: center; gap: 8px; min-width: 168px; }
+    .ledger__act button {
+      min-height: 40px;
+      padding: 8px 12px;
+      background: var(--ink);
+      color: var(--white);
+      border-color: var(--ink);
+    }
+    .ledger__act button:hover { background: #000; }
+    .ledger__act button.quiet {
+      background: transparent;
+      color: var(--ink);
+      border-color: var(--ink);
+    }
+    .gens { display: flex; gap: 6px; margin-bottom: 8px; }
+    .gens button {
+      min-height: 32px;
+      padding: 6px 12px;
+      border: 1px solid var(--ink);
+      font-family: var(--font-mono);
+      font-size: 11px;
+      letter-spacing: .06em;
+      color: var(--ink);
+    }
+    .gens button[aria-current="true"] {
+      background: var(--ink);
+      color: var(--stone);
+    }
+
+    dialog {
+      width: min(460px, calc(100vw - 32px));
+      border: 1px solid var(--ink);
+      background: var(--paper);
+      padding: 22px;
+      color: var(--ink);
+    }
+    dialog::backdrop { background: rgba(7, 8, 12, .72); }
+    dialog h3 {
+      margin: 0 0 8px;
+      font-family: var(--font-display);
+      font-size: 28px;
+      font-weight: 400;
+    }
+    dialog p { margin: 0 0 16px; color: var(--quiet); }
+    .dlg-actions { display: flex; flex-wrap: wrap; gap: 8px; }
+    .dlg-actions button {
+      min-height: 36px;
+      padding: 8px 12px;
+      border-color: var(--ink);
+      color: var(--ink);
+    }
+    .dlg-actions .primary { background: var(--ink); color: var(--white); border-color: var(--ink); }
+
+    .status-ok { color: var(--ok); }
+    .status-warn { color: var(--warn); }
+
+    @media (prefers-reduced-motion: reduce) {
+      .ink-run { display: none !important; }
+      * { animation: none !important; transition: none !important; }
+    }
+
+    @media (max-width: 900px) {
+      .app {
+        display: flex;
+        flex-direction: column;
+        height: auto;
+        min-height: 0;
+        flex: none;
+      }
+      html, body { height: auto; overflow: auto; }
+      body { display: block; }
+      .app.is-focus .folio,
+      .app.is-focus .ledger__detail { display: block; }
+      .rail {
+        flex-direction: row;
+        flex-wrap: wrap;
+        align-items: flex-start;
+        gap: 12px 20px;
+        padding: 12px 14px;
+        border-right: 0;
+        border-bottom: 1px solid rgba(247, 247, 250, .12);
+      }
+      .rail dl {
+        grid-template-columns: repeat(3, minmax(0, 1fr));
+        flex: 1;
+        gap: 10px 16px;
+      }
+      .toolbar { width: 100%; justify-content: flex-start; }
+      .toolbar select {
+        position: static;
+        width: auto;
+        height: auto;
+        overflow: visible;
+        clip: auto;
+      }
+      .plate { padding: 14px; }
+      .plate__frame { display: none; }
+      .plate h1 { font-size: 34px; }
+      .list { display: grid; gap: 0; border: 1px solid var(--ink); background: var(--paper); color: var(--ink); }
+      .list button {
+        display: grid;
+        grid-template-columns: 88px 1fr;
+        gap: 10px;
+        width: 100%;
+        padding: 10px 12px;
+        border-top: 1px solid var(--rule);
+        text-align: left;
+        color: var(--ink);
+      }
+      .list button:first-child { border-top: 0; }
+      .list button[aria-current="true"] { background: #e7e8ff; }
+      .list .k {
+        font-family: var(--font-mono);
+        font-size: 9px;
+        letter-spacing: .12em;
+        text-transform: uppercase;
+        color: var(--quiet);
+      }
+      .folio { border-left: 0; border-top: 1px solid var(--rule); }
+      .ledger {
+        grid-column: auto;
+        grid-template-columns: 1fr;
+        padding: 14px;
+      }
+    }
+  </style>
+</head>
+<body>
+  <a class="skip" href="#plate">Skip to lineage plate</a>
+  <p class="flag">Illustrative prototype · demo state only · not a live AOS run · Machine Renaissance study</p>
+
+  <div class="app" id="app">
+    <header class="rail" aria-label="Run state">
+      <div>
+        <div class="rail__mark">Plate III</div>
+        <div class="rail__brand">AOS</div>
+      </div>
+      <dl>
+        <div>
+          <dt>Research question</dt>
+          <dd class="rail__q" id="rail-question"></dd>
+        </div>
+        <div>
+          <dt>Generation</dt>
+          <dd id="rail-gen"></dd>
+        </div>
+        <div>
+          <dt>Current model</dt>
+          <dd id="rail-model"></dd>
+        </div>
+        <div>
+          <dt>Run state</dt>
+          <dd id="rail-state"></dd>
+        </div>
+        <div class="rail-epoch">
+          <dt>Observation</dt>
+          <dd id="rail-epoch">synthetic 00</dd>
+        </div>
+      </dl>
+    </header>
+
+    <section class="plate" id="plate" aria-labelledby="plate-title">
+      <div class="plate__head">
+        <div>
+          <div class="plate__kicker">Genealogy of intelligence</div>
+          <h1 id="plate-title">Lineage of Minds</h1>
+        </div>
+        <div class="plate__meta" id="plate-meta"></div>
+        <div class="toolbar">
+          <button type="button" id="btn-run" aria-pressed="true">Pause run</button>
+          <button type="button" id="btn-focus" aria-pressed="true">Focus</button>
+          <button type="button" id="btn-details" aria-pressed="false">Details</button>
+          <label for="gen-select">Generation</label>
+          <select id="gen-select" aria-label="Switch generation"></select>
+        </div>
+      </div>
+      <div class="plate__frame" aria-hidden="false">
+        <p class="plate__inscribe">Inherit after evidence</p>
+        <span class="tick tick--tl"></span>
+        <span class="tick tick--tr"></span>
+        <span class="tick tick--bl"></span>
+        <span class="tick tick--br"></span>
+        <svg id="plate-svg" viewBox="0 0 980 560" role="img" aria-labelledby="plate-title plate-desc">
+          <title>Lineage of Minds</title>
+          <desc id="plate-desc">Cobalt architectural plate. Strata from goal through lead, branches, workers, findings, and proposed improvement. Not a generic node graph.</desc>
+        </svg>
+      </div>
+      <div class="list" id="lineage-list" hidden></div>
+    </section>
+
+    <aside class="folio" id="folio" aria-live="polite">
+      <div class="folio__role" id="folio-role">Selected object</div>
+      <h2 id="folio-title">—</h2>
+      <dl>
+        <div><dt>Role</dt><dd id="folio-job"></dd></div>
+        <div><dt>Exact model</dt><dd id="folio-model"></dd></div>
+        <div><dt>Present task</dt><dd id="folio-task"></dd></div>
+        <div><dt>Last inherited change</dt><dd id="folio-inh"></dd></div>
+        <div class="folio__hidden" id="details-block">
+          <div><dt>Tokens / latency</dt><dd id="folio-use"></dd></div>
+          <div><dt>Sources / evidence</dt><dd id="folio-src"></dd></div>
+          <div><dt>Confidence boundary</dt><dd id="folio-conf"></dd></div>
+        </div>
+      </dl>
+    </aside>
+
+    <footer class="ledger" aria-label="Generation ledger">
+      <div>
+        <div class="gens" id="gen-tabs" role="tablist" aria-label="Generations"></div>
+        <div class="ledger__detail">
+          <table>
+            <thead>
+              <tr>
+                <th>Compare</th>
+                <th>Capability gained</th>
+                <th>Cost</th>
+                <th>Time</th>
+                <th>Error</th>
+                <th>Rollback point</th>
+              </tr>
+            </thead>
+            <tbody id="ledger-body"></tbody>
+          </table>
+        </div>
+      </div>
+      <div class="ledger__act">
+        <button type="button" id="btn-review">Review mutation</button>
+        <button type="button" class="quiet" id="btn-reset">Reset demo</button>
+      </div>
+    </footer>
+  </div>
+
+  <dialog id="review-dialog" aria-labelledby="review-title">
+    <h3 id="review-title">Review mutation</h3>
+    <p id="review-copy"></p>
+    <p>Demo only. Approve and rollback are reversible and do not write a live run.</p>
+    <div class="dlg-actions">
+      <button type="button" class="primary" id="btn-approve">Approve inherit</button>
+      <button type="button" id="btn-rollback">Rollback</button>
+      <button type="button" id="btn-cancel">Close</button>
+    </div>
+  </dialog>
+
+  <script>
+    const QUESTION = "How should AOS inherit a worker mutation after a failed evidence pass?";
+    const STRATA = [
+      { id: "goal", y: 72, label: "Goal" },
+      { id: "lead", y: 154, label: "Lead" },
+      { id: "branch", y: 236, label: "Branches" },
+      { id: "worker", y: 318, label: "Workers" },
+      { id: "finding", y: 400, label: "Find" },
+      { id: "mutation", y: 482, label: "Change" },
+    ];
+
+    const GENERATIONS = [
+      {
+        id: 0,
+        code: "GEN 00",
+        name: "Baseline docket",
+        state: "inherited",
+        model: "claude-fable-5-1",
+        ledger: {
+          versus: "Baseline",
+          capability: "Delegation without a review gate",
+          cost: "1.00×",
+          time: "4.2 h median review wait",
+          error: "Evidence omitted in 2 of 5 tasks",
+          rollback: "—",
+        },
+        nodes: [
+          { id: "g0-goal", stratum: "goal", x: 490, title: "Inherit mutations only after evidence", job: "Objective", model: "—", task: "State the failure: implementation landed without an evidence ledger.", use: "—", src: "4 notes", conf: "High on diagnosis", inh: "Founding question" },
+          { id: "g0-lead", stratum: "lead", x: 490, title: "fable-aos", job: "Planner / coordinator", model: "claude-fable-5-1", task: "Frame the failure and assign review and implementation branches.", use: "41.2k · 6.4s", src: "4 sources", conf: "High on diagnosis; low on fix", inh: "Original lead" },
+          { id: "g0-br1", stratum: "branch", x: 300, title: "Research review", job: "Branch", model: "claude-opus-4-8-thinking-high", task: "Check whether the omission was process or evidence.", use: "18.0k · 9.1s", src: "2 sources", conf: "Medium", inh: "Assigned by lead" },
+          { id: "g0-br2", stratum: "branch", x: 680, title: "Implementation", job: "Branch", model: "grok-4.6", task: "Land the worker change without a gate.", use: "22.4k · 11.0s", src: "1 source", conf: "Low on provenance", inh: "Assigned by lead" },
+          { id: "g0-w1", stratum: "worker", x: 300, title: "opus-aos", job: "Reviewer", model: "claude-opus-4-8-thinking-high", task: "Read the docket and mark the missing ledger.", use: "12.6k · 4.8s", src: "2 sources", conf: "High on omission", inh: "From research review" },
+          { id: "g0-w2", stratum: "worker", x: 680, title: "grok46-aos", job: "Implementer", model: "grok-4.6", task: "Ship the change. No review gate existed.", use: "19.8k · 8.2s", src: "0 evidence rows", conf: "Work done; proof absent", inh: "From implementation" },
+          { id: "g0-f", stratum: "finding", x: 490, title: "Evidence omitted", job: "Finding", model: "—", task: "Two of five tasks closed without an evidence row.", use: "—", src: "5 task records", conf: "Observed", inh: "From both branches" },
+          { id: "g0-m", stratum: "mutation", x: 490, title: "Insert execution-manager gate", job: "Proposed mutation", model: "—", task: "Stop inheritance until an execution manager reviews evidence.", use: "—", src: "1 proposal", conf: "Unevaluated", inh: "Not inherited" },
+        ],
+        stems: [["g0-goal","g0-lead"],["g0-lead","g0-br1"],["g0-lead","g0-br2"],["g0-br1","g0-w1"],["g0-br2","g0-w2"],["g0-w1","g0-f"],["g0-w2","g0-f"],["g0-f","g0-m"]],
+      },
+      {
+        id: 1,
+        code: "GEN 01",
+        name: "Execution gate",
+        state: "under evaluation",
+        model: "cursor-grok-4.6-high",
+        ledger: {
+          versus: "Candidate vs GEN 00",
+          capability: "Mutations stop for evidence review",
+          cost: "1.18×",
+          time: "Review wait −3.1 h; gate +18 min",
+          error: "Evidence omitted in 0 of 5 tasks",
+          rollback: "GEN 00 / baseline docket",
+        },
+        nodes: [
+          { id: "g1-goal", stratum: "goal", x: 490, title: "Inherit mutations only after evidence", job: "Objective", model: "—", task: "Keep the same question; evaluate the gate.", use: "—", src: "4 notes + GEN 00", conf: "Unchanged objective", inh: "From GEN 00" },
+          { id: "g1-lead", stratum: "lead", x: 490, title: "fable-aos", job: "Planner / coordinator", model: "claude-fable-5-1", task: "Hold the hierarchy. Do not let workers overwrite each other.", use: "28.4k · 5.1s", src: "6 sources", conf: "High on structure", inh: "Lead retained" },
+          { id: "g1-br1", stratum: "branch", x: 250, title: "Research review", job: "Branch", model: "claude-opus-4-8-thinking-high", task: "Confirm the gate catches the GEN 00 failure.", use: "9.2k · 3.6s", src: "3 sources", conf: "High", inh: "Retained branch" },
+          { id: "g1-br2", stratum: "branch", x: 490, title: "Execution", job: "Branch", model: "cursor-grok-4.6-high", task: "Review evidence before inheritance.", use: "14.0k · 4.2s", src: "5 sources", conf: "Medium-high", inh: "New branch" },
+          { id: "g1-br3", stratum: "branch", x: 740, title: "Implementation", job: "Branch", model: "grok-4.6", task: "Land only what the gate accepts.", use: "16.1k · 7.4s", src: "2 sources", conf: "Medium", inh: "Retained, gated" },
+          { id: "g1-w1", stratum: "worker", x: 250, title: "opus-aos", job: "Reviewer", model: "claude-opus-4-8-thinking-high", task: "Re-read GEN 00 omission against the new gate.", use: "8.8k · 3.1s", src: "3 sources", conf: "High", inh: "From research review" },
+          { id: "g1-w2", stratum: "worker", x: 490, title: "grok46-cursor-aos", job: "Execution manager", model: "cursor-grok-4.6-high", task: "Hold the review gate. Report blockers. Do not merge unreviewed UI.", use: "11.5k · 4.0s", src: "5 sources", conf: "High on process", inh: "Inserted by mutation" },
+          { id: "g1-w3", stratum: "worker", x: 680, title: "grok46-aos", job: "Implementer", model: "grok-4.6", task: "Implement behind the gate.", use: "15.2k · 6.8s", src: "2 sources", conf: "Medium", inh: "From implementation" },
+          { id: "g1-w4", stratum: "worker", x: 820, title: "deepseek-flash-aos", job: "Bulk checker", model: "deepseek-v4.1-flash:free", task: "Scan task rows for missing evidence.", use: "3.1k · 1.2s", src: "5 task records", conf: "High on counts", inh: "Cheap lane" },
+          { id: "g1-f", stratum: "finding", x: 490, title: "Gate holds; latency traded", job: "Finding", model: "—", task: "Zero omitted evidence rows. Cost up. Wait down.", use: "—", src: "5 task records", conf: "Observed in demo", inh: "From execution + bulk" },
+          { id: "g1-m", stratum: "mutation", x: 490, title: "Inherit GEN 01 or roll back", job: "Pending decision", model: "—", task: "Founder/reviewer must approve. The system does not rewrite itself.", use: "—", src: "1 decision", conf: "Awaiting review", inh: "Not inherited" },
+        ],
+        stems: [["g1-goal","g1-lead"],["g1-lead","g1-br1"],["g1-lead","g1-br2"],["g1-lead","g1-br3"],["g1-br1","g1-w1"],["g1-br2","g1-w2"],["g1-br3","g1-w3"],["g1-br3","g1-w4"],["g1-w1","g1-f"],["g1-w2","g1-f"],["g1-w3","g1-f"],["g1-w4","g1-f"],["g1-f","g1-m"]],
+      },
+      {
+        id: 2,
+        code: "GEN 02",
+        name: "Bulk verification lane",
+        state: "proposed",
+        model: "deepseek-v4.1-flash:free",
+        ledger: {
+          versus: "Proposed vs GEN 01",
+          capability: "Cheap bulk check before human review",
+          cost: "1.06× vs GEN 01 (est.)",
+          time: "Gate −8 min (est.)",
+          error: "Unevaluated",
+          rollback: "GEN 01 / execution gate",
+        },
+        nodes: [
+          { id: "g2-goal", stratum: "goal", x: 490, title: "Inherit mutations only after evidence", job: "Objective", model: "—", task: "Same question. Do not treat this generation as inherited.", use: "—", src: "GEN 00–01", conf: "Proposal only", inh: "From GEN 01" },
+          { id: "g2-lead", stratum: "lead", x: 490, title: "fable-aos", job: "Planner / coordinator", model: "claude-fable-5-1", task: "Decide whether a cheap lane may run before the gate.", use: "—", src: "—", conf: "Not run", inh: "Lead retained" },
+          { id: "g2-br1", stratum: "branch", x: 320, title: "Execution", job: "Branch", model: "cursor-grok-4.6-high", task: "Keep the review gate above the cheap lane.", use: "—", src: "—", conf: "Proposed", inh: "From GEN 01" },
+          { id: "g2-br2", stratum: "branch", x: 680, title: "Bulk verification", job: "Branch", model: "deepseek-v4.1-flash:free", task: "Pre-scan evidence rows before manager review.", use: "—", src: "—", conf: "Proposed", inh: "New proposed branch" },
+          { id: "g2-w1", stratum: "worker", x: 320, title: "grok46-cursor-aos", job: "Execution manager", model: "cursor-grok-4.6-high", task: "Accept or reject the bulk lane. Still no self-rewrite.", use: "—", src: "—", conf: "Proposed", inh: "Gate stays" },
+          { id: "g2-w2", stratum: "worker", x: 680, title: "deepseek-flash-aos", job: "Bulk checker", model: "deepseek-v4.1-flash:free", task: "Flag missing evidence before human time is spent.", use: "—", src: "—", conf: "Proposed", inh: "Promoted lane" },
+          { id: "g2-f", stratum: "finding", x: 490, title: "Not yet observed", job: "Finding", model: "—", task: "No live claim. This plate is a proposed generation.", use: "—", src: "0 runs", conf: "None", inh: "—" },
+          { id: "g2-m", stratum: "mutation", x: 490, title: "Do not inherit yet", job: "Proposed mutation", model: "—", task: "Evaluate against GEN 01 before any inherit.", use: "—", src: "1 proposal", conf: "Blocked on review", inh: "Not inherited" },
+        ],
+        stems: [["g2-goal","g2-lead"],["g2-lead","g2-br1"],["g2-lead","g2-br2"],["g2-br1","g2-w1"],["g2-br2","g2-w2"],["g2-w1","g2-f"],["g2-w2","g2-f"],["g2-f","g2-m"]],
+      },
+    ];
+
+    const state = {
+      gen: 1,
+      selected: "g1-w2",
+      details: false,
+      focus: true,
+      running: true,
+      epoch: 0,
+      decision: "pending",
+    };
+
+    const $ = (id) => document.getElementById(id);
+    const gen = () => GENERATIONS[state.gen];
+    const nodeById = (id) => gen().nodes.find((n) => n.id === id);
+    const stratumY = (id) => STRATA.find((s) => s.id === id).y;
+
+    function ribs() {
+      return [0, 1, 2, 3, 4, 5, 6, 7].map((i) => {
+        const y = 28 + i * 62;
+        const bow = 22 + i * 7;
+        return `<path class="rib" d="M 36 ${y} C 260 ${y + bow}, 720 ${y + bow}, 944 ${y}" />`;
+      }).join("");
+    }
+
+    function renderPlate() {
+      const g = gen();
+      const svg = $("plate-svg");
+      const reduced = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+      const nodes = g.nodes;
+      const byId = Object.fromEntries(nodes.map((n) => [n.id, n]));
+      const pairs = [];
+      const seen = new Set();
+      g.stems.forEach(([a, b]) => {
+        const sa = byId[a].stratum;
+        const sb = byId[b].stratum;
+        if (sa === sb) return;
+        const key = sa + ">" + sb;
+        if (seen.has(key)) return;
+        seen.add(key);
+        pairs.push([sa, sb]);
+      });
+      const stems = pairs.map(([sa, sb]) => {
+        const y1 = stratumY(sa);
+        const y2 = stratumY(sb);
+        return `M 88 ${y1} C 36 ${y1}, 36 ${y2}, 88 ${y2}`;
+      }).join("");
+      const bands = STRATA.map((s, i) => i % 2 === 0
+        ? `<rect class="band" x="92" y="${s.y - 26}" width="864" height="52" />`
+        : "").join("");
+
+      const marks = nodes.map((n, i) => {
+        const y = stratumY(n.stratum);
+        const selected = n.id === state.selected;
+        const num = String(i + 1).padStart(2, "0");
+        return `<g class="hit" tabindex="0" data-id="${n.id}" role="button" aria-pressed="${selected}" aria-label="${n.job}: ${n.title}">
+          <line x1="${n.x - 6}" y1="${y}" x2="${n.x + 6}" y2="${y}" stroke="var(--white)" stroke-width="${selected ? 2 : 1}" />
+          <line x1="${n.x}" y1="${y - 6}" x2="${n.x}" y2="${y + 6}" stroke="var(--white)" stroke-width="${selected ? 2 : 1}" />
+          ${selected ? `<circle class="node-core" cx="${n.x}" cy="${y}" r="3.5" />` : ""}
+          <text class="node-code" x="${n.x + 11}" y="${y - 9}">${num} · ${n.job}</text>
+          <text class="node-label ${selected ? "is-selected" : ""}" x="${n.x + 11}" y="${y + 8}">${n.title}</text>
+        </g>`;
+      }).join("");
+
+      const labels = STRATA.map((s) =>
+        `<text class="stratum-label" x="24" y="${s.y + 3}">${s.label}</text>
+         <line x1="92" y1="${s.y}" x2="956" y2="${s.y}" stroke="var(--white)" stroke-opacity=".22" />`
+      ).join("");
+
+      svg.innerHTML = `
+        ${ribs()}
+        ${bands}
+        ${labels}
+        <path class="stem" d="${stems}" />
+        ${reduced ? "" : `<path class="ink-run ${g.id === 1 || g.id === 2 ? "draw" : ""}" d="M 92 ${stratumY("mutation")} H 956" />`}
+        ${marks}
+        <text class="stratum-label" x="24" y="544">reg. 03 / 1000 · plate III · illustrative · no live telemetry</text>
+      `;
+
+      svg.querySelectorAll(".hit").forEach((el) => {
+        const id = el.getAttribute("data-id");
+        el.addEventListener("click", () => select(id));
+        el.addEventListener("keydown", (e) => {
+          if (e.key === "Enter" || e.key === " ") { e.preventDefault(); select(id); }
+        });
+      });
+    }
+
+    function renderList() {
+      const box = $("lineage-list");
+      const mobile = window.matchMedia("(max-width: 900px)").matches;
+      box.hidden = !mobile;
+      box.innerHTML = gen().nodes.map((n) => `
+        <button type="button" data-id="${n.id}" aria-current="${n.id === state.selected}">
+          <span class="k">${n.job}</span>
+          <span>${n.title}</span>
+        </button>
+      `).join("");
+      box.querySelectorAll("button").forEach((b) => b.addEventListener("click", () => select(b.dataset.id)));
+    }
+
+    function renderFolio() {
+      const n = nodeById(state.selected) || gen().nodes[0];
+      $("folio-role").textContent = `${gen().code} · ${n.stratum}`;
+      $("folio-title").textContent = n.title;
+      $("folio-job").textContent = n.job;
+      $("folio-model").textContent = n.model;
+      $("folio-task").textContent = n.task;
+      $("folio-use").textContent = n.use;
+      $("folio-src").textContent = n.src;
+      $("folio-conf").textContent = n.conf;
+      $("folio-inh").textContent = n.inh;
+      $("details-block").hidden = !state.details;
+    }
+
+    function renderRail() {
+      const g = gen();
+      $("rail-question").textContent = QUESTION;
+      $("rail-gen").textContent = `${g.code} · ${g.name}`;
+      $("rail-model").textContent = g.model;
+      const decision = state.decision === "approved" ? "inherited (demo)"
+        : state.decision === "rolled-back" ? "rolled back (demo)"
+        : g.state;
+      $("rail-state").textContent = `${decision}${state.running ? " · running" : " · paused"}`;
+      $("rail-epoch").textContent = `synthetic ${String(state.epoch).padStart(2, "0")}`;
+      $("plate-meta").textContent = `${g.code}\n${g.name}\n${decision}`;
+      $("btn-run").textContent = state.running ? "Pause run" : "Resume run";
+      $("btn-run").setAttribute("aria-pressed", String(state.running));
+      $("btn-focus").setAttribute("aria-pressed", String(state.focus));
+      $("btn-details").setAttribute("aria-pressed", String(state.details));
+      $("app").classList.toggle("is-focus", state.focus);
+      $("app").classList.toggle("is-paused", !state.running);
+    }
+
+    function renderLedger() {
+      const tabs = $("gen-tabs");
+      tabs.innerHTML = GENERATIONS.map((g) =>
+        `<button type="button" role="tab" ${g.id === state.gen ? 'aria-current="true"' : ""} data-id="${g.id}">${g.code}</button>`
+      ).join("");
+      tabs.querySelectorAll("button").forEach((b) => b.addEventListener("click", () => setGen(Number(b.dataset.id))));
+      const sel = $("gen-select");
+      sel.innerHTML = GENERATIONS.map((g) =>
+        `<option value="${g.id}" ${g.id === state.gen ? "selected" : ""}>${g.code} · ${g.name}</option>`
+      ).join("");
+      const L = gen().ledger;
+      $("ledger-body").innerHTML = `<tr>
+        <td>${L.versus}</td><td>${L.capability}</td><td>${L.cost}</td>
+        <td>${L.time}</td><td>${L.error}</td><td>${L.rollback}</td>
+      </tr>`;
+      $("review-copy").textContent = `GEN 01 inserts an execution-manager review gate after GEN 00 omitted evidence. GEN 02 is a proposal only. Current demo decision: ${state.decision}.`;
+    }
+
+    function select(id) {
+      if (!nodeById(id)) return;
+      state.selected = id;
+      draw();
+    }
+
+    function setGen(id) {
+      state.gen = id;
+      const first = GENERATIONS[id].nodes.find((n) => n.stratum === "worker") || GENERATIONS[id].nodes[0];
+      state.selected = first.id;
+      draw();
+    }
+
+    function draw() {
+      renderRail();
+      renderPlate();
+      renderList();
+      renderFolio();
+      renderLedger();
+    }
+
+    $("btn-run").addEventListener("click", () => { state.running = !state.running; renderRail(); });
+    $("btn-focus").addEventListener("click", () => {
+      state.focus = true;
+      state.details = false;
+      renderRail();
+      renderFolio();
+    });
+    $("btn-details").addEventListener("click", () => {
+      state.details = true;
+      state.focus = false;
+      renderRail();
+      renderFolio();
+    });
+    $("gen-select").addEventListener("change", (e) => setGen(Number(e.target.value)));
+    $("btn-review").addEventListener("click", () => $("review-dialog").showModal());
+    $("btn-cancel").addEventListener("click", () => $("review-dialog").close());
+    $("btn-approve").addEventListener("click", () => {
+      state.decision = "approved";
+      state.gen = 1;
+      $("review-dialog").close();
+      draw();
+    });
+    $("btn-rollback").addEventListener("click", () => {
+      state.decision = "rolled-back";
+      state.gen = 0;
+      state.selected = "g0-m";
+      $("review-dialog").close();
+      draw();
+    });
+    $("btn-reset").addEventListener("click", () => {
+      state.gen = 1;
+      state.selected = "g1-w2";
+      state.details = false;
+      state.focus = true;
+      state.running = true;
+      state.epoch = 0;
+      state.decision = "pending";
+      draw();
+    });
+
+    window.addEventListener("resize", renderList);
+    setInterval(() => {
+      if (!state.running) return;
+      state.epoch = (state.epoch + 1) % 48;
+      $("rail-epoch").textContent = `synthetic ${String(state.epoch).padStart(2, "0")}`;
+    }, 1600);
+
+    draw();
+  </script>
+</body>
+</html>

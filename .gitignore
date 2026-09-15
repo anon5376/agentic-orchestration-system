@@ -1,0 +1,10 @@
+node_modules/
+dist/
+.aos/
+.backups/
+evidence/
+.cursor/
+/techno-renaissance
+/public-runtime/techno-renaissance/
+*.tmp
+.DS_Store

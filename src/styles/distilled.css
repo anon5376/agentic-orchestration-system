@@ -1,0 +1,340 @@
+/*
+ * Focus is the default operating density. Secondary telemetry remains in the
+ * DOM and can be restored from the DETAILS control without losing state.
+ */
+
+[data-density="focus"] .missions-page__hero-count,
+[data-density="focus"] .missions-page__hero-note,
+[data-density="focus"] .mission-row__signal,
+[data-density="focus"] .mission-row__event,
+[data-density="focus"] .missions-page__selection-note > :last-child,
+[data-density="focus"] .intake-page__step-line,
+[data-density="focus"] .intake-context__item:nth-child(n + 3),
+[data-density="focus"] .intake-section:nth-of-type(n + 3),
+[data-density="focus"] .intake-input__footnote,
+[data-density="focus"] .intake-page__footer-note,
+[data-density="focus"] .intake-interpretation__aside-note,
+[data-density="focus"] .intake-interpretation__annotation,
+[data-density="focus"] .swarm-metrics,
+[data-density="focus"] .swarm-inspector__specimen,
+[data-density="focus"] .swarm-inspector__members,
+[data-density="focus"] .swarm-page__legend,
+[data-density="focus"] .swarm-field__system-copy,
+[data-density="focus"] .swarm-field__bottom-copy,
+[data-density="focus"] .evidence-page__hero-copy,
+[data-density="focus"] .evidence-page__hero-stats,
+[data-density="focus"] .evidence-page__specimen,
+[data-density="focus"] .evidence-card__meta,
+[data-density="focus"] .evidence-page__state > :last-child,
+[data-density="focus"] .synthesis-hero__thesis,
+[data-density="focus"] .synthesis-hero__context,
+[data-density="focus"] .synthesis-perspective,
+[data-density="focus"] .synthesis-check__criteria span:nth-child(2),
+[data-density="focus"] .synthesis-signal,
+[data-density="focus"] .synthesis-conclusion__copy p,
+[data-density="focus"] .synthesis-decision-bar > button:not(:nth-of-type(1)) small,
+[data-density="focus"] .evolution-hero__thesis,
+[data-density="focus"] .evolution-hero__context,
+[data-density="focus"] .evolution-observation__detail,
+[data-density="focus"] .evolution-version__labels span:nth-child(2),
+[data-density="focus"] .evolution-version__labels span:nth-child(3),
+[data-density="focus"] .evolution-version__labels span:nth-child(6),
+[data-density="focus"] .evolution-results__foot,
+[data-density="focus"] .evolution-actions button:not(:first-child) small,
+[data-density="focus"] .capabilities-hero__thesis,
+[data-density="focus"] .capabilities-hero__context,
+[data-density="focus"] .capability-column li:nth-child(n + 4),
+[data-density="focus"] .capability-column__add,
+[data-density="focus"] .capabilities-routes,
+[data-density="focus"] .capability-topology__caption small,
+[data-density="focus"] .capability-item__menu,
+[data-density="focus"] .memory-hero__thesis,
+[data-density="focus"] .memory-hero__context,
+[data-density="focus"] .memory-layer:not(.is-active) .memory-layer__body,
+[data-density="focus"] .memory-layer__paths,
+[data-density="focus"] .policy-row__copy small,
+[data-density="focus"] .policy-row__state small,
+[data-density="focus"] .policy-ledger footer button:nth-child(n + 2),
+[data-density="focus"] .memory-status small {
+  display: none;
+}
+
+@media (max-width: 920px) {
+  [data-density="focus"] .synthesis-conclusion {
+    order: -1;
+  }
+}
+
+@media (min-width: 981px) {
+  [data-density="focus"] .global-rail {
+    grid-template-columns: minmax(170px, 0.55fr) minmax(460px, 2.8fr) auto;
+  }
+
+  [data-density="focus"] .global-rail__run,
+  [data-density="focus"] .global-rail__project,
+  [data-density="focus"] .global-rail__divider,
+  [data-density="focus"] .global-rail__actions .status-signal,
+  [data-density="focus"] .route-nav__label {
+    display: none;
+  }
+
+  [data-density="focus"] .route-nav {
+    justify-content: center;
+    gap: 14px;
+  }
+
+  [data-density="focus"] .route-nav__link {
+    justify-content: center;
+    min-width: 40px;
+    padding-inline: 8px;
+  }
+
+  [data-density="focus"] .aos-main {
+    padding-inline: clamp(38px, 4.5vw, 72px);
+  }
+
+  /* Missions: one specimen, one brief, one decision. */
+  [data-density="focus"] .missions-page__hero {
+    grid-template-columns: minmax(0, 1fr) minmax(220px, 0.28fr);
+  }
+
+  [data-density="focus"] .missions-page__hero-count,
+  [data-density="focus"] .missions-page__hero-note,
+  [data-density="focus"] .mission-row__signal,
+  [data-density="focus"] .mission-row__event,
+  [data-density="focus"] .missions-page__selection-note > :last-child {
+    display: none;
+  }
+
+  [data-density="focus"] .mission-row {
+    grid-template-columns: 34px minmax(210px, 0.9fr) minmax(300px, 1.35fr) minmax(130px, 0.55fr) minmax(250px, 1fr);
+    min-height: 224px;
+  }
+
+  [data-density="focus"] .mission-row__brief,
+  [data-density="focus"] .mission-row__telemetry,
+  [data-density="focus"] .mission-row__decision {
+    padding-inline: 24px;
+  }
+
+  /* Intake: keep the objective and interpretation; defer policy boilerplate. */
+  [data-density="focus"] .intake-page__workspace {
+    grid-template-columns: minmax(430px, 0.92fr) minmax(0, 1.08fr);
+  }
+
+  [data-density="focus"] .intake-page__step-line,
+  [data-density="focus"] .intake-context__item:nth-child(n + 3),
+  [data-density="focus"] .intake-section:nth-of-type(n + 3),
+  [data-density="focus"] .intake-input__footnote,
+  [data-density="focus"] .intake-page__footer-note,
+  [data-density="focus"] .intake-interpretation__aside-note,
+  [data-density="focus"] .intake-interpretation__annotation {
+    display: none;
+  }
+
+  [data-density="focus"] .intake-page__steps {
+    justify-content: space-between;
+  }
+
+  [data-density="focus"] .intake-input,
+  [data-density="focus"] .intake-interpretation__copy {
+    padding-inline: 30px;
+  }
+
+  /* Swarm: map and selected branch are the operating surface. */
+  [data-density="focus"] .swarm-page__body {
+    grid-template-columns: minmax(0, 1fr) minmax(270px, 0.34fr);
+  }
+
+  [data-density="focus"] .swarm-metrics,
+  [data-density="focus"] .swarm-inspector__specimen,
+  [data-density="focus"] .swarm-inspector__members,
+  [data-density="focus"] .swarm-page__legend,
+  [data-density="focus"] .swarm-field__system-copy,
+  [data-density="focus"] .swarm-field__bottom-copy {
+    display: none;
+  }
+
+  [data-density="focus"] .swarm-inspector {
+    padding: 24px 22px;
+  }
+
+  [data-density="focus"] .swarm-branches {
+    gap: 12px;
+    padding: 18px;
+  }
+
+  /* Evidence: the claim graph and its filters do the talking. */
+  [data-density="focus"] .evidence-page__hero {
+    grid-template-columns: minmax(480px, 1fr) minmax(420px, 0.7fr);
+  }
+
+  [data-density="focus"] .evidence-page__hero-copy,
+  [data-density="focus"] .evidence-page__hero-stats,
+  [data-density="focus"] .evidence-page__specimen,
+  [data-density="focus"] .evidence-card__meta,
+  [data-density="focus"] .evidence-page__state > :last-child {
+    display: none;
+  }
+
+  [data-density="focus"] .evidence-page__atlas {
+    gap: 18px;
+    padding-top: 18px;
+  }
+
+  [data-density="focus"] .evidence-card__body > span {
+    display: none;
+  }
+
+  /* Synthesis: three checks converge on one conclusion. */
+  [data-density="focus"] .synthesis-hero {
+    grid-template-columns: minmax(0, 1fr) minmax(260px, 0.32fr);
+  }
+
+  [data-density="focus"] .synthesis-hero__thesis,
+  [data-density="focus"] .synthesis-hero__context,
+  [data-density="focus"] .synthesis-perspective,
+  [data-density="focus"] .synthesis-check__criteria span:nth-child(2),
+  [data-density="focus"] .synthesis-signal,
+  [data-density="focus"] .synthesis-conclusion__copy p,
+  [data-density="focus"] .synthesis-decision-bar > button:not(:nth-of-type(1)) small {
+    display: none;
+  }
+
+  [data-density="focus"] .synthesis-workfield {
+    grid-template-columns: minmax(190px, 0.86fr) minmax(190px, 0.86fr) minmax(390px, 1.7fr) minmax(190px, 0.86fr);
+  }
+
+  [data-density="focus"] .synthesis-check {
+    gap: 22px;
+    padding: 26px 22px 22px;
+  }
+
+  [data-density="focus"] .synthesis-conclusion {
+    padding: 26px 34px 22px;
+  }
+
+  [data-density="focus"] .synthesis-conclusion__copy h2 {
+    margin-top: 54px;
+    font-size: clamp(38px, 3.15vw, 52px);
+  }
+
+  [data-density="focus"] .synthesis-decision-bar {
+    grid-template-columns: minmax(220px, 0.75fr) minmax(330px, 1.35fr) repeat(2, minmax(220px, 0.85fr));
+  }
+
+  [data-density="focus"] .synthesis-decision-bar > button:not(:nth-of-type(1)) {
+    color: var(--atlas-ash);
+  }
+
+  /* Evolution: compare the organisms and the outcome; traces are on demand. */
+  [data-density="focus"] .evolution-hero {
+    grid-template-columns: minmax(0, 1fr) minmax(260px, 0.3fr);
+  }
+
+  [data-density="focus"] .evolution-hero__thesis,
+  [data-density="focus"] .evolution-hero__context,
+  [data-density="focus"] .evolution-observation__detail,
+  [data-density="focus"] .evolution-version__labels span:nth-child(2),
+  [data-density="focus"] .evolution-version__labels span:nth-child(3),
+  [data-density="focus"] .evolution-version__labels span:nth-child(6),
+  [data-density="focus"] .evolution-results__foot {
+    display: none;
+  }
+
+  [data-density="focus"] .evolution-observations {
+    grid-template-columns: repeat(4, minmax(0, 0.85fr)) minmax(280px, 1.4fr);
+  }
+
+  [data-density="focus"] .evolution-observation,
+  [data-density="focus"] .evolution-results {
+    min-height: 170px;
+    padding: 20px;
+  }
+
+  [data-density="focus"] .evolution-actions button:not(:first-child) small {
+    display: none;
+  }
+
+  /* Capabilities: route shape first, module detail second. */
+  [data-density="focus"] .capabilities-hero {
+    grid-template-columns: minmax(0, 1fr) minmax(280px, 0.3fr);
+  }
+
+  [data-density="focus"] .capabilities-hero__thesis,
+  [data-density="focus"] .capabilities-hero__context,
+  [data-density="focus"] .capability-column li:nth-child(n + 4),
+  [data-density="focus"] .capability-column__add,
+  [data-density="focus"] .capabilities-routes,
+  [data-density="focus"] .capability-topology__caption small,
+  [data-density="focus"] .capability-item__menu {
+    display: none;
+  }
+
+  [data-density="focus"] .capabilities-field {
+    grid-template-columns: minmax(300px, 0.8fr) minmax(0, 2.2fr);
+  }
+
+  [data-density="focus"] .capabilities-columns {
+    gap: 10px;
+    padding: 20px;
+  }
+
+  [data-density="focus"] .capability-column {
+    padding-inline: 8px;
+  }
+
+  [data-density="focus"] .capability-item {
+    min-height: 78px;
+    padding: 12px 9px;
+  }
+
+  [data-density="focus"] .capabilities-bottom {
+    grid-template-columns: minmax(220px, 0.42fr) minmax(0, 1fr);
+  }
+
+  [data-density="focus"] .capabilities-actions,
+  [data-density="focus"] .capabilities-inspector {
+    padding-inline: 24px;
+  }
+
+  /* Memory: only the active layer opens; the full ledger stays scannable. */
+  [data-density="focus"] .memory-hero {
+    grid-template-columns: minmax(0, 1fr) minmax(300px, 0.34fr);
+  }
+
+  [data-density="focus"] .memory-hero__thesis,
+  [data-density="focus"] .memory-hero__context,
+  [data-density="focus"] .memory-layer:not(.is-active) .memory-layer__body,
+  [data-density="focus"] .memory-layer__paths,
+  [data-density="focus"] .policy-row__copy small,
+  [data-density="focus"] .policy-row__state small,
+  [data-density="focus"] .policy-ledger footer button:nth-child(n + 2),
+  [data-density="focus"] .memory-status small {
+    display: none;
+  }
+
+  [data-density="focus"] .memory-field {
+    grid-template-columns: minmax(340px, 1.1fr) minmax(390px, 1fr) minmax(330px, 0.9fr);
+  }
+
+  [data-density="focus"] .memory-layer__head {
+    min-height: 86px;
+    padding: 18px;
+  }
+
+  [data-density="focus"] .memory-layer__body {
+    grid-template-columns: 1fr;
+    padding: 18px;
+  }
+
+  [data-density="focus"] .policy-row {
+    grid-template-columns: 42px minmax(0, 1fr) minmax(130px, 0.55fr);
+    min-height: 86px;
+    padding: 16px 14px;
+  }
+
+  [data-density="focus"] .policy-ledger footer {
+    grid-template-columns: 1fr;
+  }
+}

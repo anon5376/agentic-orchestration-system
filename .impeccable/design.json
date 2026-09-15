@@ -1,0 +1,42 @@
+{
+  "schemaVersion": 2,
+  "generatedAt": "2026-09-13T00:00:00+09:00",
+  "title": "Design System: AOS Research Docket / Electric Archive",
+  "extensions": {
+    "colorMeta": {
+      "cobalt": { "role": "primary", "displayName": "Electric Cobalt", "canonical": "#101CFF" },
+      "cobalt-deep": { "role": "primary", "displayName": "Deep Cobalt", "canonical": "#000DB9" },
+      "paper": { "role": "neutral", "displayName": "Paper", "canonical": "#F7F7F4" },
+      "white": { "role": "neutral", "displayName": "White", "canonical": "#FFFFFF" },
+      "ink": { "role": "neutral", "displayName": "Ink", "canonical": "#111111" },
+      "quiet": { "role": "neutral", "displayName": "Quiet", "canonical": "#666761" },
+      "rule": { "role": "neutral", "displayName": "Rule", "canonical": "#D8D9D4" },
+      "success": { "role": "state", "displayName": "Success", "canonical": "#177245" },
+      "warning": { "role": "state", "displayName": "Warning", "canonical": "#B74618" }
+    },
+    "typographyMeta": {
+      "display": { "displayName": "Page title", "purpose": "Concise page identity only." },
+      "body": { "displayName": "Working text", "purpose": "Research questions, findings, and controls." },
+      "label": { "displayName": "Interface label", "purpose": "State, provenance, and short control labels." }
+    },
+    "shadows": [],
+    "motion": [
+      { "name": "state", "value": "180ms cubic-bezier(0.16, 1, 0.3, 1)", "purpose": "Selection and disclosure feedback." }
+    ],
+    "breakpoints": [
+      { "name": "compact", "value": "900px" },
+      { "name": "narrow", "value": "620px" }
+    ]
+  },
+  "components": [],
+  "narrative": {
+    "northStar": "Electric Archive",
+    "overview": "A calm research workspace with an electric editorial masthead and code-drawn technical plates, without science-fiction theatre.",
+    "keyCharacteristics": ["Continuous electric cobalt", "Paper and ink working fields", "Editorial serif plus plain sans", "One contextual SVG plate", "Two or three columns at most"],
+    "rules": [
+      { "name": "Field Rule", "body": "Cobalt owns a region or a real active state; it is never decorative confetti.", "section": "colors" }
+    ],
+    "dos": ["Lead with the current research question.", "Use whitespace before adding rules.", "Keep one dominant action."],
+    "donts": ["Do not use found AI imagery or anatomical allegory.", "Do not use red-on-black danger theatre or tiny telemetry.", "Do not copy Nous compositions or marks; reference only its mood."]
+  }
+}

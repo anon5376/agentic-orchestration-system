@@ -1,0 +1,1235 @@
+<!doctype html>
+<!--
+THESIS: AOS is a municipal network for moving research work safely; it refuses the interchangeable metric-card dashboard.
+OWN-WORLD: Desaturated navy, concrete, paper, transit-map rules, dispatch type, square stations, and one amber disruption mark.
+STORY: The operator sees the live route, selects a station, checks the assigned worker, and pauses new dispatch when a branch needs attention.
+FIRST VIEWPORT: A navy civic masthead opens onto a route map on the left and a dispatch ledger/detail column on the right; pause and filter sit above the rows.
+FORM: A transit operations board, chosen over a generic admin grid; the map is the primary form and the ledger is its operational register.
+-->
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="theme-color" content="#142638" />
+    <title>AOS / Metro Control</title>
+    <style>
+      :root {
+        --navy-950: #101d2a;
+        --navy-900: #162b3d;
+        --navy-750: #29475c;
+        --ink: #172632;
+        --muted: #5d6b74;
+        --concrete: #bec3c2;
+        --concrete-dark: #a9b0b1;
+        --paper: #f3f2ed;
+        --white: #fffefa;
+        --rule: #9ba5a7;
+        --rule-dark: #697881;
+        --amber: #b87319;
+        --amber-pale: #f4e4c7;
+        --focus: #1d6b93;
+        --font-sans: Arial, Helvetica, sans-serif;
+        --font-mono: "Courier New", Courier, monospace;
+      }
+
+      *,
+      *::before,
+      *::after {
+        box-sizing: border-box;
+      }
+
+      html {
+        min-width: 320px;
+        background: var(--concrete);
+        color-scheme: light;
+      }
+
+      body {
+        min-width: 320px;
+        min-height: 100vh;
+        margin: 0;
+        overflow-x: hidden;
+        background: var(--concrete);
+        color: var(--ink);
+        font-family: var(--font-sans);
+        font-size: 14px;
+        line-height: 1.4;
+        text-rendering: optimizeLegibility;
+        -webkit-font-smoothing: antialiased;
+      }
+
+      button,
+      input,
+      select {
+        margin: 0;
+        color: inherit;
+        font: inherit;
+      }
+
+      button,
+      select {
+        cursor: pointer;
+      }
+
+      button {
+        border: 0;
+        border-radius: 0;
+      }
+
+      a {
+        color: inherit;
+        text-decoration: none;
+      }
+
+      button:focus-visible,
+      a:focus-visible,
+      select:focus-visible,
+      input:focus-visible {
+        outline: 3px solid var(--focus);
+        outline-offset: 3px;
+      }
+
+      ::selection {
+        background: var(--navy-900);
+        color: var(--white);
+      }
+
+      .shell {
+        width: min(100%, 1680px);
+        min-height: 100vh;
+        margin: 0 auto;
+        background: var(--paper);
+      }
+
+      .topbar {
+        display: grid;
+        grid-template-columns: minmax(170px, 0.75fr) minmax(320px, 1.3fr) auto;
+        gap: 28px;
+        align-items: center;
+        padding: 18px clamp(18px, 3vw, 48px);
+        background: var(--navy-900);
+        color: var(--white);
+        border-bottom: 1px solid var(--navy-750);
+      }
+
+      .brand {
+        display: flex;
+        gap: 12px;
+        align-items: baseline;
+        letter-spacing: 0.08em;
+        text-transform: uppercase;
+      }
+
+      .brand strong {
+        font-size: 18px;
+        letter-spacing: 0.13em;
+      }
+
+      .brand span {
+        color: #c4d0d4;
+        font-family: var(--font-mono);
+        font-size: 10px;
+      }
+
+      .topbar nav {
+        display: flex;
+        gap: 20px;
+        align-items: center;
+        min-width: 0;
+        color: #d5dfe1;
+        font-family: var(--font-mono);
+        font-size: 11px;
+        letter-spacing: 0.04em;
+        text-transform: uppercase;
+      }
+
+      .topbar nav a {
+        padding-block: 5px;
+        border-bottom: 1px solid transparent;
+        white-space: nowrap;
+      }
+
+      .topbar nav a[aria-current="page"] {
+        color: var(--white);
+        border-bottom-color: var(--white);
+      }
+
+      .clock {
+        justify-self: end;
+        color: #bdcbd0;
+        font-family: var(--font-mono);
+        font-size: 11px;
+        white-space: nowrap;
+      }
+
+      .intro-band {
+        display: grid;
+        grid-template-columns: minmax(0, 1fr) auto;
+        gap: 24px;
+        align-items: end;
+        padding: 20px clamp(18px, 3vw, 48px) 17px;
+        border-bottom: 1px solid var(--rule);
+      }
+
+      .prototype-label,
+      .kicker,
+      .micro-label {
+        margin: 0;
+        color: var(--navy-750);
+        font-family: var(--font-mono);
+        font-size: 10px;
+        letter-spacing: 0.08em;
+        line-height: 1.3;
+        text-transform: uppercase;
+      }
+
+      .prototype-label {
+        display: inline-block;
+        padding: 5px 8px;
+        background: var(--navy-900);
+        color: var(--white);
+      }
+
+      .intro-band h1 {
+        max-width: 18ch;
+        margin: 12px 0 0;
+        color: var(--navy-950);
+        font-size: clamp(28px, 4vw, 52px);
+        font-weight: 700;
+        letter-spacing: -0.04em;
+        line-height: 0.98;
+      }
+
+      .intro-note {
+        max-width: 38ch;
+        margin: 0 0 2px;
+        color: var(--muted);
+        font-size: 13px;
+        line-height: 1.45;
+        text-align: right;
+      }
+
+      .run-strip {
+        display: grid;
+        grid-template-columns: minmax(170px, 1.25fr) repeat(5, minmax(120px, 1fr));
+        border-bottom: 1px solid var(--rule-dark);
+        background: var(--white);
+      }
+
+      .run-cell {
+        min-width: 0;
+        padding: 14px 16px 13px;
+        border-right: 1px solid var(--rule);
+      }
+
+      .run-cell:last-child {
+        border-right: 0;
+      }
+
+      .run-cell dt,
+      .run-cell dd {
+        margin: 0;
+      }
+
+      .run-cell dt {
+        color: var(--muted);
+        font-family: var(--font-mono);
+        font-size: 10px;
+        letter-spacing: 0.06em;
+        text-transform: uppercase;
+      }
+
+      .run-cell dd {
+        margin-top: 5px;
+        color: var(--navy-950);
+        font-size: 16px;
+        font-weight: 700;
+        line-height: 1.1;
+      }
+
+      .run-cell--primary {
+        background: var(--navy-950);
+        color: var(--white);
+      }
+
+      .run-cell--primary dt {
+        color: #bdcbd0;
+      }
+
+      .run-cell--primary dd {
+        color: var(--white);
+      }
+
+      .run-state {
+        display: inline-flex;
+        gap: 8px;
+        align-items: center;
+      }
+
+      .run-state::before,
+      .station-marker,
+      .row-signal {
+        display: inline-block;
+        width: 9px;
+        height: 9px;
+        flex: 0 0 9px;
+        border: 1px solid currentColor;
+        background: currentColor;
+      }
+
+      .run-cell--disruption {
+        background: var(--amber-pale);
+        color: #6b4311;
+      }
+
+      .run-cell--disruption dt,
+      .run-cell--disruption dd {
+        color: #6b4311;
+      }
+
+      .workbench {
+        display: grid;
+        grid-template-columns: minmax(0, 1.12fr) minmax(430px, 0.88fr);
+        min-width: 0;
+        border-bottom: 1px solid var(--rule-dark);
+      }
+
+      .map-panel,
+      .ops-panel {
+        min-width: 0;
+      }
+
+      .map-panel {
+        padding: 26px clamp(18px, 3vw, 48px) 32px;
+        border-right: 1px solid var(--rule-dark);
+        background: var(--concrete);
+      }
+
+      .ops-panel {
+        padding: 26px clamp(18px, 3vw, 40px) 32px;
+        background: var(--paper);
+      }
+
+      .panel-heading {
+        display: flex;
+        gap: 18px;
+        align-items: end;
+        justify-content: space-between;
+        min-height: 58px;
+        margin-bottom: 20px;
+      }
+
+      .panel-heading h2 {
+        margin: 6px 0 0;
+        color: var(--navy-950);
+        font-size: clamp(23px, 2.3vw, 34px);
+        font-weight: 700;
+        letter-spacing: -0.035em;
+        line-height: 1;
+      }
+
+      .panel-heading p {
+        max-width: 30ch;
+        margin: 0;
+        color: var(--muted);
+        font-size: 12px;
+        text-align: right;
+      }
+
+      .rail-map {
+        position: relative;
+        min-height: 540px;
+        overflow: hidden;
+        border: 1px solid var(--rule-dark);
+        background: var(--paper);
+      }
+
+      .rail-map svg {
+        position: absolute;
+        inset: 0;
+        width: 100%;
+        height: 100%;
+      }
+
+      .rail-map .rail-line {
+        fill: none;
+        stroke: var(--navy-750);
+        stroke-width: 7;
+        stroke-linecap: square;
+        stroke-linejoin: round;
+      }
+
+      .rail-map .rail-branch {
+        fill: none;
+        stroke: var(--rule-dark);
+        stroke-width: 5;
+        stroke-linecap: square;
+      }
+
+      .rail-map .rail-tie {
+        stroke: var(--concrete-dark);
+        stroke-width: 2;
+      }
+
+      .rail-map .map-caption {
+        fill: var(--muted);
+        font-family: var(--font-mono);
+        font-size: 11px;
+        letter-spacing: 0.08em;
+        text-transform: uppercase;
+      }
+
+      .station-node {
+        position: absolute;
+        top: calc(var(--y) * 1%);
+        left: calc(var(--x) * 1%);
+        z-index: 2;
+        display: grid;
+        grid-template-columns: 18px minmax(0, 1fr);
+        gap: 7px 8px;
+        width: 142px;
+        padding: 8px 9px 9px;
+        transform: translate(-50%, -50%);
+        border: 1px solid var(--rule-dark);
+        background: var(--white);
+        color: var(--ink);
+        text-align: left;
+      }
+
+      .station-node:hover,
+      .station-node.is-selected {
+        border-color: var(--navy-950);
+        background: var(--navy-950);
+        color: var(--white);
+      }
+
+      .station-node.is-disruption {
+        border-color: var(--amber);
+        background: var(--amber-pale);
+        color: #6b4311;
+      }
+
+      .station-node.is-disruption:hover,
+      .station-node.is-disruption.is-selected {
+        background: var(--amber);
+        color: var(--white);
+      }
+
+      .station-node .station-marker {
+        grid-row: span 2;
+        align-self: center;
+        width: 14px;
+        height: 14px;
+        flex-basis: 14px;
+        background: transparent;
+        border: 3px solid currentColor;
+      }
+
+      .station-node .station-marker::after {
+        display: block;
+        width: 4px;
+        height: 4px;
+        margin: 2px;
+        background: currentColor;
+        content: "";
+      }
+
+      .station-code {
+        display: block;
+        font-family: var(--font-mono);
+        font-size: 10px;
+        line-height: 1;
+      }
+
+      .station-name {
+        display: block;
+        margin-top: 2px;
+        font-size: 12px;
+        font-weight: 700;
+        line-height: 1.14;
+      }
+
+      .station-state {
+        grid-column: 2;
+        color: var(--muted);
+        font-family: var(--font-mono);
+        font-size: 9px;
+        letter-spacing: 0.04em;
+        line-height: 1.1;
+        text-transform: uppercase;
+      }
+
+      .station-node:hover .station-state,
+      .station-node.is-selected .station-state,
+      .station-node.is-disruption.is-selected .station-state {
+        color: #d6e0e1;
+      }
+
+      .station-node.is-disruption .station-state {
+        color: #6b4311;
+      }
+
+      .station-node[data-task="root"] {
+        left: 14%;
+      }
+
+      .map-foot {
+        display: flex;
+        gap: 16px;
+        justify-content: space-between;
+        margin-top: 12px;
+        color: var(--muted);
+        font-family: var(--font-mono);
+        font-size: 10px;
+        line-height: 1.4;
+      }
+
+      .map-foot span {
+        max-width: 48%;
+      }
+
+      .dispatch-controls {
+        display: flex;
+        gap: 10px;
+        align-items: end;
+        justify-content: space-between;
+        padding-bottom: 15px;
+        border-bottom: 1px solid var(--rule-dark);
+      }
+
+      .control-block {
+        display: grid;
+        gap: 6px;
+      }
+
+      .control-label {
+        color: var(--muted);
+        font-family: var(--font-mono);
+        font-size: 10px;
+        letter-spacing: 0.06em;
+        text-transform: uppercase;
+      }
+
+      select,
+      .text-filter {
+        min-height: 36px;
+        padding: 7px 10px;
+        border: 1px solid var(--rule-dark);
+        border-radius: 0;
+        background: var(--white);
+        color: var(--ink);
+        font-size: 12px;
+      }
+
+      .text-filter {
+        width: 100%;
+      }
+
+      .pause-button,
+      .detail-action,
+      .clear-filter {
+        min-height: 36px;
+        padding: 8px 12px;
+        border: 1px solid var(--navy-950);
+        background: var(--navy-950);
+        color: var(--white);
+        font-family: var(--font-mono);
+        font-size: 10px;
+        letter-spacing: 0.04em;
+        text-transform: uppercase;
+      }
+
+      .pause-button:hover,
+      .detail-action:hover,
+      .clear-filter:hover {
+        background: var(--navy-750);
+      }
+
+      .pause-button[aria-pressed="true"] {
+        border-color: var(--amber);
+        background: var(--amber-pale);
+        color: #6b4311;
+      }
+
+      .dispatch-heading {
+        display: flex;
+        justify-content: space-between;
+        margin-top: 19px;
+        color: var(--muted);
+        font-family: var(--font-mono);
+        font-size: 10px;
+        letter-spacing: 0.06em;
+        text-transform: uppercase;
+      }
+
+      .dispatch-ledger {
+        margin-top: 7px;
+        border-top: 2px solid var(--navy-950);
+      }
+
+      .dispatch-row {
+        display: grid;
+        grid-template-columns: 62px minmax(145px, 0.9fr) minmax(120px, 1fr) 60px;
+        gap: 10px;
+        align-items: center;
+        width: 100%;
+        min-height: 61px;
+        padding: 10px 0;
+        border-bottom: 1px solid var(--rule);
+        background: transparent;
+        color: var(--ink);
+        text-align: left;
+      }
+
+      .dispatch-row:hover,
+      .dispatch-row.is-selected {
+        background: #e4e5e0;
+      }
+
+      .dispatch-row.is-hidden {
+        display: none;
+      }
+
+      .row-id,
+      .row-state {
+        font-family: var(--font-mono);
+        font-size: 10px;
+      }
+
+      .row-id {
+        color: var(--muted);
+      }
+
+      .row-title {
+        min-width: 0;
+        overflow: hidden;
+        font-size: 12px;
+        font-weight: 700;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+      }
+
+      .row-owner {
+        overflow: hidden;
+        color: var(--muted);
+        font-family: var(--font-mono);
+        font-size: 10px;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+      }
+
+      .row-state {
+        color: var(--navy-750);
+        text-align: right;
+        text-transform: uppercase;
+      }
+
+      .row-state--amber {
+        color: var(--amber);
+      }
+
+      .row-signal {
+        width: 7px;
+        height: 7px;
+        margin-right: 5px;
+        vertical-align: 1px;
+        border: 0;
+      }
+
+      .detail-panel {
+        margin-top: 26px;
+        padding-top: 18px;
+        border-top: 2px solid var(--navy-950);
+      }
+
+      .detail-panel h3 {
+        margin: 6px 0 0;
+        color: var(--navy-950);
+        font-size: 25px;
+        letter-spacing: -0.035em;
+        line-height: 1;
+      }
+
+      .detail-summary {
+        max-width: 58ch;
+        margin: 10px 0 17px;
+        color: var(--muted);
+        font-size: 13px;
+      }
+
+      .detail-spec {
+        display: grid;
+        grid-template-columns: repeat(3, minmax(0, 1fr));
+        gap: 12px;
+        margin: 0 0 18px;
+      }
+
+      .detail-spec div {
+        padding-top: 8px;
+        border-top: 1px solid var(--rule);
+      }
+
+      .detail-spec dt,
+      .detail-spec dd {
+        margin: 0;
+      }
+
+      .detail-spec dt {
+        color: var(--muted);
+        font-family: var(--font-mono);
+        font-size: 9px;
+        letter-spacing: 0.05em;
+        text-transform: uppercase;
+      }
+
+      .detail-spec dd {
+        margin-top: 3px;
+        font-size: 12px;
+        font-weight: 700;
+        overflow-wrap: anywhere;
+      }
+
+      .detail-action {
+        background: transparent;
+        color: var(--navy-950);
+      }
+
+      .detail-action:hover {
+        color: var(--white);
+      }
+
+      .ledger-section {
+        padding: 26px clamp(18px, 3vw, 48px) 40px;
+        background: var(--paper);
+      }
+
+      .ledger-heading {
+        display: flex;
+        gap: 24px;
+        align-items: end;
+        justify-content: space-between;
+        margin-bottom: 15px;
+      }
+
+      .ledger-heading h2 {
+        margin: 6px 0 0;
+        color: var(--navy-950);
+        font-size: clamp(22px, 2.5vw, 32px);
+        letter-spacing: -0.035em;
+        line-height: 1;
+      }
+
+      .ledger-heading p {
+        max-width: 46ch;
+        margin: 0;
+        color: var(--muted);
+        font-size: 12px;
+        text-align: right;
+      }
+
+      .ledger-table {
+        width: 100%;
+        border-collapse: collapse;
+        table-layout: fixed;
+        border-top: 2px solid var(--navy-950);
+        font-size: 12px;
+      }
+
+      .ledger-table th,
+      .ledger-table td {
+        padding: 12px 10px 11px 0;
+        border-bottom: 1px solid var(--rule);
+        text-align: left;
+        vertical-align: top;
+        overflow-wrap: anywhere;
+      }
+
+      .ledger-table th {
+        color: var(--muted);
+        font-family: var(--font-mono);
+        font-size: 10px;
+        font-weight: 400;
+        letter-spacing: 0.05em;
+        text-transform: uppercase;
+      }
+
+      .ledger-table td:first-child,
+      .ledger-table td:nth-child(2) {
+        font-family: var(--font-mono);
+        font-size: 11px;
+      }
+
+      .ledger-table td:last-child {
+        color: var(--navy-750);
+        font-weight: 700;
+      }
+
+      .footer {
+        display: flex;
+        gap: 20px;
+        justify-content: space-between;
+        padding: 15px clamp(18px, 3vw, 48px);
+        border-top: 1px solid var(--rule-dark);
+        background: var(--navy-900);
+        color: #d5dfe1;
+        font-family: var(--font-mono);
+        font-size: 10px;
+      }
+
+      .footer a {
+        text-decoration: underline;
+        text-underline-offset: 3px;
+      }
+
+      body.is-paused .run-cell--primary {
+        background: #3d4246;
+      }
+
+      body.is-paused .run-state::before {
+        background: var(--amber);
+        border-color: var(--amber);
+      }
+
+      @media (max-width: 1120px) {
+        .topbar {
+          grid-template-columns: auto 1fr;
+        }
+
+        .topbar nav {
+          justify-content: flex-end;
+          overflow-x: auto;
+        }
+
+        .clock {
+          grid-column: 1 / -1;
+          justify-self: start;
+        }
+
+        .run-strip {
+          grid-template-columns: repeat(3, minmax(0, 1fr));
+        }
+
+        .run-cell {
+          border-bottom: 1px solid var(--rule);
+        }
+
+        .workbench {
+          grid-template-columns: minmax(0, 1fr);
+        }
+
+        .map-panel {
+          border-right: 0;
+          border-bottom: 1px solid var(--rule-dark);
+        }
+      }
+
+      @media (max-width: 680px) {
+        .topbar {
+          display: block;
+          padding: 15px 16px;
+        }
+
+        .topbar nav {
+          justify-content: flex-start;
+          margin-top: 13px;
+          padding-bottom: 2px;
+        }
+
+        .clock {
+          margin-top: 12px;
+        }
+
+        .intro-band {
+          display: block;
+          padding: 17px 16px 15px;
+        }
+
+        .intro-note {
+          margin-top: 14px;
+          text-align: left;
+        }
+
+        .run-strip {
+          grid-template-columns: repeat(2, minmax(0, 1fr));
+        }
+
+        .run-cell {
+          padding: 12px;
+        }
+
+        .map-panel,
+        .ops-panel,
+        .ledger-section {
+          padding-inline: 16px;
+        }
+
+        .panel-heading,
+        .ledger-heading {
+          display: block;
+        }
+
+        .panel-heading p,
+        .ledger-heading p {
+          margin-top: 9px;
+          text-align: left;
+        }
+
+        .rail-map {
+          min-height: 500px;
+        }
+
+        .station-node {
+          width: 126px;
+          padding: 7px;
+        }
+
+        .station-node[data-task="root"] {
+          left: 18%;
+          width: 108px;
+        }
+
+        .map-foot {
+          display: block;
+        }
+
+        .map-foot span {
+          display: block;
+          max-width: 100%;
+        }
+
+        .map-foot span + span {
+          margin-top: 6px;
+        }
+
+        .dispatch-controls {
+          display: grid;
+          grid-template-columns: minmax(0, 1fr) auto;
+        }
+
+        .dispatch-row {
+          grid-template-columns: 52px minmax(0, 1fr) 65px;
+        }
+
+        .row-owner {
+          grid-column: 2;
+          grid-row: 2;
+        }
+
+        .row-state {
+          grid-column: 3;
+          grid-row: 1 / span 2;
+        }
+
+        .detail-spec {
+          grid-template-columns: repeat(2, minmax(0, 1fr));
+        }
+
+        .ledger-table {
+          font-size: 11px;
+        }
+
+        .ledger-table th,
+        .ledger-table td {
+          padding-right: 6px;
+        }
+
+        .ledger-table th:nth-child(4),
+        .ledger-table td:nth-child(4) {
+          display: none;
+        }
+
+        .footer {
+          display: block;
+          padding-inline: 16px;
+        }
+
+        .footer span + span {
+          display: block;
+          margin-top: 7px;
+        }
+      }
+
+      @media (prefers-reduced-motion: reduce) {
+        *,
+        *::before,
+        *::after {
+          scroll-behavior: auto !important;
+          transition-duration: 0.001ms !important;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <div class="shell">
+      <header class="topbar">
+        <div class="brand"><strong>AOS</strong><span>METRO CONTROL / 03</span></div>
+        <nav aria-label="Prototype variants">
+          <a href="../" aria-label="Return to prototype index">INDEX / ../</a>
+          <a href="./" aria-current="page">METRO CONTROL</a>
+          <a href="../04-waveform-lab/">WAVEFORM LAB</a>
+        </nav>
+        <div class="clock">RUN R-240 / 09:42:18 UTC</div>
+      </header>
+
+      <section class="intro-band" aria-labelledby="page-title">
+        <div>
+          <p class="prototype-label">VISUAL PROTOTYPE · SYNTHETIC RUNNING STATE</p>
+          <h1 id="page-title">Research network / live dispatch</h1>
+        </div>
+        <p class="intro-note">A single investigation rendered as a civic route: stations are tasks, interchanges are leads, and dispatch rows show the workers in motion.</p>
+      </section>
+
+      <dl class="run-strip" aria-label="Run overview">
+        <div class="run-cell run-cell--primary">
+          <dt>Network state</dt>
+          <dd><span class="run-state" id="runState">RUNNING</span></dd>
+        </div>
+        <div class="run-cell">
+          <dt>Active slots</dt>
+          <dd>3 / 4</dd>
+        </div>
+        <div class="run-cell">
+          <dt>Dispatch model</dt>
+          <dd>luna / max</dd>
+        </div>
+        <div class="run-cell">
+          <dt>Verified sessions</dt>
+          <dd>27</dd>
+        </div>
+        <div class="run-cell">
+          <dt>Input / cache</dt>
+          <dd>7.3M / 5.8M</dd>
+        </div>
+        <div class="run-cell run-cell--disruption">
+          <dt>Disruption</dt>
+          <dd id="disruptionState">N-04 waiting</dd>
+        </div>
+      </dl>
+
+      <main>
+        <div class="workbench">
+          <section class="map-panel" aria-labelledby="network-title">
+            <div class="panel-heading">
+              <div>
+                <p class="kicker">01 / ROUTE VIEW</p>
+                <h2 id="network-title">Task hierarchy</h2>
+              </div>
+              <p>Dark rail = dependency · stop = worker task · interchange = branch lead</p>
+            </div>
+
+            <div class="rail-map" role="tree" aria-label="AOS-240 task hierarchy rail map">
+              <svg viewBox="0 0 800 560" aria-hidden="true" preserveAspectRatio="none">
+                <path class="rail-line" d="M72 95 H210 V280 H374 V432 H712" />
+                <path class="rail-branch" d="M210 280 V142 H440 H640" />
+                <path class="rail-branch" d="M374 432 V498 H548" />
+                <path class="rail-tie" d="M210 118 V166 M210 256 V304 M374 406 V458 M672 432 V472" />
+                <text class="map-caption" x="34" y="532">AOS-240 / EVIDENCE ROUTE / SYNTHETIC</text>
+              </svg>
+
+              <button class="station-node is-selected" style="--x: 10; --y: 17" type="button" role="treeitem" aria-selected="true" data-task="root">
+                <span class="station-marker" aria-hidden="true"></span>
+                <span><span class="station-code">AOS-240</span><span class="station-name">Evidence route</span></span>
+                <span class="station-state">running / lead</span>
+              </button>
+
+              <button class="station-node" style="--x: 28; --y: 50" type="button" role="treeitem" aria-selected="false" data-task="triage">
+                <span class="station-marker" aria-hidden="true"></span>
+                <span><span class="station-code">INT-01</span><span class="station-name">Lead triage</span></span>
+                <span class="station-state">interchange / 3 branches</span>
+              </button>
+
+              <button class="station-node" style="--x: 57; --y: 25" type="button" role="treeitem" aria-selected="false" data-task="sources">
+                <span class="station-marker" aria-hidden="true"></span>
+                <span><span class="station-code">T-17</span><span class="station-name">Source triangulation</span></span>
+                <span class="station-state">active / 11 sessions</span>
+              </button>
+
+              <button class="station-node" style="--x: 83; --y: 25" type="button" role="treeitem" aria-selected="false" data-task="citations">
+                <span class="station-marker" aria-hidden="true"></span>
+                <span><span class="station-code">T-18</span><span class="station-name">Citation audit</span></span>
+                <span class="station-state">active / 8 sessions</span>
+              </button>
+
+              <button class="station-node" style="--x: 47; --y: 77" type="button" role="treeitem" aria-selected="false" data-task="conflicts">
+                <span class="station-marker" aria-hidden="true"></span>
+                <span><span class="station-code">T-19</span><span class="station-name">Conflict register</span></span>
+                <span class="station-state">waiting / lead input</span>
+              </button>
+
+              <button class="station-node is-disruption" style="--x: 83; --y: 78" type="button" role="treeitem" aria-selected="false" data-task="handoff">
+                <span class="station-marker" aria-hidden="true"></span>
+                <span><span class="station-code">N-04</span><span class="station-name">Synthesis handoff</span></span>
+                <span class="station-state">disruption / operator</span>
+              </button>
+
+              <button class="station-node" style="--x: 69; --y: 94" type="button" role="treeitem" aria-selected="false" data-task="checkpoint">
+                <span class="station-marker" aria-hidden="true"></span>
+                <span><span class="station-code">CHK-01</span><span class="station-name">Integrity checkpoint</span></span>
+                <span class="station-state">verified / 27 sessions</span>
+              </button>
+            </div>
+            <div class="map-foot"><span>Selected: <strong id="mapSelection">AOS-240 / Evidence route</strong></span><span>Map updates on task selection; no dispatch is created by watching.</span></div>
+          </section>
+
+          <aside class="ops-panel" aria-labelledby="dispatch-title">
+            <div class="panel-heading">
+              <div>
+                <p class="kicker">02 / OPERATIONS</p>
+                <h2 id="dispatch-title">Dispatch ledger</h2>
+              </div>
+              <p id="dispatchCount">6 visible rows</p>
+            </div>
+
+            <div class="dispatch-controls">
+              <label class="control-block" for="filterSelect">
+                <span class="control-label">Filter dispatch</span>
+                <select id="filterSelect">
+                  <option value="all">All states</option>
+                  <option value="active">Active only</option>
+                  <option value="waiting">Waiting only</option>
+                  <option value="verified">Verified only</option>
+                </select>
+              </label>
+              <button class="pause-button" id="pauseButton" type="button" aria-pressed="false">Pause dispatch</button>
+            </div>
+
+            <div class="dispatch-heading"><span>Worker / assignment</span><span>State</span></div>
+            <div class="dispatch-ledger" id="dispatchLedger" aria-live="polite">
+              <button class="dispatch-row is-selected" type="button" data-task="root" data-status="active">
+                <span class="row-id">S-027</span><span class="row-title">Evidence route</span><span class="row-owner">lead / intake coordinator</span><span class="row-state"><span class="row-signal"></span>active</span>
+              </button>
+              <button class="dispatch-row" type="button" data-task="sources" data-status="active">
+                <span class="row-id">S-026</span><span class="row-title">Source triangulation</span><span class="row-owner">luna / source analyst</span><span class="row-state"><span class="row-signal"></span>active</span>
+              </button>
+              <button class="dispatch-row" type="button" data-task="citations" data-status="active">
+                <span class="row-id">S-025</span><span class="row-title">Citation audit</span><span class="row-owner">luna / citation analyst</span><span class="row-state"><span class="row-signal"></span>active</span>
+              </button>
+              <button class="dispatch-row" type="button" data-task="conflicts" data-status="waiting">
+                <span class="row-id">S-024</span><span class="row-title">Conflict register</span><span class="row-owner">lead / evidence integrator</span><span class="row-state"><span class="row-signal"></span>waiting</span>
+              </button>
+              <button class="dispatch-row" type="button" data-task="handoff" data-status="waiting">
+                <span class="row-id">S-023</span><span class="row-title">Synthesis handoff</span><span class="row-owner">luna / synthesis writer</span><span class="row-state row-state--amber"><span class="row-signal"></span>waiting</span>
+              </button>
+              <button class="dispatch-row" type="button" data-task="checkpoint" data-status="verified">
+                <span class="row-id">S-022</span><span class="row-title">Integrity checkpoint</span><span class="row-owner">system / verifier</span><span class="row-state"><span class="row-signal"></span>verified</span>
+              </button>
+            </div>
+
+            <section class="detail-panel" aria-labelledby="detail-title" aria-live="polite">
+              <p class="kicker">SELECTED TASK</p>
+              <h3 id="detail-title">Evidence route</h3>
+              <p class="detail-summary" id="detailSummary">Lead route keeps the evidence request and its three dependent branches aligned. Watching is read-only; a pause stops new dispatch while current workers report.</p>
+              <dl class="detail-spec">
+                <div><dt>State</dt><dd id="detailState">running</dd></div>
+                <div><dt>Owner</dt><dd id="detailOwner">lead / intake coordinator</dd></div>
+                <div><dt>Model</dt><dd id="detailModel">gpt-5.6-luna / max</dd></div>
+                <div><dt>Sessions</dt><dd id="detailSessions">27 verified</dd></div>
+                <div><dt>Last signal</dt><dd id="detailSignal">09:42:18 UTC</dd></div>
+                <div><dt>Next action</dt><dd id="detailNext">dispatch remains open</dd></div>
+              </dl>
+              <button class="detail-action" id="detailAction" type="button">Open assignment note</button>
+            </section>
+          </aside>
+        </div>
+
+        <section class="ledger-section" aria-labelledby="session-title">
+          <div class="ledger-heading">
+            <div>
+              <p class="kicker">03 / SESSION RECORD</p>
+              <h2 id="session-title">Model-session ledger</h2>
+            </div>
+            <p>27 verified sessions · aggregate 7.3M input / 5.8M cached / 381.3K output / 311.7K reasoning</p>
+          </div>
+          <table class="ledger-table">
+            <caption class="sr-only">Synthetic model-session ledger for the running AOS research route</caption>
+            <colgroup><col style="width: 15%" /><col style="width: 23%" /><col style="width: 28%" /><col style="width: 16%" /><col style="width: 18%" /></colgroup>
+            <thead><tr><th>Session</th><th>Model / profile</th><th>Assignment</th><th>Tokens</th><th>Result</th></tr></thead>
+            <tbody>
+              <tr><td>S-027</td><td>gpt-5.6-luna / max</td><td>Lead route · evidence intake</td><td>2.4M in · 1.8M cache</td><td>active / coordinating</td></tr>
+              <tr><td>S-026</td><td>gpt-5.6-luna / max</td><td>Source triangulation · branch A</td><td>1.6M in · 1.3M cache</td><td>active / comparing</td></tr>
+              <tr><td>S-025</td><td>gpt-5.6-luna / max</td><td>Citation audit · branch B</td><td>1.2M in · 1.0M cache</td><td>active / checking</td></tr>
+              <tr><td>S-024</td><td>gpt-5.6-luna / max</td><td>Conflict register · branch C</td><td>0.9M in · 0.7M cache</td><td>waiting / input</td></tr>
+              <tr><td>S-022</td><td>gpt-5.6-luna / max</td><td>Integrity checkpoint · verifier</td><td>1.2M in · 1.0M cache</td><td>verified / 27 total</td></tr>
+            </tbody>
+          </table>
+        </section>
+      </main>
+
+      <footer class="footer">
+        <span>AOS / METRO CONTROL · read-only visual prototype · all run data synthetic</span>
+        <span><a href="../">Back to variants</a> · <a href="../04-waveform-lab/">Open Waveform Lab</a></span>
+      </footer>
+    </div>
+
+    <script>
+      (() => {
+        const taskData = {
+          root: { title: "Evidence route", state: "running", owner: "lead / intake coordinator", model: "gpt-5.6-luna / max", sessions: "27 verified", signal: "09:42:18 UTC", next: "dispatch remains open", summary: "Lead route keeps the evidence request and its three dependent branches aligned. Watching is read-only; a pause stops new dispatch while current workers report." },
+          triage: { title: "Lead triage", state: "interchange", owner: "lead / dispatch planner", model: "gpt-5.6-luna / max", sessions: "3 branches", signal: "09:41:52 UTC", next: "route branch C", summary: "The interchange holds the objective, branch assignments, and capacity decision in one readable stop before work leaves the lead." },
+          sources: { title: "Source triangulation", state: "active", owner: "luna / source analyst", model: "gpt-5.6-luna / max", sessions: "11 sessions", signal: "09:42:09 UTC", next: "compare source set 04", summary: "Branch A is comparing the supplied sources against a stable claim list. New dispatch remains within the four-slot cap." },
+          citations: { title: "Citation audit", state: "active", owner: "luna / citation analyst", model: "gpt-5.6-luna / max", sessions: "8 sessions", signal: "09:42:12 UTC", next: "check locator pair", summary: "Branch B is testing whether each claim can return to a source locator without importing confidence from a summary." },
+          conflicts: { title: "Conflict register", state: "waiting", owner: "lead / evidence integrator", model: "gpt-5.6-luna / max", sessions: "4 sessions", signal: "09:40:37 UTC", next: "await branch A", summary: "Branch C has a clean queue but waits for the source and citation branches to return their incompatible observations." },
+          handoff: { title: "Synthesis handoff", state: "disruption", owner: "luna / synthesis writer", model: "gpt-5.6-luna / max", sessions: "2 sessions", signal: "09:37:14 UTC", next: "operator acknowledgement", summary: "N-04 is waiting at the handoff. The writer has a complete draft packet, but the route stays amber until an operator acknowledges the unresolved source split." },
+          checkpoint: { title: "Integrity checkpoint", state: "verified", owner: "system / verifier", model: "gpt-5.6-luna / max", sessions: "27 verified", signal: "09:38:44 UTC", next: "record receipt", summary: "The checkpoint has verified the current session record and token roll-up. It does not claim that the research conclusion is established." }
+        };
+
+        const body = document.body;
+        const runState = document.getElementById("runState");
+        const pauseButton = document.getElementById("pauseButton");
+        const filterSelect = document.getElementById("filterSelect");
+        const rows = [...document.querySelectorAll(".dispatch-row")];
+        const stations = [...document.querySelectorAll(".station-node")];
+        const count = document.getElementById("dispatchCount");
+        const detailAction = document.getElementById("detailAction");
+
+        function selectTask(taskId) {
+          const data = taskData[taskId] || taskData.root;
+          stations.forEach((station) => {
+            const selected = station.dataset.task === taskId;
+            station.classList.toggle("is-selected", selected);
+            station.setAttribute("aria-selected", String(selected));
+          });
+          rows.forEach((row) => row.classList.toggle("is-selected", row.dataset.task === taskId));
+          document.getElementById("mapSelection").textContent = `${taskId === "root" ? "AOS-240" : taskId.toUpperCase()} / ${data.title}`;
+          document.getElementById("detail-title").textContent = data.title;
+          document.getElementById("detailSummary").textContent = data.summary;
+          document.getElementById("detailState").textContent = data.state;
+          document.getElementById("detailOwner").textContent = data.owner;
+          document.getElementById("detailModel").textContent = data.model;
+          document.getElementById("detailSessions").textContent = data.sessions;
+          document.getElementById("detailSignal").textContent = data.signal;
+          document.getElementById("detailNext").textContent = data.next;
+          detailAction.textContent = data.state === "disruption" ? "Acknowledge assignment note" : "Open assignment note";
+        }
+
+        function applyFilter() {
+          const filter = filterSelect.value;
+          let visible = 0;
+          rows.forEach((row) => {
+            const show = filter === "all" || row.dataset.status === filter;
+            row.classList.toggle("is-hidden", !show);
+            if (show) visible += 1;
+          });
+          count.textContent = `${visible} visible row${visible === 1 ? "" : "s"}`;
+        }
+
+        stations.forEach((station) => station.addEventListener("click", () => selectTask(station.dataset.task)));
+        rows.forEach((row) => row.addEventListener("click", () => selectTask(row.dataset.task)));
+        filterSelect.addEventListener("change", applyFilter);
+        pauseButton.addEventListener("click", () => {
+          const paused = pauseButton.getAttribute("aria-pressed") === "true";
+          pauseButton.setAttribute("aria-pressed", String(!paused));
+          pauseButton.textContent = paused ? "Pause dispatch" : "Resume dispatch";
+          body.classList.toggle("is-paused", !paused);
+          runState.textContent = paused ? "RUNNING" : "PAUSED";
+        });
+        detailAction.addEventListener("click", () => {
+          detailAction.textContent = detailAction.textContent.startsWith("Acknowledge") ? "Assignment note acknowledged" : "Assignment note opened";
+        });
+
+        selectTask("root");
+        applyFilter();
+      })();
+    </script>
+  </body>
+</html>

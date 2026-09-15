@@ -1,0 +1,765 @@
+<!doctype html>
+<!--
+THESIS: Signal Yard makes a live agent run feel like a daylight maintenance bench, not a sci-fi control room.
+OWN-WORLD: Cold white work paper, cobalt fixtures, ink labels, safety orange only when a consequence needs attention.
+STORY: Follow the cable-route task tree, inspect the selected work order, and pause or filter the running handoff.
+FIRST VIEWPORT: A cobalt service bar, large SIGNAL YARD title, split-flap telemetry, then a three-column desk for tree, detail, and ledger.
+FORM: Operate surface; route hierarchy and calibration marks are the native structure, with a flat industrial bench rather than card grids.
+-->
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="theme-color" content="#102a73" />
+    <title>AOS · Signal Yard</title>
+    <style>
+      :root {
+        --paper: #eef1f2;
+        --sheet: #f9faf9;
+        --ink: #10202d;
+        --muted: #58636d;
+        --rule: #c8d0d5;
+        --rule-dark: #8d9ba5;
+        --cobalt: #102a73;
+        --cobalt-dark: #081b4f;
+        --cobalt-soft: #dbe4f6;
+        --orange: #d7661b;
+        --orange-soft: #f6e0d0;
+        --green: #1e654b;
+        --font-sans: "Helvetica Neue", Helvetica, Arial, sans-serif;
+        --font-mono: "IBM Plex Mono", "SFMono-Regular", Consolas, monospace;
+        --font-display: "Arial Narrow", "Helvetica Neue", Helvetica, sans-serif;
+      }
+
+      *,
+      *::before,
+      *::after { box-sizing: border-box; }
+
+      html { min-width: 320px; background: var(--paper); scroll-behavior: smooth; }
+
+      body {
+        min-width: 320px;
+        margin: 0;
+        overflow-x: hidden;
+        background: var(--paper);
+        color: var(--ink);
+        font-family: var(--font-sans);
+        font-size: 14px;
+        line-height: 1.45;
+        -webkit-font-smoothing: antialiased;
+      }
+
+      a { color: inherit; text-decoration: none; }
+      button, input { font: inherit; }
+      button { border: 0; border-radius: 0; cursor: pointer; }
+      button:disabled { cursor: not-allowed; }
+      button:focus-visible, a:focus-visible, input:focus-visible {
+        outline: 2px solid var(--orange);
+        outline-offset: 3px;
+      }
+
+      .masthead {
+        min-height: 60px;
+        padding: 0 clamp(18px, 4vw, 64px);
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 24px;
+        background: var(--cobalt);
+        color: #fff;
+      }
+
+      .brand {
+        display: inline-flex;
+        align-items: center;
+        gap: 12px;
+        min-width: max-content;
+        font-family: var(--font-mono);
+        font-size: 10px;
+        letter-spacing: .13em;
+        text-transform: uppercase;
+      }
+
+      .brand-mark {
+        display: inline-grid;
+        place-items: center;
+        width: 34px;
+        height: 34px;
+        border: 1px solid rgba(255, 255, 255, .7);
+        font-weight: 700;
+        letter-spacing: -.04em;
+      }
+
+      .masthead nav {
+        display: flex;
+        align-items: center;
+        gap: clamp(12px, 2.5vw, 30px);
+        font-family: var(--font-mono);
+        font-size: 10px;
+        letter-spacing: .08em;
+        text-transform: uppercase;
+      }
+
+      .masthead nav a {
+        padding: 20px 0 17px;
+        border-bottom: 2px solid transparent;
+        white-space: nowrap;
+      }
+
+      .masthead nav a:hover,
+      .masthead nav a[aria-current="page"] { border-bottom-color: #fff; }
+
+      .yard {
+        width: min(1600px, calc(100% - 36px));
+        margin: 0 auto;
+        padding: 44px 0 56px;
+      }
+
+      .intro {
+        display: grid;
+        grid-template-columns: minmax(0, 1.35fr) minmax(260px, .65fr);
+        gap: 48px;
+        align-items: end;
+        padding: 0 clamp(4px, 2vw, 28px) 40px;
+      }
+
+      .eyebrow,
+      .section-label,
+      .micro-label {
+        margin: 0;
+        font-family: var(--font-mono);
+        font-size: 10px;
+        font-weight: 700;
+        letter-spacing: .1em;
+        line-height: 1.3;
+        text-transform: uppercase;
+      }
+
+      .eyebrow { color: var(--cobalt); }
+
+      h1 {
+        max-width: 6rem;
+        margin: 12px 0 12px;
+        font-family: var(--font-display);
+        font-size: clamp(4rem, 9vw, 6rem);
+        font-stretch: condensed;
+        font-weight: 800;
+        letter-spacing: -.065em;
+        line-height: .82;
+        text-transform: uppercase;
+      }
+
+      .intro-copy {
+        max-width: 55ch;
+        margin: 0;
+        color: var(--muted);
+        font-size: clamp(15px, 1.5vw, 18px);
+      }
+
+      .intro-meta {
+        min-height: 164px;
+        padding: 8px 0 0 28px;
+        display: flex;
+        flex-direction: column;
+        justify-content: space-between;
+        border-left: 1px solid var(--rule-dark);
+      }
+
+      .run-meta { margin: 0; }
+      .run-meta dt {
+        margin-top: 10px;
+        color: var(--muted);
+        font-family: var(--font-mono);
+        font-size: 10px;
+        letter-spacing: .08em;
+        text-transform: uppercase;
+      }
+      .run-meta dd {
+        margin: 2px 0 0;
+        font-family: var(--font-mono);
+        font-size: 13px;
+      }
+
+      .pause-button {
+        width: max-content;
+        padding: 11px 15px;
+        background: var(--orange);
+        color: #1b120d;
+        font-family: var(--font-mono);
+        font-size: 11px;
+        font-weight: 700;
+        letter-spacing: .08em;
+        text-transform: uppercase;
+      }
+
+      .pause-button:hover { background: #bd4d0c; color: #fff; }
+      .pause-button[data-paused="true"] { background: var(--cobalt); color: #fff; }
+
+      .telemetry {
+        display: flex;
+        flex-wrap: wrap;
+        border-top: 1px solid var(--rule-dark);
+        border-bottom: 1px solid var(--rule-dark);
+        background: #e1e6e9;
+      }
+
+      .flap {
+        position: relative;
+        flex: 1 1 150px;
+        min-height: 78px;
+        padding: 13px 16px 11px;
+        border-right: 1px solid var(--rule-dark);
+        overflow: hidden;
+      }
+
+      .flap:last-child { border-right: 0; }
+      .flap::after {
+        content: "";
+        position: absolute;
+        top: 49%;
+        right: 0;
+        left: 0;
+        border-top: 1px solid rgba(16, 32, 45, .14);
+        pointer-events: none;
+      }
+      .flap-label {
+        display: block;
+        color: var(--muted);
+        font-family: var(--font-mono);
+        font-size: 9px;
+        letter-spacing: .08em;
+        text-transform: uppercase;
+      }
+      .flap-value {
+        position: relative;
+        z-index: 1;
+        display: block;
+        margin-top: 4px;
+        font-family: var(--font-mono);
+        font-size: clamp(16px, 2vw, 22px);
+        font-weight: 700;
+        letter-spacing: -.05em;
+      }
+      .flap-note {
+        display: block;
+        margin-top: 3px;
+        color: var(--muted);
+        font-family: var(--font-mono);
+        font-size: 9px;
+        text-transform: uppercase;
+      }
+      .flap-wide { flex-basis: 285px; }
+      .token-inline {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 6px 14px;
+        margin-top: 5px;
+      }
+      .token-inline span { font-family: var(--font-mono); font-size: 11px; }
+      .token-inline b { font-weight: 700; }
+
+      .desk {
+        display: grid;
+        grid-template-columns: minmax(220px, .86fr) minmax(360px, 1.45fr) minmax(280px, .99fr);
+        margin-top: 30px;
+        border-top: 1px solid var(--rule-dark);
+        border-bottom: 1px solid var(--rule-dark);
+        background: var(--sheet);
+      }
+
+      .panel { min-width: 0; }
+      .task-panel { background: #e7ecee; border-right: 1px solid var(--rule-dark); }
+      .record-panel { background: var(--sheet); border-right: 1px solid var(--rule-dark); }
+      .ledger-panel { background: #f4f6f6; }
+
+      .panel-heading {
+        min-height: 64px;
+        padding: 18px 18px 14px;
+        display: flex;
+        align-items: start;
+        justify-content: space-between;
+        gap: 12px;
+        border-bottom: 1px solid var(--rule);
+      }
+      .panel-heading h2 {
+        margin: 0;
+        font-size: 13px;
+        font-weight: 700;
+        letter-spacing: .02em;
+        text-transform: uppercase;
+      }
+      .panel-heading p {
+        margin: 2px 0 0;
+        color: var(--muted);
+        font-family: var(--font-mono);
+        font-size: 10px;
+      }
+      .count {
+        color: var(--cobalt);
+        font-family: var(--font-mono);
+        font-size: 11px;
+        white-space: nowrap;
+      }
+
+      .filter-wrap { padding: 16px 18px; border-bottom: 1px solid var(--rule); }
+      .filter-wrap label { display: block; }
+      .filter-input {
+        width: 100%;
+        margin-top: 7px;
+        padding: 9px 10px;
+        border: 1px solid var(--rule-dark);
+        border-radius: 0;
+        background: var(--sheet);
+        color: var(--ink);
+        font-family: var(--font-mono);
+        font-size: 11px;
+      }
+      .filter-input::placeholder { color: #68747e; }
+      .filter-status {
+        min-height: 17px;
+        margin: 8px 0 0;
+        color: var(--muted);
+        font-family: var(--font-mono);
+        font-size: 10px;
+      }
+
+      .tree { padding: 12px 0 24px; }
+      .tree-children { margin-left: 17px; border-left: 1px solid var(--rule-dark); }
+      .task-row {
+        position: relative;
+        width: 100%;
+        padding: 10px 17px 10px 18px;
+        display: grid;
+        grid-template-columns: 10px minmax(0, 1fr);
+        gap: 9px;
+        text-align: left;
+        background: transparent;
+        color: var(--ink);
+        border-bottom: 1px solid rgba(141, 155, 165, .38);
+      }
+      .tree-children .task-row { padding-left: 14px; }
+      .task-row:hover { background: rgba(255, 255, 255, .68); }
+      .task-row[aria-selected="true"] {
+        background: var(--cobalt-soft);
+        box-shadow: inset 3px 0 0 var(--cobalt);
+      }
+      .task-row[hidden] { display: none; }
+      .status-dot {
+        width: 8px;
+        height: 8px;
+        margin-top: 4px;
+        display: inline-block;
+        border: 1px solid currentColor;
+        border-radius: 50%;
+        color: var(--muted);
+      }
+      .status-dot.active { background: var(--green); border-color: var(--green); }
+      .status-dot.queued { background: transparent; color: var(--cobalt); }
+      .status-dot.blocked { background: var(--orange); border-color: var(--orange); }
+      .task-name { display: block; font-size: 12px; font-weight: 700; line-height: 1.25; }
+      .task-meta { display: block; margin-top: 2px; color: var(--muted); font-family: var(--font-mono); font-size: 9px; line-height: 1.3; }
+
+      .record-body { padding: 28px clamp(20px, 3vw, 34px) 34px; }
+      .record-kicker { color: var(--cobalt); }
+      .record-body h2 {
+        margin: 10px 0 9px;
+        font-size: clamp(26px, 3vw, 40px);
+        letter-spacing: -.04em;
+        line-height: 1;
+      }
+      .record-lede { max-width: 58ch; margin: 0; color: var(--muted); font-size: 15px; }
+      .record-facts {
+        display: grid;
+        grid-template-columns: repeat(3, minmax(0, 1fr));
+        gap: 12px;
+        margin: 26px 0 0;
+        padding: 15px 0 17px;
+        border-top: 1px solid var(--rule-dark);
+        border-bottom: 1px solid var(--rule);
+      }
+      .record-facts dt { color: var(--muted); font-family: var(--font-mono); font-size: 9px; text-transform: uppercase; }
+      .record-facts dd { margin: 4px 0 0; font-family: var(--font-mono); font-size: 11px; overflow-wrap: anywhere; }
+
+      .route-plate { margin-top: 27px; padding: 14px 14px 10px; border: 1px solid var(--rule-dark); background: #f1f4f4; }
+      .route-plate-head { display: flex; justify-content: space-between; gap: 16px; color: var(--muted); font-family: var(--font-mono); font-size: 9px; text-transform: uppercase; }
+      .route-plate svg { display: block; width: 100%; height: auto; margin-top: 13px; }
+      .route-plate text { fill: var(--muted); font-family: var(--font-mono); font-size: 8px; letter-spacing: .05em; }
+      .route-plate .line { fill: none; stroke: var(--cobalt); stroke-width: 2; }
+      .route-plate .faint { fill: none; stroke: var(--rule-dark); stroke-width: 1; }
+      .route-plate .node { fill: var(--sheet); stroke: var(--cobalt); stroke-width: 2; }
+      .route-plate .warn { fill: var(--orange); stroke: var(--orange); }
+
+      .detail-list { margin: 28px 0 0; padding: 0; list-style: none; border-top: 1px solid var(--rule-dark); }
+      .detail-list li { display: grid; grid-template-columns: 12px minmax(0, 1fr); gap: 10px; padding: 12px 0; border-bottom: 1px solid var(--rule); }
+      .detail-list li::before { content: ""; width: 7px; height: 7px; margin-top: 5px; border: 1px solid var(--cobalt); border-radius: 50%; }
+      .detail-list strong { display: block; font-size: 12px; }
+      .detail-list span { display: block; margin-top: 2px; color: var(--muted); font-size: 12px; }
+      .detail-next { margin: 23px 0 0; padding: 13px 14px; border: 1px solid var(--rule-dark); background: var(--orange-soft); }
+      .detail-next strong { display: block; font-size: 11px; letter-spacing: .05em; text-transform: uppercase; }
+      .detail-next p { margin: 6px 0 0; font-size: 12px; }
+
+      .ledger-body { padding: 0 18px 28px; }
+      .ledger-note { margin: 17px 0 22px; color: var(--muted); font-size: 12px; }
+      .ledger-table { width: 100%; border-collapse: collapse; table-layout: fixed; font-family: var(--font-mono); font-size: 10px; }
+      .ledger-table caption { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); }
+      .ledger-table th { padding: 8px 4px; color: var(--muted); font-size: 9px; font-weight: 400; letter-spacing: .05em; text-align: left; text-transform: uppercase; border-bottom: 1px solid var(--rule-dark); }
+      .ledger-table td { padding: 12px 4px; vertical-align: top; border-bottom: 1px solid var(--rule); overflow-wrap: anywhere; }
+      .ledger-table th:first-child, .ledger-table td:first-child { padding-left: 0; width: 27%; }
+      .ledger-table th:last-child, .ledger-table td:last-child { padding-right: 0; width: 24%; text-align: right; }
+      .ledger-session { display: block; color: var(--cobalt); font-weight: 700; }
+      .ledger-sub { display: block; margin-top: 3px; color: var(--muted); font-size: 9px; }
+      .ledger-state { display: inline-flex; align-items: center; gap: 5px; }
+      .ledger-state::before { content: ""; width: 6px; height: 6px; display: inline-block; border: 1px solid currentColor; border-radius: 50%; }
+      .ledger-state.live { color: var(--green); }
+      .ledger-state.live::before { background: var(--green); }
+      .ledger-state.hold { color: var(--orange); }
+      .ledger-state.hold::before { background: var(--orange); }
+      .ledger-summary { margin-top: 26px; border-top: 1px solid var(--rule-dark); }
+      .ledger-summary-row { display: flex; justify-content: space-between; gap: 18px; padding: 10px 0; border-bottom: 1px solid var(--rule); font-family: var(--font-mono); font-size: 10px; }
+      .ledger-summary-row span:first-child { color: var(--muted); text-transform: uppercase; }
+      .ledger-summary-row strong { font-weight: 700; text-align: right; }
+      .ledger-summary-row.warning strong { color: var(--orange); }
+
+      .yard-foot {
+        display: grid;
+        grid-template-columns: minmax(260px, 1.1fr) minmax(0, .9fr);
+        gap: 36px;
+        padding: 34px clamp(4px, 2vw, 28px) 0;
+      }
+      .calibration { min-width: 0; }
+      .calibration svg { display: block; width: 100%; height: 56px; }
+      .calibration text { fill: var(--muted); font-family: var(--font-mono); font-size: 8px; letter-spacing: .08em; }
+      .foot-note { margin: 0; color: var(--muted); font-size: 12px; }
+      .foot-note strong { color: var(--ink); }
+      .live-status { margin-top: 10px; color: var(--green); font-family: var(--font-mono); font-size: 10px; text-transform: uppercase; }
+      body[data-paused="true"] .live-status { color: var(--orange); }
+
+      @media (max-width: 1180px) {
+        .desk { grid-template-columns: minmax(220px, .84fr) minmax(0, 1.4fr); }
+        .ledger-panel { grid-column: 1 / -1; border-top: 1px solid var(--rule-dark); }
+        .ledger-body { padding-bottom: 22px; }
+        .ledger-table { table-layout: auto; }
+        .ledger-table th:first-child, .ledger-table td:first-child,
+        .ledger-table th:last-child, .ledger-table td:last-child { width: auto; }
+        .ledger-summary { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 18px; }
+      }
+
+      @media (max-width: 760px) {
+        .masthead { align-items: flex-start; flex-direction: column; padding-top: 14px; padding-bottom: 0; gap: 6px; }
+        .masthead nav { width: 100%; overflow-x: auto; gap: 22px; }
+        .masthead nav a { padding: 11px 0 14px; }
+        .yard { width: min(100% - 24px, 1600px); padding-top: 30px; }
+        .intro { grid-template-columns: 1fr; gap: 28px; padding-bottom: 30px; }
+        .intro-meta { min-height: 0; padding: 17px 0 0; border-top: 1px solid var(--rule-dark); border-left: 0; gap: 24px; }
+        .telemetry { margin: 0 -12px; }
+        .flap { flex-basis: 145px; border-bottom: 1px solid var(--rule-dark); }
+        .flap:nth-child(2n) { border-right: 0; }
+        .flap-wide { flex-basis: 100%; }
+        .desk { display: block; margin-top: 22px; }
+        .task-panel, .record-panel { border-right: 0; border-bottom: 1px solid var(--rule-dark); }
+        .panel-heading { min-height: 58px; }
+        .record-body { padding-top: 24px; }
+        .record-facts { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+        .ledger-summary { display: block; }
+        .yard-foot { grid-template-columns: 1fr; gap: 18px; padding-top: 26px; }
+      }
+
+      @media (prefers-reduced-motion: reduce) {
+        html { scroll-behavior: auto; }
+        *, *::before, *::after { animation-duration: .001ms !important; transition-duration: .001ms !important; }
+      }
+    </style>
+  </head>
+  <body>
+    <header class="masthead">
+      <a class="brand" href="../" aria-label="AOS prototype index">
+        <span class="brand-mark">AOS</span>
+        <span>agent orchestration system</span>
+      </a>
+      <nav aria-label="Prototype navigation">
+        <a href="../" title="Prototype index">Index</a>
+        <a href="./" aria-current="page">Signal Yard</a>
+        <a href="../02-night-index/">Night Index</a>
+      </nav>
+    </header>
+
+    <main class="yard" id="main-content">
+      <section class="intro" aria-labelledby="page-title">
+        <div>
+          <p class="eyebrow">VISUAL PROTOTYPE · SYNTHETIC RUNNING STATE</p>
+          <h1 id="page-title">Signal<br />Yard</h1>
+          <p class="intro-copy">A daylight maintenance desk for a research run: trace the delegated work, check the handoff evidence, and intervene before a signal becomes a consequence.</p>
+        </div>
+        <div class="intro-meta">
+          <dl class="run-meta">
+            <dt>Run docket</dt>
+            <dd>SY-0069 / 14:22:08Z</dd>
+            <dt>Objective</dt>
+            <dd>Map contradiction routes in the source register</dd>
+          </dl>
+          <button class="pause-button" id="pauseRun" type="button" aria-pressed="false" data-paused="false">Pause run</button>
+        </div>
+      </section>
+
+      <section class="telemetry" aria-label="Run telemetry">
+        <div class="flap">
+          <span class="flap-label">Active agents / cap</span>
+          <strong class="flap-value">03 / 04</strong>
+          <span class="flap-note" id="agentState">three on line</span>
+        </div>
+        <div class="flap">
+          <span class="flap-label">Model / policy</span>
+          <strong class="flap-value">LUNA / MAX</strong>
+          <span class="flap-note">gpt-5.6-luna · max</span>
+        </div>
+        <div class="flap">
+          <span class="flap-label">Verified sessions</span>
+          <strong class="flap-value">27</strong>
+          <span class="flap-note">custody checks complete</span>
+        </div>
+        <div class="flap flap-wide">
+          <span class="flap-label">Aggregate tokens</span>
+          <div class="token-inline" aria-label="Aggregate token counts">
+            <span><b>7.3M</b> input</span>
+            <span><b>5.8M</b> cached</span>
+            <span><b>381.3K</b> output</span>
+            <span><b>311.7K</b> reasoning</span>
+          </div>
+          <span class="flap-note">synthetic counters · current run</span>
+        </div>
+      </section>
+
+      <section class="desk" aria-label="Run workbench">
+        <aside class="panel task-panel" aria-labelledby="tree-title">
+          <div class="panel-heading">
+            <div>
+              <h2 id="tree-title">Task tree</h2>
+              <p>cable route / delegated work</p>
+            </div>
+            <span class="count" id="taskCount">08 nodes</span>
+          </div>
+          <div class="filter-wrap">
+            <label class="micro-label" for="taskFilter">Filter route
+              <input class="filter-input" id="taskFilter" type="search" placeholder="name, owner, status" autocomplete="off" />
+            </label>
+            <p class="filter-status" id="filterStatus" role="status" aria-live="polite">Showing all task nodes</p>
+          </div>
+          <div class="tree" id="taskTree" role="tree" aria-label="Delegated task hierarchy">
+            <button class="task-row" type="button" role="treeitem" aria-selected="true" data-task-id="anchor" data-status="active">
+              <span class="status-dot active" aria-hidden="true"></span>
+              <span><span class="task-name">Anchor contradiction map</span><span class="task-meta">LEAD / active · 62% route mapped</span></span>
+            </button>
+            <div class="tree-children" role="group">
+              <button class="task-row" type="button" role="treeitem" aria-selected="false" data-task-id="registry" data-status="active">
+                <span class="status-dot active" aria-hidden="true"></span>
+                <span><span class="task-name">Sift source registry</span><span class="task-meta">LUNA-01 / active · 184 records</span></span>
+              </button>
+              <button class="task-row" type="button" role="treeitem" aria-selected="false" data-task-id="contradictions" data-status="active">
+                <span class="status-dot active" aria-hidden="true"></span>
+                <span><span class="task-name">Mark contradiction set</span><span class="task-meta">LUNA-02 / active · 11 flags</span></span>
+              </button>
+              <div class="tree-children" role="group">
+                <button class="task-row" type="button" role="treeitem" aria-selected="false" data-task-id="crosscheck" data-status="queued">
+                  <span class="status-dot queued" aria-hidden="true"></span>
+                  <span><span class="task-name">Cross-check provenance</span><span class="task-meta">LUNA-03 / queued · waits on flags</span></span>
+                </button>
+              </div>
+            </div>
+            <button class="task-row" type="button" role="treeitem" aria-selected="false" data-task-id="synthesis" data-status="active">
+              <span class="status-dot active" aria-hidden="true"></span>
+              <span><span class="task-name">Prepare synthesis plate</span><span class="task-meta">LEAD / active · 3 findings held</span></span>
+            </button>
+            <div class="tree-children" role="group">
+              <button class="task-row" type="button" role="treeitem" aria-selected="false" data-task-id="claimset" data-status="queued">
+                <span class="status-dot queued" aria-hidden="true"></span>
+                <span><span class="task-name">Bound claim set</span><span class="task-meta">LUNA-01 / queued · evidence gate</span></span>
+              </button>
+              <button class="task-row" type="button" role="treeitem" aria-selected="false" data-task-id="review" data-status="blocked">
+                <span class="status-dot blocked" aria-hidden="true"></span>
+                <span><span class="task-name">Owner review checkpoint</span><span class="task-meta">OPERATOR / hold · one route exception</span></span>
+              </button>
+            </div>
+            <button class="task-row" type="button" role="treeitem" aria-selected="false" data-task-id="archive" data-status="queued">
+              <span class="status-dot queued" aria-hidden="true"></span>
+              <span><span class="task-name">Archive verified run</span><span class="task-meta">SYSTEM / queued · after decision</span></span>
+            </button>
+          </div>
+        </aside>
+
+        <article class="panel record-panel" aria-labelledby="recordTitle" aria-live="polite">
+          <div class="record-body">
+            <p class="section-label record-kicker" id="recordStatus">Active work order</p>
+            <h2 id="recordTitle">Anchor contradiction map</h2>
+            <p class="record-lede" id="recordObjective">Keep source claims attached to their provenance while the registry is being sifted. The selected route is the lead agent's current handoff surface.</p>
+            <dl class="record-facts">
+              <div><dt>Owner</dt><dd id="recordOwner">Lead / yard desk</dd></div>
+              <div><dt>Route state</dt><dd id="recordRoute">62% mapped</dd></div>
+              <div><dt>Last signal</dt><dd id="recordSignal">14:21:44Z</dd></div>
+            </dl>
+
+            <div class="route-plate" aria-label="Cable route diagram">
+              <div class="route-plate-head"><span>Route plate 03</span><span id="routeMark">junction / A—B</span></div>
+              <svg viewBox="0 0 560 170" role="img" aria-label="Cobalt cable route with three junctions and one orange exception">
+                <path class="faint" d="M22 138H538M22 31H538M22 84H538" />
+                <path class="faint" d="M72 14V154M184 14V154M318 14V154M468 14V154" />
+                <path class="line" d="M26 118H92V68H190V108H318V54H462V91H534" />
+                <path class="line" d="M190 108V143H318" />
+                <circle class="node" cx="92" cy="68" r="7" />
+                <circle class="node" cx="190" cy="108" r="7" />
+                <circle class="node warn" cx="318" cy="54" r="7" />
+                <circle class="node" cx="462" cy="91" r="7" />
+                <text x="78" y="53">REGISTRY</text>
+                <text x="168" y="128">FLAGS 11</text>
+                <text x="298" y="39">EXCEPTION</text>
+                <text x="444" y="112">REVIEW</text>
+              </svg>
+            </div>
+
+            <ul class="detail-list" id="evidenceList" aria-label="Selected task evidence">
+              <li><div><strong>184 source records attached</strong><span>Registry sweep has a stable owner and immutable route IDs.</span></div></li>
+              <li><div><strong>11 contradiction flags held</strong><span>Two claims share a citation but diverge in stated date.</span></div></li>
+              <li><div><strong>One decision still needs a human</strong><span>The orange mark is a consequence signal, not a failed run.</span></div></li>
+            </ul>
+            <div class="detail-next">
+              <strong>Next safe action</strong>
+              <p id="recordNext">Open the cross-check route when the registry pass closes; do not merge the held claims yet.</p>
+            </div>
+          </div>
+        </article>
+
+        <aside class="panel ledger-panel" aria-labelledby="ledgerTitle">
+          <div class="panel-heading">
+            <div>
+              <h2 id="ledgerTitle">Model-session ledger</h2>
+              <p>verified worker handoffs</p>
+            </div>
+            <span class="count">27 verified</span>
+          </div>
+          <div class="ledger-body">
+            <p class="ledger-note">Each row is a synthetic session receipt. Model identity, policy, and state stay visible beside the task tree.</p>
+            <table class="ledger-table">
+              <caption>Current model-session ledger</caption>
+              <thead><tr><th>Session</th><th>Model / policy</th><th>State</th><th>Tokens</th></tr></thead>
+              <tbody>
+                <tr><td><span class="ledger-session">S-027</span><span class="ledger-sub">14:22:08Z</span></td><td>gpt-5.6-luna<br /><span class="ledger-sub">max</span></td><td><span class="ledger-state live">live</span></td><td>1.8M</td></tr>
+                <tr><td><span class="ledger-session">S-026</span><span class="ledger-sub">14:20:51Z</span></td><td>gpt-5.6-luna<br /><span class="ledger-sub">max</span></td><td><span class="ledger-state live">live</span></td><td>2.1M</td></tr>
+                <tr><td><span class="ledger-session">S-025</span><span class="ledger-sub">14:17:04Z</span></td><td>gpt-5.6-luna<br /><span class="ledger-sub">max</span></td><td><span class="ledger-state hold">hold</span></td><td>1.5M</td></tr>
+                <tr><td><span class="ledger-session">S-024</span><span class="ledger-sub">14:10:18Z</span></td><td>gpt-5.6-luna<br /><span class="ledger-sub">max</span></td><td><span class="ledger-state live">live</span></td><td>1.9M</td></tr>
+              </tbody>
+            </table>
+            <div class="ledger-summary" aria-label="Aggregate token totals">
+              <div class="ledger-summary-row"><span>Input</span><strong>7.3M</strong></div>
+              <div class="ledger-summary-row"><span>Cached</span><strong>5.8M</strong></div>
+              <div class="ledger-summary-row"><span>Output</span><strong>381.3K</strong></div>
+              <div class="ledger-summary-row warning"><span>Reasoning</span><strong>311.7K</strong></div>
+            </div>
+          </div>
+        </aside>
+      </section>
+
+      <footer class="yard-foot">
+        <div class="calibration" aria-label="Calibration marks">
+          <svg viewBox="0 0 680 56" role="img" aria-label="Industrial calibration scale">
+            <path d="M0 34H680" fill="none" stroke="#8d9ba5" stroke-width="1" />
+            <path d="M0 26V42M34 30V42M68 26V42M102 30V42M136 26V42M170 30V42M204 26V42M238 30V42M272 26V42M306 30V42M340 26V42M374 30V42M408 26V42M442 30V42M476 26V42M510 30V42M544 26V42M578 30V42M612 26V42M646 30V42M680 26V42" fill="none" stroke="#8d9ba5" stroke-width="1" />
+            <path d="M424 17V47" fill="none" stroke="#d7661b" stroke-width="2" />
+            <text x="0" y="14">CALIBRATION / YARD DESK 01</text>
+            <text x="402" y="14">14:22</text>
+          </svg>
+        </div>
+        <div>
+          <p class="foot-note"><strong>Bench note:</strong> This is a synthetic running state for AOS. The route is the interface: inspect an actual handoff before reaching for a control.</p>
+          <p class="live-status" id="liveStatus" role="status" aria-live="polite">run is live · controls armed</p>
+        </div>
+      </footer>
+    </main>
+
+    <script>
+      (() => {
+        const taskRows = Array.from(document.querySelectorAll('.task-row'));
+        const filterInput = document.querySelector('#taskFilter');
+        const filterStatus = document.querySelector('#filterStatus');
+        const taskCount = document.querySelector('#taskCount');
+        const pauseButton = document.querySelector('#pauseRun');
+        const agentState = document.querySelector('#agentState');
+        const liveStatus = document.querySelector('#liveStatus');
+        const detail = {
+          status: document.querySelector('#recordStatus'),
+          title: document.querySelector('#recordTitle'),
+          objective: document.querySelector('#recordObjective'),
+          owner: document.querySelector('#recordOwner'),
+          route: document.querySelector('#recordRoute'),
+          signal: document.querySelector('#recordSignal'),
+          mark: document.querySelector('#routeMark'),
+          evidence: document.querySelector('#evidenceList'),
+          next: document.querySelector('#recordNext'),
+        };
+
+        const taskDetails = {
+          anchor: {
+            status: 'Active work order', title: 'Anchor contradiction map', objective: 'Keep source claims attached to their provenance while the registry is being sifted. The selected route is the lead agent\'s current handoff surface.', owner: 'Lead / yard desk', route: '62% mapped', signal: '14:21:44Z', mark: 'junction / A—B', next: 'Open the cross-check route when the registry pass closes; do not merge the held claims yet.', evidence: [['184 source records attached', 'Registry sweep has a stable owner and immutable route IDs.'], ['11 contradiction flags held', 'Two claims share a citation but diverge in stated date.'], ['One decision still needs a human', 'The orange mark is a consequence signal, not a failed run.']],
+          },
+          registry: {
+            status: 'Active worker route', title: 'Sift source registry', objective: 'Normalize the source register into stable records without erasing the original citation shape or custody note.', owner: 'LUNA-01 / registry', route: '184 records', signal: '14:20:51Z', mark: 'junction / A—1', next: 'Finish the last 36 records, then release the contradiction set to cross-check.', evidence: [['Registry IDs are stable', 'Each source keeps its original locator and ingest timestamp.'], ['Scope is bounded', '184 records are inside this run; no external source fetch is implied.'], ['Worker receipt verified', 'S-026 carries model, policy, and route metadata.']],
+          },
+          contradictions: {
+            status: 'Active worker route', title: 'Mark contradiction set', objective: 'Separate conflicts in wording, date, and provenance so the lead can inspect consequence rather than absorb a blended summary.', owner: 'LUNA-02 / compare', route: '11 flags', signal: '14:19:37Z', mark: 'junction / B—2', next: 'Keep the two date conflicts held until provenance cross-check returns.', evidence: [['11 flags are classified', 'Date, wording, and provenance each have a distinct reason code.'], ['Two flags share a citation', 'The route remains open because the date evidence diverges.'], ['No synthesis merged', 'Claim boundaries remain intact while review is pending.']],
+          },
+          crosscheck: {
+            status: 'Queued handoff', title: 'Cross-check provenance', objective: 'Verify the two held citation routes against their source records once the contradiction worker closes its pass.', owner: 'LUNA-03 / queued', route: 'waiting on flags', signal: '14:18:03Z', mark: 'junction / B—3', next: 'Wait for the contradiction worker; do not start a parallel merge.', evidence: [['Dependency is explicit', 'The queue is downstream of the 11-flag contradiction pass.'], ['Capacity is reserved', 'One of four slots remains available for this route.'], ['Start condition is known', 'Two citation/date conflicts must be present before launch.']],
+          },
+          synthesis: {
+            status: 'Active work order', title: 'Prepare synthesis plate', objective: 'Turn verified findings into a compact evidence plate while keeping unresolved routes visible to the operator.', owner: 'Lead / synthesis', route: '3 findings held', signal: '14:16:12Z', mark: 'junction / C—1', next: 'Keep the plate in draft until the owner review checkpoint clears.', evidence: [['Three findings are staged', 'Each finding links back to a selected source route.'], ['Open routes remain visible', 'Draft status prevents a false completion signal.'], ['Output is bounded', 'No new claim is authored by the plate itself.']],
+          },
+          claimset: {
+            status: 'Queued handoff', title: 'Bound claim set', objective: 'Attach confidence and evidence boundaries to the staged findings before the plate can move to review.', owner: 'LUNA-01 / claims', route: 'evidence gate', signal: '14:13:29Z', mark: 'junction / C—2', next: 'Start after synthesis plate emits the three staged finding IDs.', evidence: [['Evidence gate is closed', 'The worker has no permission to widen the source set.'], ['Three findings are waiting', 'Input is held until the synthesis draft is stable.'], ['Claim labels are defined', 'Illustrative values cannot pass this gate as evidence.']],
+          },
+          review: {
+            status: 'Operator hold', title: 'Owner review checkpoint', objective: 'Resolve the one route exception that changes the consequence of the current handoff before any archive action.', owner: 'Operator / required', route: 'one exception', signal: '14:11:06Z', mark: 'junction / C—3', next: 'Review the orange exception, then choose resume or hold with the route note attached.', evidence: [['One exception is visible', 'The signal is a consequence marker, not a transport error.'], ['Owner action is required', 'A worker cannot close this checkpoint on its own.'], ['Archive is downstream', 'No final receipt is generated while the hold remains.']],
+          },
+          archive: {
+            status: 'Queued system route', title: 'Archive verified run', objective: 'Seal the verified session receipts and selected evidence routes after the human checkpoint is resolved.', owner: 'System / archive', route: 'after decision', signal: '14:06:22Z', mark: 'junction / D—1', next: 'Wait for the review checkpoint and the final claim-boundary check.', evidence: [['Archive path is reserved', 'The system has a destination but no completion authority yet.'], ['27 receipts are available', 'Verified session count is stable for this synthetic run.'], ['Run remains open', 'Archive cannot close a route with a live consequence marker.']],
+          },
+        };
+
+        function renderTask(id) {
+          const item = taskDetails[id] || taskDetails.anchor;
+          taskRows.forEach((row) => row.setAttribute('aria-selected', row.dataset.taskId === id ? 'true' : 'false'));
+          detail.status.textContent = item.status;
+          detail.title.textContent = item.title;
+          detail.objective.textContent = item.objective;
+          detail.owner.textContent = item.owner;
+          detail.route.textContent = item.route;
+          detail.signal.textContent = item.signal;
+          detail.mark.textContent = item.mark;
+          detail.next.textContent = item.next;
+          detail.evidence.innerHTML = item.evidence.map(([title, copy]) => `<li><div><strong>${title}</strong><span>${copy}</span></div></li>`).join('');
+        }
+
+        function filterTasks() {
+          const query = filterInput.value.trim().toLowerCase();
+          let visible = 0;
+          taskRows.forEach((row) => {
+            const match = !query || row.textContent.toLowerCase().includes(query);
+            row.hidden = !match;
+            if (match) visible += 1;
+          });
+          taskCount.textContent = `${visible} / ${taskRows.length} nodes`;
+          filterStatus.textContent = query ? `${visible} task nodes match “${query}”` : 'Showing all task nodes';
+        }
+
+        taskRows.forEach((row) => row.addEventListener('click', () => renderTask(row.dataset.taskId)));
+        filterInput.addEventListener('input', filterTasks);
+        pauseButton.addEventListener('click', () => {
+          const paused = document.body.dataset.paused === 'true';
+          document.body.dataset.paused = String(!paused);
+          pauseButton.dataset.paused = String(!paused);
+          pauseButton.setAttribute('aria-pressed', String(!paused));
+          pauseButton.textContent = paused ? 'Pause run' : 'Resume run';
+          agentState.textContent = paused ? 'three on line' : 'three held';
+          liveStatus.textContent = paused ? 'run is live · controls armed' : 'run is paused · review safe';
+        });
+      })();
+    </script>
+  </body>
+</html>

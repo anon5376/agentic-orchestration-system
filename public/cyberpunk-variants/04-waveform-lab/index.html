@@ -1,0 +1,1259 @@
+<!doctype html>
+<!--
+THESIS: AOS is a research instrument that makes delegated work measurable; it refuses the decorative command-center screen.
+OWN-WORLD: Warm instrument grey, surgical white, black scope glass, ruled lab labels, hard corners, and arterial red only for live activity or anomaly.
+STORY: The operator reads the primary task hierarchy, watches three concurrent traces, selects a branch, and pauses new dispatch when a signal needs review.
+FIRST VIEWPORT: A white instrument header and metrics strip lead directly to a two-part workbench: hierarchy first, waveform scope second, with the selected task beneath the trace.
+FORM: An electrophysiology bench, chosen for its timebase and channel discipline; the waveform is a real animated SVG signal, not a decorative sparkline.
+-->
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="theme-color" content="#1a1a18" />
+    <title>AOS / Waveform Lab</title>
+    <style>
+      :root {
+        --instrument: #bcb8b0;
+        --instrument-dark: #8f8c84;
+        --surgical: #f7f6f0;
+        --white: #fffef9;
+        --black: #151615;
+        --black-soft: #292a27;
+        --ink: #1e201d;
+        --muted: #5f605a;
+        --rule: #9c9c94;
+        --rule-dark: #595b55;
+        --red: #aa2925;
+        --red-pale: #f1d8d3;
+        --focus: #000000;
+        --font-sans: Arial, Helvetica, sans-serif;
+        --font-mono: "Courier New", Courier, monospace;
+      }
+
+      *,
+      *::before,
+      *::after {
+        box-sizing: border-box;
+      }
+
+      html {
+        min-width: 320px;
+        background: var(--instrument);
+        color-scheme: light;
+      }
+
+      body {
+        min-width: 320px;
+        min-height: 100vh;
+        margin: 0;
+        overflow-x: hidden;
+        background: var(--instrument);
+        color: var(--ink);
+        font-family: var(--font-sans);
+        font-size: 14px;
+        line-height: 1.4;
+        text-rendering: optimizeLegibility;
+        -webkit-font-smoothing: antialiased;
+      }
+
+      button,
+      input,
+      select {
+        margin: 0;
+        color: inherit;
+        font: inherit;
+      }
+
+      button,
+      a {
+        -webkit-tap-highlight-color: transparent;
+      }
+
+      button {
+        border: 0;
+        border-radius: 0;
+        cursor: pointer;
+      }
+
+      a {
+        color: inherit;
+        text-decoration: none;
+      }
+
+      button:focus-visible,
+      a:focus-visible,
+      input:focus-visible,
+      select:focus-visible {
+        outline: 3px solid var(--focus);
+        outline-offset: 3px;
+      }
+
+      ::selection {
+        background: var(--red);
+        color: var(--white);
+      }
+
+      .shell {
+        width: min(100%, 1680px);
+        min-height: 100vh;
+        margin: 0 auto;
+        background: var(--surgical);
+      }
+
+      .topbar {
+        display: grid;
+        grid-template-columns: minmax(180px, 0.72fr) minmax(320px, 1.4fr) auto;
+        gap: 28px;
+        align-items: center;
+        padding: 18px clamp(18px, 3vw, 48px);
+        background: var(--black);
+        color: var(--white);
+        border-bottom: 1px solid var(--black-soft);
+      }
+
+      .brand {
+        display: flex;
+        gap: 12px;
+        align-items: baseline;
+        letter-spacing: 0.08em;
+        text-transform: uppercase;
+      }
+
+      .brand strong {
+        font-size: 18px;
+        letter-spacing: 0.13em;
+      }
+
+      .brand span {
+        color: #c7c5bb;
+        font-family: var(--font-mono);
+        font-size: 10px;
+      }
+
+      .topbar nav {
+        display: flex;
+        gap: 20px;
+        align-items: center;
+        min-width: 0;
+        color: #d8d6cc;
+        font-family: var(--font-mono);
+        font-size: 11px;
+        letter-spacing: 0.04em;
+        text-transform: uppercase;
+      }
+
+      .topbar nav a {
+        padding-block: 5px;
+        border-bottom: 1px solid transparent;
+        white-space: nowrap;
+      }
+
+      .topbar nav a[aria-current="page"] {
+        color: var(--white);
+        border-bottom-color: var(--white);
+      }
+
+      .clock {
+        justify-self: end;
+        color: #b9b8af;
+        font-family: var(--font-mono);
+        font-size: 11px;
+        white-space: nowrap;
+      }
+
+      .intro-band {
+        display: grid;
+        grid-template-columns: minmax(0, 1fr) auto;
+        gap: 24px;
+        align-items: end;
+        padding: 20px clamp(18px, 3vw, 48px) 17px;
+        border-bottom: 1px solid var(--rule);
+        background: var(--surgical);
+      }
+
+      .prototype-label,
+      .kicker,
+      .micro-label,
+      .scope-axis {
+        margin: 0;
+        color: var(--muted);
+        font-family: var(--font-mono);
+        font-size: 10px;
+        letter-spacing: 0.08em;
+        line-height: 1.3;
+        text-transform: uppercase;
+      }
+
+      .prototype-label {
+        display: inline-block;
+        padding: 5px 8px;
+        background: var(--black);
+        color: var(--white);
+      }
+
+      .intro-band h1 {
+        max-width: 19ch;
+        margin: 12px 0 0;
+        color: var(--black);
+        font-size: clamp(28px, 4vw, 52px);
+        font-weight: 700;
+        letter-spacing: -0.04em;
+        line-height: 0.98;
+      }
+
+      .intro-note {
+        max-width: 39ch;
+        margin: 0 0 2px;
+        color: var(--muted);
+        font-size: 13px;
+        line-height: 1.45;
+        text-align: right;
+      }
+
+      .run-strip {
+        display: grid;
+        grid-template-columns: minmax(170px, 1.15fr) repeat(5, minmax(120px, 1fr));
+        border-bottom: 1px solid var(--rule-dark);
+        background: var(--white);
+      }
+
+      .run-cell {
+        min-width: 0;
+        padding: 14px 16px 13px;
+        border-right: 1px solid var(--rule);
+      }
+
+      .run-cell:last-child {
+        border-right: 0;
+      }
+
+      .run-cell dt,
+      .run-cell dd {
+        margin: 0;
+      }
+
+      .run-cell dt {
+        color: var(--muted);
+        font-family: var(--font-mono);
+        font-size: 10px;
+        letter-spacing: 0.06em;
+        text-transform: uppercase;
+      }
+
+      .run-cell dd {
+        margin-top: 5px;
+        color: var(--black);
+        font-size: 16px;
+        font-weight: 700;
+        line-height: 1.1;
+      }
+
+      .run-cell--primary {
+        background: var(--black);
+        color: var(--white);
+      }
+
+      .run-cell--primary dt {
+        color: #cfcdc2;
+      }
+
+      .run-cell--primary dd {
+        color: var(--white);
+      }
+
+      .run-state {
+        display: inline-flex;
+        gap: 8px;
+        align-items: center;
+      }
+
+      .live-marker,
+      .run-state::before,
+      .trace-dot {
+        display: inline-block;
+        width: 9px;
+        height: 9px;
+        flex: 0 0 9px;
+        background: var(--red);
+      }
+
+      .run-cell--anomaly {
+        background: var(--red-pale);
+        color: var(--red);
+      }
+
+      .run-cell--anomaly dt,
+      .run-cell--anomaly dd {
+        color: var(--red);
+      }
+
+      .lab-controls {
+        display: flex;
+        gap: 16px;
+        align-items: end;
+        justify-content: space-between;
+        padding: 17px clamp(18px, 3vw, 48px);
+        border-bottom: 1px solid var(--rule-dark);
+        background: var(--instrument);
+      }
+
+      .instrument-status {
+        display: flex;
+        gap: 9px;
+        align-items: center;
+        color: var(--black);
+        font-family: var(--font-mono);
+        font-size: 11px;
+        letter-spacing: 0.05em;
+        text-transform: uppercase;
+      }
+
+      .instrument-status small {
+        color: var(--muted);
+        font-size: 10px;
+        letter-spacing: 0.03em;
+      }
+
+      .control-set {
+        display: flex;
+        gap: 10px;
+        align-items: end;
+      }
+
+      .control-block {
+        display: grid;
+        gap: 6px;
+      }
+
+      .control-label {
+        color: var(--muted);
+        font-family: var(--font-mono);
+        font-size: 10px;
+        letter-spacing: 0.06em;
+        text-transform: uppercase;
+      }
+
+      .tree-filter,
+      .pause-button,
+      .detail-action {
+        min-height: 36px;
+        border: 1px solid var(--black);
+        border-radius: 0;
+        background: var(--white);
+        color: var(--black);
+      }
+
+      .tree-filter {
+        width: min(260px, 34vw);
+        padding: 8px 10px;
+        font-size: 12px;
+      }
+
+      .pause-button,
+      .detail-action {
+        padding: 8px 12px;
+        background: var(--black);
+        color: var(--white);
+        font-family: var(--font-mono);
+        font-size: 10px;
+        letter-spacing: 0.04em;
+        text-transform: uppercase;
+      }
+
+      .pause-button:hover,
+      .detail-action:hover {
+        background: var(--black-soft);
+      }
+
+      .pause-button[aria-pressed="true"] {
+        border-color: var(--red);
+        background: var(--red-pale);
+        color: var(--red);
+      }
+
+      .workbench {
+        display: grid;
+        grid-template-columns: minmax(300px, 0.46fr) minmax(0, 1.54fr);
+        min-width: 0;
+        border-bottom: 1px solid var(--rule-dark);
+      }
+
+      .hierarchy-panel {
+        min-width: 0;
+        padding: 26px clamp(18px, 3vw, 40px) 34px clamp(18px, 3vw, 48px);
+        border-right: 1px solid var(--rule-dark);
+        background: var(--instrument);
+      }
+
+      .scope-panel {
+        min-width: 0;
+        padding: 26px clamp(18px, 3vw, 48px) 34px clamp(18px, 3vw, 40px);
+        background: var(--surgical);
+      }
+
+      .panel-heading {
+        display: flex;
+        gap: 18px;
+        align-items: end;
+        justify-content: space-between;
+        min-height: 58px;
+        margin-bottom: 20px;
+      }
+
+      .panel-heading h2 {
+        margin: 6px 0 0;
+        color: var(--black);
+        font-size: clamp(23px, 2.3vw, 34px);
+        font-weight: 700;
+        letter-spacing: -0.035em;
+        line-height: 1;
+      }
+
+      .panel-heading p {
+        max-width: 30ch;
+        margin: 0;
+        color: var(--muted);
+        font-size: 12px;
+        text-align: right;
+      }
+
+      .lab-tree {
+        margin: 0;
+        padding: 0;
+        list-style: none;
+      }
+
+      .lab-tree ul {
+        margin: 0 0 0 20px;
+        padding: 0 0 0 20px;
+        border-left: 1px solid var(--rule-dark);
+        list-style: none;
+      }
+
+      .lab-tree-item {
+        position: relative;
+        min-width: 0;
+      }
+
+      .lab-tree-item::before {
+        position: absolute;
+        top: 23px;
+        left: -20px;
+        width: 16px;
+        border-top: 1px solid var(--rule-dark);
+        content: "";
+      }
+
+      .lab-tree > .lab-tree-item::before {
+        display: none;
+      }
+
+      .lab-tree-item.is-hidden {
+        display: none;
+      }
+
+      .tree-button {
+        display: grid;
+        grid-template-columns: 16px minmax(0, 1fr) auto;
+        gap: 9px;
+        align-items: start;
+        width: 100%;
+        min-height: 57px;
+        padding: 10px 8px;
+        border-top: 1px solid transparent;
+        border-bottom: 1px solid var(--rule);
+        background: transparent;
+        color: var(--ink);
+        text-align: left;
+      }
+
+      .tree-button:hover,
+      .tree-button.is-selected {
+        border-top-color: var(--black);
+        border-bottom-color: var(--black);
+        background: var(--surgical);
+      }
+
+      .tree-button.is-selected .tree-node-mark {
+        background: var(--red);
+      }
+
+      .tree-node-mark {
+        width: 10px;
+        height: 10px;
+        margin-top: 3px;
+        border: 1px solid var(--black);
+        background: transparent;
+      }
+
+      .tree-node-id {
+        display: block;
+        color: var(--muted);
+        font-family: var(--font-mono);
+        font-size: 9px;
+        letter-spacing: 0.04em;
+      }
+
+      .tree-node-name {
+        display: block;
+        margin-top: 3px;
+        color: var(--black);
+        font-size: 13px;
+        font-weight: 700;
+        line-height: 1.15;
+      }
+
+      .tree-node-state {
+        color: var(--muted);
+        font-family: var(--font-mono);
+        font-size: 9px;
+        line-height: 1.25;
+        text-align: right;
+        text-transform: uppercase;
+      }
+
+      .tree-node-state.is-live,
+      .tree-node-state.is-anomaly {
+        color: var(--red);
+      }
+
+      .tree-note {
+        max-width: 36ch;
+        margin: 22px 0 0;
+        color: var(--muted);
+        font-size: 12px;
+      }
+
+      .tree-note strong {
+        color: var(--black);
+      }
+
+      .tree-empty {
+        display: none;
+        margin: 14px 0;
+        color: var(--muted);
+        font-family: var(--font-mono);
+        font-size: 11px;
+      }
+
+      .tree-empty.is-visible {
+        display: block;
+      }
+
+      .scope-header {
+        display: flex;
+        gap: 18px;
+        align-items: end;
+        justify-content: space-between;
+        margin-bottom: 16px;
+      }
+
+      .scope-header h2 {
+        margin: 6px 0 0;
+        color: var(--black);
+        font-size: clamp(23px, 2.5vw, 36px);
+        letter-spacing: -0.04em;
+        line-height: 1;
+      }
+
+      .scope-meta {
+        display: flex;
+        gap: 16px;
+        align-items: end;
+        color: var(--muted);
+        font-family: var(--font-mono);
+        font-size: 10px;
+        text-align: right;
+        text-transform: uppercase;
+      }
+
+      .scope-meta strong {
+        display: block;
+        color: var(--black);
+        font-size: 14px;
+        font-weight: 700;
+      }
+
+      .scope-meta .live-readout {
+        color: var(--red);
+      }
+
+      .scope-screen {
+        position: relative;
+        overflow: hidden;
+        border: 2px solid var(--black);
+        background: var(--black);
+      }
+
+      .scope-screen svg {
+        display: block;
+        width: 100%;
+        height: auto;
+        aspect-ratio: 1000 / 360;
+      }
+
+      .scope-grid line {
+        stroke: #41423d;
+        stroke-width: 1;
+      }
+
+      .scope-grid line.major {
+        stroke: #62635c;
+        stroke-width: 1.4;
+      }
+
+      .scope-grid text,
+      .scope-label {
+        fill: #d7d5cb;
+        font-family: var(--font-mono);
+        font-size: 12px;
+        letter-spacing: 0.04em;
+      }
+
+      .scope-label--live {
+        fill: var(--red);
+      }
+
+      .trace {
+        fill: none;
+        stroke-linecap: round;
+        stroke-linejoin: round;
+      }
+
+      .trace-a {
+        stroke: var(--red);
+        stroke-width: 3;
+      }
+
+      .trace-b {
+        stroke: #e1dfd5;
+        stroke-width: 2.2;
+      }
+
+      .trace-c {
+        stroke: #979891;
+        stroke-width: 2;
+      }
+
+      .trace-event {
+        fill: var(--red);
+      }
+
+      .scope-axis-row {
+        display: flex;
+        gap: 12px;
+        justify-content: space-between;
+        padding-top: 8px;
+        color: var(--muted);
+      }
+
+      .scope-axis:last-child {
+        text-align: right;
+      }
+
+      .trace-detail {
+        margin-top: 24px;
+        padding-top: 18px;
+        border-top: 2px solid var(--black);
+      }
+
+      .trace-detail h3 {
+        margin: 6px 0 0;
+        color: var(--black);
+        font-size: 25px;
+        letter-spacing: -0.035em;
+        line-height: 1;
+      }
+
+      .trace-summary {
+        max-width: 62ch;
+        margin: 10px 0 17px;
+        color: var(--muted);
+        font-size: 13px;
+      }
+
+      .trace-spec {
+        display: grid;
+        grid-template-columns: repeat(3, minmax(0, 1fr));
+        gap: 12px;
+        margin: 0 0 18px;
+      }
+
+      .trace-spec div {
+        padding-top: 8px;
+        border-top: 1px solid var(--rule);
+      }
+
+      .trace-spec dt,
+      .trace-spec dd {
+        margin: 0;
+      }
+
+      .trace-spec dt {
+        color: var(--muted);
+        font-family: var(--font-mono);
+        font-size: 9px;
+        letter-spacing: 0.05em;
+        text-transform: uppercase;
+      }
+
+      .trace-spec dd {
+        margin-top: 3px;
+        color: var(--black);
+        font-size: 12px;
+        font-weight: 700;
+        overflow-wrap: anywhere;
+      }
+
+      .trace-spec dd.is-anomaly {
+        color: var(--red);
+      }
+
+      .session-section {
+        padding: 26px clamp(18px, 3vw, 48px) 40px;
+        background: var(--surgical);
+      }
+
+      .session-heading {
+        display: flex;
+        gap: 24px;
+        align-items: end;
+        justify-content: space-between;
+        margin-bottom: 15px;
+      }
+
+      .session-heading h2 {
+        margin: 6px 0 0;
+        color: var(--black);
+        font-size: clamp(22px, 2.5vw, 32px);
+        letter-spacing: -0.035em;
+        line-height: 1;
+      }
+
+      .session-heading p {
+        max-width: 50ch;
+        margin: 0;
+        color: var(--muted);
+        font-size: 12px;
+        text-align: right;
+      }
+
+      .ledger-head,
+      .ledger-row {
+        display: grid;
+        grid-template-columns: 0.7fr 1.1fr 1.55fr 1fr 0.86fr;
+        gap: 12px;
+        align-items: center;
+      }
+
+      .ledger-head {
+        padding: 0 0 9px;
+        border-bottom: 2px solid var(--black);
+        color: var(--muted);
+        font-family: var(--font-mono);
+        font-size: 10px;
+        letter-spacing: 0.05em;
+        text-transform: uppercase;
+      }
+
+      .ledger-row {
+        width: 100%;
+        min-height: 55px;
+        padding: 9px 0;
+        border-bottom: 1px solid var(--rule);
+        background: transparent;
+        color: var(--ink);
+        text-align: left;
+      }
+
+      .ledger-row:hover,
+      .ledger-row.is-selected {
+        background: var(--instrument);
+      }
+
+      .ledger-row span {
+        min-width: 0;
+        overflow-wrap: anywhere;
+      }
+
+      .ledger-row span:first-child,
+      .ledger-row span:nth-child(2) {
+        font-family: var(--font-mono);
+        font-size: 11px;
+      }
+
+      .ledger-row span:last-child {
+        color: var(--muted);
+        font-weight: 700;
+      }
+
+      .footer {
+        display: flex;
+        gap: 20px;
+        justify-content: space-between;
+        padding: 15px clamp(18px, 3vw, 48px);
+        border-top: 1px solid var(--black-soft);
+        background: var(--black);
+        color: #d8d6cc;
+        font-family: var(--font-mono);
+        font-size: 10px;
+      }
+
+      .footer a {
+        text-decoration: underline;
+        text-underline-offset: 3px;
+      }
+
+      body.is-paused .run-cell--primary {
+        background: #42433f;
+      }
+
+      body.is-paused .run-state::before {
+        background: var(--red);
+      }
+
+      @media (max-width: 1120px) {
+        .topbar {
+          grid-template-columns: auto 1fr;
+        }
+
+        .topbar nav {
+          justify-content: flex-end;
+          overflow-x: auto;
+        }
+
+        .clock {
+          grid-column: 1 / -1;
+          justify-self: start;
+        }
+
+        .run-strip {
+          grid-template-columns: repeat(3, minmax(0, 1fr));
+        }
+
+        .run-cell {
+          border-bottom: 1px solid var(--rule);
+        }
+      }
+
+      @media (max-width: 900px) {
+        .workbench {
+          grid-template-columns: minmax(0, 1fr);
+        }
+
+        .hierarchy-panel {
+          border-right: 0;
+          border-bottom: 1px solid var(--rule-dark);
+        }
+      }
+
+      @media (max-width: 680px) {
+        .topbar {
+          display: block;
+          padding: 15px 16px;
+        }
+
+        .topbar nav {
+          justify-content: flex-start;
+          margin-top: 13px;
+          padding-bottom: 2px;
+        }
+
+        .clock {
+          margin-top: 12px;
+        }
+
+        .intro-band {
+          display: block;
+          padding: 17px 16px 15px;
+        }
+
+        .intro-note {
+          margin-top: 14px;
+          text-align: left;
+        }
+
+        .run-strip {
+          grid-template-columns: repeat(2, minmax(0, 1fr));
+        }
+
+        .run-cell {
+          padding: 12px;
+        }
+
+        .lab-controls {
+          display: block;
+          padding-inline: 16px;
+        }
+
+        .control-set {
+          display: grid;
+          grid-template-columns: minmax(0, 1fr) auto;
+          margin-top: 14px;
+        }
+
+        .tree-filter {
+          width: 100%;
+        }
+
+        .hierarchy-panel,
+        .scope-panel,
+        .session-section {
+          padding-inline: 16px;
+        }
+
+        .panel-heading,
+        .session-heading,
+        .scope-header {
+          display: block;
+        }
+
+        .panel-heading p,
+        .session-heading p {
+          margin-top: 9px;
+          text-align: left;
+        }
+
+        .scope-meta {
+          justify-content: space-between;
+          margin-top: 12px;
+          text-align: left;
+        }
+
+        .trace-spec {
+          grid-template-columns: repeat(2, minmax(0, 1fr));
+        }
+
+        .ledger-head,
+        .ledger-row {
+          grid-template-columns: 0.68fr 1.1fr 1.45fr 0.9fr;
+          gap: 8px;
+        }
+
+        .ledger-head span:nth-child(4),
+        .ledger-row span:nth-child(4) {
+          display: none;
+        }
+
+        .footer {
+          display: block;
+          padding-inline: 16px;
+        }
+
+        .footer span + span {
+          display: block;
+          margin-top: 7px;
+        }
+      }
+
+      @media (prefers-reduced-motion: reduce) {
+        *,
+        *::before,
+        *::after {
+          scroll-behavior: auto !important;
+          transition-duration: 0.001ms !important;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <div class="shell">
+      <header class="topbar">
+        <div class="brand"><strong>AOS</strong><span>WAVEFORM LAB / 04</span></div>
+        <nav aria-label="Prototype variants">
+          <a href="../" aria-label="Return to prototype index">INDEX / ../</a>
+          <a href="../03-metro-control/">METRO CONTROL</a>
+          <a href="./" aria-current="page">WAVEFORM LAB</a>
+        </nav>
+        <div class="clock">RUN R-240 / 09:42:18 UTC</div>
+      </header>
+
+      <section class="intro-band" aria-labelledby="page-title">
+        <div>
+          <p class="prototype-label">VISUAL PROTOTYPE · SYNTHETIC RUNNING STATE</p>
+          <h1 id="page-title">Delegation / live trace</h1>
+        </div>
+        <p class="intro-note">A research instrument for a running AOS route: the hierarchy is the primary record, while three channels make concurrency and interruption visible in time.</p>
+      </section>
+
+      <dl class="run-strip" aria-label="Run overview">
+        <div class="run-cell run-cell--primary">
+          <dt>Instrument state</dt>
+          <dd><span class="run-state" id="runState">RUNNING</span></dd>
+        </div>
+        <div class="run-cell">
+          <dt>Active channels</dt>
+          <dd>3 / 4</dd>
+        </div>
+        <div class="run-cell">
+          <dt>Dispatch model</dt>
+          <dd>luna / max</dd>
+        </div>
+        <div class="run-cell">
+          <dt>Verified sessions</dt>
+          <dd>27</dd>
+        </div>
+        <div class="run-cell">
+          <dt>Input / cache</dt>
+          <dd>7.3M / 5.8M</dd>
+        </div>
+        <div class="run-cell run-cell--anomaly">
+          <dt>Trace anomaly</dt>
+          <dd id="anomalyState">N-04 / review</dd>
+        </div>
+      </dl>
+
+      <div class="lab-controls" aria-label="Instrument controls">
+        <div class="instrument-status"><span class="live-marker" aria-hidden="true"></span><strong id="instrumentStatus">LIVE ACQUISITION</strong><small>read-only / synthetic signals</small></div>
+        <div class="control-set">
+          <label class="control-block" for="treeFilter"><span class="control-label">Filter hierarchy</span><input class="tree-filter" id="treeFilter" type="search" placeholder="branch, task, or owner" /></label>
+          <button class="pause-button" id="pauseButton" type="button" aria-pressed="false">Pause dispatch</button>
+        </div>
+      </div>
+
+      <main>
+        <div class="workbench">
+          <section class="hierarchy-panel" aria-labelledby="hierarchy-title">
+            <div class="panel-heading">
+              <div>
+                <p class="kicker">01 / PRIMARY RECORD</p>
+                <h2 id="hierarchy-title">Task hierarchy</h2>
+              </div>
+              <p>Lead → branch → worker. Selection changes the trace annotation and task detail.</p>
+            </div>
+
+            <ul class="lab-tree" id="labTree" role="tree" aria-label="AOS-240 task hierarchy">
+              <li class="lab-tree-item" data-task="root" data-search="aos-240 evidence route lead running">
+                <button class="tree-button is-selected" type="button" role="treeitem" aria-selected="true" data-task="root">
+                  <span class="tree-node-mark" aria-hidden="true"></span><span><span class="tree-node-id">AOS-240 / ROOT</span><span class="tree-node-name">Evidence route</span></span><span class="tree-node-state is-live">running</span>
+                </button>
+                <ul role="group">
+                  <li class="lab-tree-item" data-task="triage" data-search="int-01 lead triage dispatch planner interchange">
+                    <button class="tree-button" type="button" role="treeitem" aria-selected="false" data-task="triage">
+                      <span class="tree-node-mark" aria-hidden="true"></span><span><span class="tree-node-id">INT-01 / LEAD</span><span class="tree-node-name">Lead triage</span></span><span class="tree-node-state">interchange</span>
+                    </button>
+                    <ul role="group">
+                      <li class="lab-tree-item" data-task="sources" data-search="t-17 source triangulation source analyst active branch a">
+                        <button class="tree-button" type="button" role="treeitem" aria-selected="false" data-task="sources">
+                          <span class="tree-node-mark" aria-hidden="true"></span><span><span class="tree-node-id">T-17 / BRANCH A</span><span class="tree-node-name">Source triangulation</span></span><span class="tree-node-state is-live">active</span>
+                        </button>
+                      </li>
+                      <li class="lab-tree-item" data-task="citations" data-search="t-18 citation audit citation analyst active branch b">
+                        <button class="tree-button" type="button" role="treeitem" aria-selected="false" data-task="citations">
+                          <span class="tree-node-mark" aria-hidden="true"></span><span><span class="tree-node-id">T-18 / BRANCH B</span><span class="tree-node-name">Citation audit</span></span><span class="tree-node-state is-live">active</span>
+                        </button>
+                      </li>
+                      <li class="lab-tree-item" data-task="conflicts" data-search="t-19 conflict register evidence integrator waiting branch c">
+                        <button class="tree-button" type="button" role="treeitem" aria-selected="false" data-task="conflicts">
+                          <span class="tree-node-mark" aria-hidden="true"></span><span><span class="tree-node-id">T-19 / BRANCH C</span><span class="tree-node-name">Conflict register</span></span><span class="tree-node-state">waiting</span>
+                        </button>
+                      </li>
+                      <li class="lab-tree-item" data-task="handoff" data-search="n-04 synthesis handoff synthesis writer disruption anomaly operator">
+                        <button class="tree-button" type="button" role="treeitem" aria-selected="false" data-task="handoff">
+                          <span class="tree-node-mark" aria-hidden="true"></span><span><span class="tree-node-id">N-04 / ANOMALY</span><span class="tree-node-name">Synthesis handoff</span></span><span class="tree-node-state is-anomaly">review</span>
+                        </button>
+                      </li>
+                    </ul>
+                  </li>
+                  <li class="lab-tree-item" data-task="checkpoint" data-search="chk-01 integrity checkpoint verifier verified">
+                    <button class="tree-button" type="button" role="treeitem" aria-selected="false" data-task="checkpoint">
+                      <span class="tree-node-mark" aria-hidden="true"></span><span><span class="tree-node-id">CHK-01 / CHECK</span><span class="tree-node-name">Integrity checkpoint</span></span><span class="tree-node-state">verified</span>
+                    </button>
+                  </li>
+                </ul>
+              </li>
+            </ul>
+            <p class="tree-empty" id="treeEmpty">No hierarchy row matches that filter. Clear the field to restore the route.</p>
+            <p class="tree-note"><strong>Reading the trace:</strong> red is reserved for live acquisition and the one unresolved handoff. A quiet channel is not a completed conclusion.</p>
+          </section>
+
+          <section class="scope-panel" aria-labelledby="scope-title">
+            <div class="scope-header">
+              <div>
+                <p class="kicker">02 / TIMEBASE</p>
+                <h2 id="scope-title">Concurrent channels</h2>
+              </div>
+              <div class="scope-meta"><span><strong>25 ms</strong>per division</span><span><strong>250 Hz</strong>synthetic sample</span><span class="live-readout"><strong><span class="trace-dot" aria-hidden="true"></span> LIVE</strong>trace A / lead</span></div>
+            </div>
+
+            <div class="scope-screen">
+              <svg id="scopeSvg" viewBox="0 0 1000 360" role="img" aria-label="Three synthetic electrophysiology-like waveforms showing concurrent AOS branch activity">
+                <g class="scope-grid" aria-hidden="true">
+                  <line class="major" x1="0" y1="50" x2="1000" y2="50" /><line x1="0" y1="100" x2="1000" y2="100" /><line class="major" x1="0" y1="150" x2="1000" y2="150" /><line x1="0" y1="200" x2="1000" y2="200" /><line class="major" x1="0" y1="250" x2="1000" y2="250" /><line x1="0" y1="300" x2="1000" y2="300" />
+                  <line class="major" x1="0" y1="0" x2="0" y2="360" /><line x1="100" y1="0" x2="100" y2="360" /><line x1="200" y1="0" x2="200" y2="360" /><line x1="300" y1="0" x2="300" y2="360" /><line x1="400" y1="0" x2="400" y2="360" /><line x1="500" y1="0" x2="500" y2="360" /><line x1="600" y1="0" x2="600" y2="360" /><line x1="700" y1="0" x2="700" y2="360" /><line x1="800" y1="0" x2="800" y2="360" /><line x1="900" y1="0" x2="900" y2="360" /><line class="major" x1="1000" y1="0" x2="1000" y2="360" />
+                </g>
+                <text class="scope-label" x="20" y="34">A / LEAD</text>
+                <text class="scope-label" x="20" y="166">B / AUDIT</text>
+                <text class="scope-label" x="20" y="266">C / HOLD</text>
+                <text class="scope-label scope-label--live" x="820" y="34">LIVE ACQUISITION</text>
+                <path id="traceA" class="trace trace-a" d="M0 70 L100 70 L200 70 L300 70 L400 70 L500 70 L600 70 L700 70 L800 70 L900 70 L1000 70" />
+                <path id="traceB" class="trace trace-b" d="M0 170 L100 170 L200 170 L300 170 L400 170 L500 170 L600 170 L700 170 L800 170 L900 170 L1000 170" />
+                <path id="traceC" class="trace trace-c" d="M0 270 L100 270 L200 270 L300 270 L400 270 L500 270 L600 270 L700 270 L800 270 L900 270 L1000 270" />
+                <circle class="trace-event" cx="704" cy="70" r="5" aria-label="Live event marker" />
+              </svg>
+            </div>
+            <div class="scope-axis-row"><span class="scope-axis">-250 ms</span><span class="scope-axis">0 ms / selected task</span><span class="scope-axis">+250 ms</span></div>
+
+            <section class="trace-detail" aria-labelledby="detail-title" aria-live="polite">
+              <p class="kicker">SELECTED TASK / TRACE ANNOTATION</p>
+              <h3 id="detail-title">Evidence route</h3>
+              <p class="trace-summary" id="detailSummary">Lead route keeps the evidence request and its three dependent branches aligned. Watching is read-only; a pause stops new dispatch while current workers report.</p>
+              <dl class="trace-spec">
+                <div><dt>State</dt><dd id="detailState">running</dd></div>
+                <div><dt>Owner</dt><dd id="detailOwner">lead / intake coordinator</dd></div>
+                <div><dt>Model</dt><dd id="detailModel">gpt-5.6-luna / max</dd></div>
+                <div><dt>Sessions</dt><dd id="detailSessions">27 verified</dd></div>
+                <div><dt>Last event</dt><dd id="detailSignal">09:42:18 UTC</dd></div>
+                <div><dt>Trace note</dt><dd id="detailNext">three channels aligned</dd></div>
+              </dl>
+              <button class="detail-action" id="detailAction" type="button">Open assignment note</button>
+            </section>
+          </section>
+        </div>
+
+        <section class="session-section" aria-labelledby="session-title">
+          <div class="session-heading">
+            <div>
+              <p class="kicker">03 / SESSION RECORD</p>
+              <h2 id="session-title">Model-session ledger</h2>
+            </div>
+            <p>27 verified sessions · aggregate 7.3M input / 5.8M cached / 381.3K output / 311.7K reasoning</p>
+          </div>
+          <div class="ledger-head" role="row"><span role="columnheader">Session</span><span role="columnheader">Model / profile</span><span role="columnheader">Assignment</span><span role="columnheader">Tokens</span><span role="columnheader">Result</span></div>
+          <div class="ledger-rows" role="table" aria-label="Synthetic model-session ledger">
+            <button class="ledger-row is-selected" role="row" type="button" data-task="root"><span role="cell">S-027</span><span role="cell">luna / max</span><span role="cell">Lead route · evidence intake</span><span role="cell">2.4M in · 1.8M cache</span><span role="cell">active / coordinating</span></button>
+            <button class="ledger-row" role="row" type="button" data-task="sources"><span role="cell">S-026</span><span role="cell">luna / max</span><span role="cell">Source triangulation · branch A</span><span role="cell">1.6M in · 1.3M cache</span><span role="cell">active / comparing</span></button>
+            <button class="ledger-row" role="row" type="button" data-task="citations"><span role="cell">S-025</span><span role="cell">luna / max</span><span role="cell">Citation audit · branch B</span><span role="cell">1.2M in · 1.0M cache</span><span role="cell">active / checking</span></button>
+            <button class="ledger-row" role="row" type="button" data-task="conflicts"><span role="cell">S-024</span><span role="cell">luna / max</span><span role="cell">Conflict register · branch C</span><span role="cell">0.9M in · 0.7M cache</span><span role="cell">waiting / input</span></button>
+            <button class="ledger-row" role="row" type="button" data-task="handoff"><span role="cell">S-023</span><span role="cell">luna / max</span><span role="cell">Synthesis handoff · anomaly</span><span role="cell">0.6M in · 0.5M cache</span><span role="cell">review / operator</span></button>
+            <button class="ledger-row" role="row" type="button" data-task="checkpoint"><span role="cell">S-022</span><span role="cell">luna / max</span><span role="cell">Integrity checkpoint · verifier</span><span role="cell">1.2M in · 1.0M cache</span><span role="cell">verified / 27 total</span></button>
+          </div>
+        </section>
+      </main>
+
+      <footer class="footer">
+        <span>AOS / WAVEFORM LAB · read-only visual prototype · all run data synthetic</span>
+        <span><a href="../">Back to variants</a> · <a href="../03-metro-control/">Open Metro Control</a></span>
+      </footer>
+    </div>
+
+    <script>
+      (() => {
+        const taskData = {
+          root: { title: "Evidence route", state: "running", owner: "lead / intake coordinator", model: "gpt-5.6-luna / max", sessions: "27 verified", signal: "09:42:18 UTC", next: "three channels aligned", summary: "Lead route keeps the evidence request and its three dependent branches aligned. Watching is read-only; a pause stops new dispatch while current workers report." },
+          triage: { title: "Lead triage", state: "interchange", owner: "lead / dispatch planner", model: "gpt-5.6-luna / max", sessions: "3 branches", signal: "09:41:52 UTC", next: "route branch C", summary: "The interchange holds the objective, branch assignments, and capacity decision before work leaves the lead." },
+          sources: { title: "Source triangulation", state: "active", owner: "luna / source analyst", model: "gpt-5.6-luna / max", sessions: "11 sessions", signal: "09:42:09 UTC", next: "compare source set 04", summary: "Branch A is comparing the supplied sources against a stable claim list. Channel A carries its current live activity." },
+          citations: { title: "Citation audit", state: "active", owner: "luna / citation analyst", model: "gpt-5.6-luna / max", sessions: "8 sessions", signal: "09:42:12 UTC", next: "check locator pair", summary: "Branch B is testing whether each claim can return to a source locator without importing confidence from a summary." },
+          conflicts: { title: "Conflict register", state: "waiting", owner: "lead / evidence integrator", model: "gpt-5.6-luna / max", sessions: "4 sessions", signal: "09:40:37 UTC", next: "await branch A", summary: "Branch C has a clean queue but waits for the source and citation branches to return their incompatible observations." },
+          handoff: { title: "Synthesis handoff", state: "anomaly", owner: "luna / synthesis writer", model: "gpt-5.6-luna / max", sessions: "2 sessions", signal: "09:37:14 UTC", next: "operator acknowledgement", summary: "N-04 is the only unresolved trace anomaly. The writer has a complete draft packet, but the route stays marked until an operator acknowledges the source split." },
+          checkpoint: { title: "Integrity checkpoint", state: "verified", owner: "system / verifier", model: "gpt-5.6-luna / max", sessions: "27 verified", signal: "09:38:44 UTC", next: "record receipt", summary: "The checkpoint has verified the current session record and token roll-up. It does not claim that the research conclusion is established." }
+        };
+
+        const body = document.body;
+        const tracePaths = [document.getElementById("traceA"), document.getElementById("traceB"), document.getElementById("traceC")];
+        const pauseButton = document.getElementById("pauseButton");
+        const filter = document.getElementById("treeFilter");
+        const treeItems = [...document.querySelectorAll(".lab-tree-item")];
+        const treeButtons = [...document.querySelectorAll(".tree-button")];
+        const ledgerRows = [...document.querySelectorAll(".ledger-row")];
+        const prefersReducedMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+        let paused = false;
+        let phase = 0;
+        let rafId = 0;
+
+        function gaussian(value, center, spread) {
+          return Math.exp(-Math.pow((value - center) / spread, 2));
+        }
+
+        function buildTrace(lead, offset) {
+          const baseline = [70, 170, 270][lead];
+          const points = [];
+          for (let i = 0; i <= 180; i += 1) {
+            const x = (i / 180) * 1000;
+            const beat = (x + phase * (lead === 0 ? 1.15 : lead === 1 ? 0.75 : 0.48) + offset) % 168;
+            const quiet = Math.sin((x + phase * 0.7 + offset) * 0.024) * (lead === 2 ? 2.2 : 3.2);
+            const pWave = gaussian(beat, 28, 10) * (lead === 2 ? 4 : 6);
+            const qrs = gaussian(beat, 49, 3.4) * -18 + gaussian(beat, 55, 4.2) * 36 + gaussian(beat, 63, 6) * -10;
+            const recovery = gaussian(beat, 92, 17) * (lead === 1 ? 7 : 10);
+            const y = baseline + quiet + pWave + qrs + recovery;
+            points.push(`${i === 0 ? "M" : "L"}${x.toFixed(1)} ${y.toFixed(1)}`);
+          }
+          return points.join(" ");
+        }
+
+        function drawTrace() {
+          tracePaths[0].setAttribute("d", buildTrace(0, 0));
+          tracePaths[1].setAttribute("d", buildTrace(1, 42));
+          tracePaths[2].setAttribute("d", buildTrace(2, 82));
+        }
+
+        function animate() {
+          if (paused) return;
+          phase += 1.7;
+          drawTrace();
+          rafId = window.requestAnimationFrame(animate);
+        }
+
+        function selectTask(taskId) {
+          const data = taskData[taskId] || taskData.root;
+          treeButtons.forEach((button) => {
+            const selected = button.dataset.task === taskId;
+            button.classList.toggle("is-selected", selected);
+            button.setAttribute("aria-selected", String(selected));
+          });
+          ledgerRows.forEach((row) => row.classList.toggle("is-selected", row.dataset.task === taskId));
+          document.getElementById("detail-title").textContent = data.title;
+          document.getElementById("detailSummary").textContent = data.summary;
+          document.getElementById("detailState").textContent = data.state;
+          document.getElementById("detailOwner").textContent = data.owner;
+          document.getElementById("detailModel").textContent = data.model;
+          document.getElementById("detailSessions").textContent = data.sessions;
+          document.getElementById("detailSignal").textContent = data.signal;
+          const next = document.getElementById("detailNext");
+          next.textContent = data.next;
+          next.classList.toggle("is-anomaly", data.state === "anomaly");
+          document.getElementById("detailAction").textContent = data.state === "anomaly" ? "Acknowledge assignment note" : "Open assignment note";
+        }
+
+        function applyFilter() {
+          const query = filter.value.trim().toLowerCase();
+          let visible = 0;
+          treeItems.forEach((item) => {
+            const ownMatch = !query || item.dataset.search.includes(query);
+            const descendantMatch = [...item.querySelectorAll(".lab-tree-item")].some((child) => child.dataset.search.includes(query));
+            const show = ownMatch || descendantMatch;
+            item.classList.toggle("is-hidden", !show);
+            if (show && item.dataset.task !== "root") visible += 1;
+          });
+          document.getElementById("treeEmpty").classList.toggle("is-visible", Boolean(query) && visible === 0);
+        }
+
+        pauseButton.addEventListener("click", () => {
+          paused = !paused;
+          pauseButton.setAttribute("aria-pressed", String(paused));
+          pauseButton.textContent = paused ? "Resume dispatch" : "Pause dispatch";
+          document.getElementById("runState").textContent = paused ? "PAUSED" : "RUNNING";
+          document.getElementById("instrumentStatus").textContent = paused ? "ACQUISITION HOLD" : "LIVE ACQUISITION";
+          body.classList.toggle("is-paused", paused);
+          if (!paused && !prefersReducedMotion) {
+            window.cancelAnimationFrame(rafId);
+            animate();
+          }
+        });
+
+        treeButtons.forEach((button) => button.addEventListener("click", () => selectTask(button.dataset.task)));
+        ledgerRows.forEach((row) => row.addEventListener("click", () => selectTask(row.dataset.task)));
+        filter.addEventListener("input", applyFilter);
+        document.getElementById("detailAction").addEventListener("click", (event) => {
+          event.currentTarget.textContent = event.currentTarget.textContent.startsWith("Acknowledge") ? "Assignment note acknowledged" : "Assignment note opened";
+        });
+
+        drawTrace();
+        selectTask("root");
+        applyFilter();
+        if (!prefersReducedMotion) animate();
+      })();
+    </script>
+  </body>
+</html>

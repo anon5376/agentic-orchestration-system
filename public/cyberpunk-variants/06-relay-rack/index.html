@@ -1,0 +1,1007 @@
+<!doctype html>
+<!--
+THESIS: AOS is a maintained switching cabinet: every delegation branch is a physical route, not a decorative status tile.
+OWN-WORLD: Charcoal enamel, cream engraved labels, muted green lamps, vermilion intervention marks, slotted screws, and hard-edged relay bays carry the page.
+STORY: An operator traces the live patch, selects a channel, reads its receipt and counters, then holds or resumes dispatch from the rack face.
+FIRST VIEWPORT: A cabinet header, branch patch panel, selected-task bay, and session strips appear together; the pause lever and filter sit in the service rail.
+FORM: Japanese industrial relay-rack structure, committed as a three-bay switching cabinet that becomes stacked service panels on narrow screens.
+-->
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#242a27">
+  <title>AOS / Relay Rack 06</title>
+  <style>
+    :root {
+      --enamel: #252b28;
+      --enamel-deep: #1a1e1c;
+      --enamel-mid: #303733;
+      --enamel-light: #3d4740;
+      --cream: #e8e0c9;
+      --cream-muted: #b7b19f;
+      --green: #7d9e76;
+      --green-dim: #455c4b;
+      --green-dark: #293c30;
+      --vermilion: #d64e35;
+      --vermilion-dark: #8c3028;
+      --copper: #a28c62;
+      --rule: #59635b;
+      --rule-light: #424b45;
+      --mono: "SFMono-Regular", "Cascadia Mono", "Roboto Mono", ui-monospace, monospace;
+      --narrow: "Arial Narrow", "Roboto Condensed", "Helvetica Neue", Arial, sans-serif;
+      --serif: "Iowan Old Style", "Palatino Linotype", Palatino, Georgia, serif;
+      --focus: 0 0 0 2px var(--enamel-deep), 0 0 0 4px var(--cream);
+    }
+
+    * { box-sizing: border-box; }
+    html { min-width: 320px; background: var(--enamel-deep); color: var(--cream); }
+    body {
+      min-width: 320px;
+      margin: 0;
+      overflow-x: hidden;
+      background: var(--enamel-deep);
+      color: var(--cream);
+      font-family: var(--narrow);
+      font-size: 14px;
+      line-height: 1.4;
+      -webkit-font-smoothing: antialiased;
+    }
+    a { color: inherit; }
+    button, input { font: inherit; }
+    button { cursor: pointer; }
+    .sr-only {
+      position: absolute;
+      width: 1px;
+      height: 1px;
+      padding: 0;
+      overflow: hidden;
+      clip: rect(0, 0, 0, 0);
+      white-space: nowrap;
+      border: 0;
+    }
+    button:focus-visible, a:focus-visible, input:focus-visible {
+      outline: none;
+      box-shadow: var(--focus);
+    }
+    ::selection { background: var(--vermilion); color: #fff; }
+
+    .rack {
+      width: min(1540px, 100%);
+      margin: 0 auto;
+      padding: 18px 24px 28px;
+    }
+    .cabinet {
+      position: relative;
+      min-height: calc(100vh - 46px);
+      border: 1px solid var(--rule);
+      background: var(--enamel);
+    }
+    .screw {
+      position: absolute;
+      z-index: 3;
+      width: 9px;
+      height: 9px;
+      border: 1px solid var(--copper);
+      border-radius: 50%;
+      background: var(--enamel-deep);
+    }
+    .screw::after {
+      content: "";
+      position: absolute;
+      top: 3px;
+      left: 1px;
+      width: 5px;
+      height: 1px;
+      background: var(--copper);
+      transform: rotate(31deg);
+    }
+    .screw--tl { top: 9px; left: 9px; }
+    .screw--tr { top: 9px; right: 9px; }
+    .screw--bl { bottom: 9px; left: 9px; }
+    .screw--br { right: 9px; bottom: 9px; }
+
+    .cabinet-head {
+      display: grid;
+      grid-template-columns: minmax(0, 1fr) auto minmax(260px, .62fr);
+      align-items: center;
+      gap: 22px;
+      min-height: 96px;
+      padding: 19px 33px;
+      border-bottom: 1px solid var(--rule);
+      background: var(--enamel-mid);
+    }
+    .rack-identity {
+      display: flex;
+      align-items: center;
+      gap: 13px;
+      min-width: 0;
+    }
+    .rack-mark {
+      display: inline-grid;
+      width: 39px;
+      height: 39px;
+      place-items: center;
+      border: 1px solid var(--copper);
+      color: var(--copper);
+      font-family: var(--mono);
+      font-size: 14px;
+      font-weight: 700;
+    }
+    .rack-name {
+      min-width: 0;
+      margin: 0;
+      color: var(--cream);
+      font-family: var(--mono);
+      font-size: 13px;
+      font-weight: 700;
+      letter-spacing: .11em;
+      line-height: 1.2;
+      text-transform: uppercase;
+    }
+    .rack-subname {
+      display: block;
+      margin-top: 5px;
+      color: var(--cream-muted);
+      font-family: var(--mono);
+      font-size: 9px;
+      font-weight: 400;
+      letter-spacing: .08em;
+    }
+    .rack-nav {
+      display: flex;
+      align-items: center;
+      gap: 15px;
+      white-space: nowrap;
+      font-family: var(--mono);
+      font-size: 10px;
+      letter-spacing: .07em;
+      text-transform: uppercase;
+    }
+    .rack-nav a { text-underline-offset: 4px; text-decoration-thickness: 1px; }
+    .rack-nav a:hover { color: var(--green); }
+    .rack-nav .current { color: var(--green); text-decoration: none; }
+    .lamp-bank {
+      display: flex;
+      align-items: center;
+      justify-content: flex-end;
+      gap: 12px;
+      min-width: 0;
+      color: var(--cream-muted);
+      font-family: var(--mono);
+      font-size: 9px;
+      letter-spacing: .07em;
+      text-transform: uppercase;
+    }
+    .lamp-bank__item { display: inline-flex; align-items: center; gap: 6px; white-space: nowrap; }
+    .lamp {
+      display: inline-block;
+      width: 9px;
+      height: 9px;
+      border: 1px solid var(--green);
+      border-radius: 50%;
+      background: var(--green-dim);
+    }
+    .lamp--live { background: var(--green); }
+    .lamp--fault { border-color: var(--vermilion); background: var(--vermilion); }
+    body.is-paused .lamp--live { border-color: var(--vermilion); background: var(--vermilion-dark); }
+
+    .prototype-flag {
+      display: inline-flex;
+      align-items: center;
+      min-height: 26px;
+      margin: 21px 33px 0;
+      padding: 5px 9px 4px;
+      border: 1px solid var(--green);
+      color: var(--green);
+      font-family: var(--mono);
+      font-size: 10px;
+      font-weight: 700;
+      letter-spacing: .055em;
+      line-height: 1.2;
+      text-transform: uppercase;
+    }
+    .rack-titlebar {
+      display: grid;
+      grid-template-columns: minmax(0, 1fr) auto;
+      align-items: end;
+      gap: 24px;
+      padding: 26px 33px 24px;
+      border-bottom: 1px solid var(--rule);
+    }
+    .rack-titlebar h1 {
+      max-width: 700px;
+      margin: 0 0 9px;
+      color: var(--cream);
+      font-family: var(--serif);
+      font-size: clamp(38px, 5vw, 71px);
+      font-weight: 400;
+      letter-spacing: -.05em;
+      line-height: .92;
+    }
+    .rack-titlebar p {
+      max-width: 65ch;
+      margin: 0;
+      color: var(--cream-muted);
+      font-size: 15px;
+    }
+    .capacity-plate {
+      align-self: start;
+      min-width: 176px;
+      padding: 13px 14px 11px;
+      border: 1px solid var(--copper);
+      color: var(--cream);
+      font-family: var(--mono);
+      font-size: 10px;
+      letter-spacing: .08em;
+      line-height: 1.5;
+      text-transform: uppercase;
+    }
+    .capacity-plate strong {
+      display: block;
+      color: var(--green);
+      font-size: 16px;
+      letter-spacing: .04em;
+    }
+
+    .service-rail {
+      display: grid;
+      grid-template-columns: auto minmax(200px, 1fr) auto auto;
+      align-items: center;
+      gap: 12px;
+      padding: 13px 33px;
+      border-bottom: 1px solid var(--rule);
+      background: var(--enamel-deep);
+    }
+    .service-label {
+      color: var(--copper);
+      font-family: var(--mono);
+      font-size: 10px;
+      font-weight: 700;
+      letter-spacing: .08em;
+      text-transform: uppercase;
+    }
+    .service-input {
+      width: 100%;
+      min-height: 34px;
+      padding: 7px 10px;
+      border: 1px solid var(--rule);
+      border-radius: 0;
+      background: var(--enamel-mid);
+      color: var(--cream);
+      font-size: 13px;
+    }
+    .service-input::placeholder { color: var(--cream-muted); }
+    .service-button {
+      min-height: 34px;
+      padding: 7px 12px;
+      border: 1px solid var(--rule);
+      border-radius: 0;
+      background: var(--enamel-mid);
+      color: var(--cream);
+      font-family: var(--mono);
+      font-size: 10px;
+      font-weight: 700;
+      letter-spacing: .07em;
+      text-transform: uppercase;
+    }
+    .service-button:hover { border-color: var(--green); color: var(--green); }
+    .service-button--primary { border-color: var(--green); background: var(--green-dark); color: var(--green); }
+    .service-button--primary:hover { background: var(--green); color: var(--enamel-deep); }
+    body.is-paused .service-button--primary { border-color: var(--vermilion); background: var(--vermilion-dark); color: var(--cream); }
+    .service-state {
+      color: var(--green);
+      font-family: var(--mono);
+      font-size: 9px;
+      letter-spacing: .07em;
+      text-align: right;
+      text-transform: uppercase;
+      white-space: nowrap;
+    }
+    body.is-paused .service-state { color: var(--vermilion); }
+
+    .rack-workspace {
+      display: grid;
+      grid-template-columns: minmax(230px, .75fr) minmax(0, 1.55fr) minmax(280px, .9fr);
+      min-height: 630px;
+    }
+    .bay {
+      min-width: 0;
+      padding: 21px 22px 25px;
+      border-right: 1px solid var(--rule);
+    }
+    .bay:last-child { border-right: 0; }
+    .bay-head {
+      display: flex;
+      align-items: baseline;
+      justify-content: space-between;
+      gap: 13px;
+      padding-bottom: 10px;
+      border-bottom: 2px solid var(--cream);
+    }
+    .bay-head h2 {
+      margin: 0;
+      font-family: var(--mono);
+      font-size: 11px;
+      font-weight: 700;
+      letter-spacing: .08em;
+      text-transform: uppercase;
+    }
+    .bay-head span {
+      color: var(--green);
+      font-family: var(--mono);
+      font-size: 9px;
+      letter-spacing: .05em;
+      text-transform: uppercase;
+    }
+    .bay-caption {
+      margin: 10px 0 15px;
+      color: var(--cream-muted);
+      font-family: var(--mono);
+      font-size: 9px;
+      letter-spacing: .04em;
+      text-transform: uppercase;
+    }
+    .task-tree {
+      margin: 0;
+      padding: 0;
+      list-style: none;
+    }
+    .task-row {
+      position: relative;
+      margin: 0;
+      padding: 0 0 0 14px;
+      list-style: none;
+      border-left: 1px solid var(--rule);
+    }
+    .task-row::before {
+      content: "";
+      position: absolute;
+      top: 23px;
+      left: -1px;
+      width: 14px;
+      height: 1px;
+      background: var(--rule);
+    }
+    .task-tree > .task-row { padding-left: 0; border-left: 0; }
+    .task-tree > .task-row::before { display: none; }
+    .task-branch {
+      margin: 0;
+      padding: 0 0 0 14px;
+      list-style: none;
+    }
+    .task-row.is-hidden { display: none; }
+    .task-select {
+      display: grid;
+      grid-template-columns: 10px minmax(0, 1fr) auto;
+      align-items: start;
+      width: 100%;
+      gap: 8px;
+      min-height: 47px;
+      padding: 10px 5px 9px 3px;
+      border: 0;
+      border-bottom: 1px solid var(--rule-light);
+      background: transparent;
+      color: var(--cream);
+      text-align: left;
+    }
+    .task-select:hover { background: var(--enamel-light); }
+    .task-select[aria-current="true"] { background: var(--green-dark); }
+    .task-lamp {
+      width: 8px;
+      height: 8px;
+      margin-top: 3px;
+      border: 1px solid var(--green);
+      border-radius: 50%;
+      background: transparent;
+    }
+    .task-lamp[data-status="running"] { background: var(--green); }
+    .task-lamp[data-status="complete"] { border-color: var(--cream-muted); background: var(--cream-muted); }
+    .task-lamp[data-status="waiting"] { border-color: var(--cream-muted); }
+    .task-lamp[data-status="blocked"] { border-color: var(--vermilion); background: var(--vermilion); }
+    .task-code {
+      display: block;
+      color: var(--copper);
+      font-family: var(--mono);
+      font-size: 9px;
+      font-weight: 700;
+      letter-spacing: .06em;
+      line-height: 1.2;
+      text-transform: uppercase;
+    }
+    .task-title {
+      display: block;
+      margin-top: 3px;
+      color: var(--cream);
+      font-size: 12px;
+      font-weight: 700;
+      line-height: 1.22;
+    }
+    .task-owner {
+      max-width: 64px;
+      color: var(--cream-muted);
+      font-family: var(--mono);
+      font-size: 9px;
+      line-height: 1.22;
+      text-align: right;
+      text-transform: uppercase;
+    }
+    .task-select[aria-current="true"] .task-code,
+    .task-select[aria-current="true"] .task-owner { color: var(--green); }
+    .filter-empty {
+      display: none;
+      margin: 15px 0 0;
+      color: var(--vermilion);
+      font-family: var(--mono);
+      font-size: 10px;
+      text-transform: uppercase;
+    }
+    .filter-empty.is-visible { display: block; }
+
+    .selected-bay { background: var(--enamel-mid); }
+    .route-plate {
+      display: grid;
+      grid-template-columns: minmax(0, 1fr) 152px;
+      gap: 18px;
+      margin: 16px 0 20px;
+      padding: 13px 0 15px;
+      border-bottom: 1px solid var(--rule);
+    }
+    .selected-kicker {
+      margin: 0 0 7px;
+      color: var(--green);
+      font-family: var(--mono);
+      font-size: 10px;
+      font-weight: 700;
+      letter-spacing: .09em;
+      text-transform: uppercase;
+    }
+    .selected-bay h2 {
+      max-width: 650px;
+      margin: 0 0 8px;
+      color: var(--cream);
+      font-family: var(--serif);
+      font-size: clamp(31px, 4vw, 54px);
+      font-weight: 400;
+      letter-spacing: -.045em;
+      line-height: .95;
+    }
+    .selected-summary {
+      max-width: 65ch;
+      margin: 0;
+      color: var(--cream-muted);
+      font-size: 14px;
+    }
+    .status-plate {
+      align-self: start;
+      padding: 10px 9px 8px;
+      border: 1px solid var(--green);
+      color: var(--green);
+      font-family: var(--mono);
+      font-size: 10px;
+      font-weight: 700;
+      letter-spacing: .08em;
+      text-align: center;
+      text-transform: uppercase;
+    }
+    .status-plate[data-status="COMPLETE"] { border-color: var(--cream-muted); color: var(--cream-muted); }
+    .status-plate[data-status="WAITING"] { border-color: var(--rule); color: var(--cream-muted); }
+    .status-plate[data-status="BLOCKED"] { border-color: var(--vermilion); color: var(--vermilion); }
+    .route-map {
+      width: 100%;
+      height: auto;
+      margin: 0 0 20px;
+      border-bottom: 1px solid var(--rule);
+      padding-bottom: 18px;
+    }
+    .route-map .wire { fill: none; stroke: var(--green); stroke-width: 2; }
+    .route-map .wire--quiet { stroke: var(--rule); stroke-width: 1; }
+    .route-map .node { fill: var(--enamel); stroke: var(--cream); stroke-width: 1.5; }
+    .route-map .node--active { fill: var(--green); stroke: var(--green); }
+    .route-map .node--selected { fill: var(--cream); stroke: var(--cream); }
+    .route-map text { fill: var(--cream-muted); font-family: var(--mono); font-size: 10px; letter-spacing: .05em; }
+    .route-map .label-active { fill: var(--green); }
+    .trace-list {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      margin: 0 0 22px;
+      border-top: 1px solid var(--rule);
+      border-bottom: 1px solid var(--rule);
+    }
+    .trace-cell {
+      min-height: 58px;
+      padding: 10px 10px 9px 0;
+      border-right: 1px solid var(--rule);
+      border-bottom: 1px solid var(--rule-light);
+    }
+    .trace-cell:nth-child(2n) { padding-left: 10px; border-right: 0; }
+    .trace-cell:nth-last-child(-n+2) { border-bottom: 0; }
+    .trace-label {
+      display: block;
+      margin-bottom: 6px;
+      color: var(--cream-muted);
+      font-family: var(--mono);
+      font-size: 9px;
+      letter-spacing: .08em;
+      text-transform: uppercase;
+    }
+    .trace-value {
+      display: block;
+      color: var(--cream);
+      font-family: var(--mono);
+      font-size: 12px;
+      font-weight: 700;
+      line-height: 1.2;
+    }
+    .intervention {
+      display: flex;
+      align-items: baseline;
+      gap: 8px;
+      margin: 0;
+      padding: 10px 11px;
+      border: 1px solid var(--vermilion);
+      color: var(--cream-muted);
+      font-family: var(--mono);
+      font-size: 10px;
+      line-height: 1.4;
+      text-transform: uppercase;
+    }
+    .intervention strong { color: var(--vermilion); }
+    .token-counter-bank {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      margin-bottom: 20px;
+      border-top: 2px solid var(--cream);
+      border-bottom: 1px solid var(--rule);
+    }
+    .counter {
+      min-width: 0;
+      padding: 11px 10px 12px 0;
+      border-right: 1px solid var(--rule);
+      border-bottom: 1px solid var(--rule-light);
+    }
+    .counter:nth-child(2n) { padding-left: 10px; border-right: 0; }
+    .counter:nth-last-child(-n+2) { border-bottom: 0; }
+    .counter-value {
+      display: block;
+      color: var(--cream);
+      font-family: var(--mono);
+      font-size: clamp(21px, 3vw, 32px);
+      font-weight: 700;
+      letter-spacing: -.06em;
+      line-height: 1;
+    }
+    .counter-label {
+      display: block;
+      margin-top: 7px;
+      color: var(--cream-muted);
+      font-family: var(--mono);
+      font-size: 9px;
+      letter-spacing: .08em;
+      text-transform: uppercase;
+    }
+
+    .session-bay { background: var(--enamel-deep); }
+    .session-summary {
+      display: flex;
+      align-items: baseline;
+      justify-content: space-between;
+      gap: 13px;
+      margin: 13px 0 14px;
+      color: var(--cream-muted);
+      font-family: var(--mono);
+      font-size: 9px;
+      letter-spacing: .05em;
+      text-transform: uppercase;
+    }
+    .session-summary strong { color: var(--green); font-size: 13px; }
+    .channel-ledger {
+      display: grid;
+      gap: 10px;
+    }
+    .channel-strip {
+      display: grid;
+      grid-template-columns: 13px minmax(0, 1fr);
+      gap: 8px;
+      padding: 10px 9px 10px 8px;
+      border: 1px solid var(--rule-light);
+      background: var(--enamel);
+    }
+    .channel-strip.is-selected { border-color: var(--green); background: var(--green-dark); }
+    .channel-strip .lamp { margin-top: 4px; }
+    .channel-code {
+      display: flex;
+      align-items: baseline;
+      justify-content: space-between;
+      gap: 8px;
+      color: var(--copper);
+      font-family: var(--mono);
+      font-size: 9px;
+      font-weight: 700;
+      letter-spacing: .06em;
+      text-transform: uppercase;
+    }
+    .channel-model {
+      display: block;
+      margin-top: 5px;
+      color: var(--cream);
+      font-family: var(--mono);
+      font-size: 11px;
+      font-weight: 700;
+    }
+    .channel-route {
+      display: block;
+      margin-top: 4px;
+      color: var(--cream-muted);
+      font-size: 12px;
+    }
+    .channel-note {
+      display: block;
+      margin-top: 7px;
+      padding-top: 6px;
+      border-top: 1px solid var(--rule-light);
+      color: var(--cream-muted);
+      font-family: var(--mono);
+      font-size: 9px;
+      line-height: 1.35;
+    }
+    .channel-strip.is-selected .channel-code,
+    .channel-strip.is-selected .channel-model { color: var(--green); }
+    .channel-strip.is-selected .channel-route,
+    .channel-strip.is-selected .channel-note { color: var(--cream); }
+    .ledger-footnote {
+      margin: 17px 0 0;
+      color: var(--cream-muted);
+      font-family: var(--mono);
+      font-size: 9px;
+      line-height: 1.45;
+      text-transform: uppercase;
+    }
+    .ledger-footnote strong { color: var(--green); }
+    .rack-foot {
+      display: flex;
+      align-items: baseline;
+      justify-content: space-between;
+      gap: 16px;
+      padding: 14px 33px 17px;
+      border-top: 1px solid var(--rule);
+      color: var(--cream-muted);
+      font-family: var(--mono);
+      font-size: 9px;
+      letter-spacing: .04em;
+      text-transform: uppercase;
+    }
+    .rack-foot p { margin: 0; }
+    .rack-foot p:last-child { color: var(--copper); text-align: right; }
+
+    @media (max-width: 1120px) {
+      .rack { padding: 12px 15px 22px; }
+      .cabinet-head { grid-template-columns: minmax(0, 1fr) auto; }
+      .rack-nav { grid-column: 1 / -1; grid-row: 2; overflow-x: auto; padding-top: 3px; }
+      .lamp-bank { grid-column: 2; grid-row: 1; }
+      .service-rail { grid-template-columns: auto minmax(170px, 1fr) auto; }
+      .service-state { grid-column: 1 / -1; grid-row: 2; text-align: left; }
+      .rack-workspace { grid-template-columns: minmax(220px, .72fr) minmax(0, 1.28fr); }
+      .session-bay { grid-column: 1 / -1; border-top: 1px solid var(--rule); border-right: 0; }
+      .session-bay .channel-ledger { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+      .session-bay .ledger-footnote { max-width: 65ch; }
+    }
+    @media (max-width: 760px) {
+      .cabinet-head { padding: 18px 22px; }
+      .prototype-flag, .rack-titlebar, .service-rail { margin-left: 22px; margin-right: 22px; }
+      .rack-titlebar { grid-template-columns: 1fr; align-items: start; padding-left: 0; padding-right: 0; }
+      .capacity-plate { justify-self: start; }
+      .service-rail { margin-left: 0; margin-right: 0; padding: 13px 22px; }
+      .rack-workspace { grid-template-columns: 1fr; }
+      .bay { border-right: 0; }
+      .task-bay { border-bottom: 1px solid var(--rule); }
+      .selected-bay { border-bottom: 1px solid var(--rule); }
+      .session-bay .channel-ledger { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+      .rack-foot { display: block; padding-left: 22px; padding-right: 22px; }
+      .rack-foot p:last-child { margin-top: 8px; text-align: left; }
+    }
+    @media (max-width: 520px) {
+      .rack { padding: 0 0 16px; }
+      .cabinet { border-right: 0; border-left: 0; }
+      .screw { display: none; }
+      .cabinet-head { grid-template-columns: 1fr; gap: 14px; padding: 17px 16px 16px; }
+      .lamp-bank { grid-column: auto; grid-row: auto; justify-content: flex-start; }
+      .rack-nav { grid-column: auto; grid-row: auto; }
+      .prototype-flag { margin: 17px 16px 0; font-size: 9px; }
+      .rack-titlebar { margin: 0; padding: 25px 16px 22px; }
+      .rack-titlebar h1 { font-size: clamp(39px, 14vw, 63px); }
+      .rack-titlebar p { font-size: 14px; }
+      .service-rail { grid-template-columns: 1fr 1fr; padding: 13px 16px; }
+      .service-label, .service-input { grid-column: 1 / -1; }
+      .service-state { grid-column: 1 / -1; }
+      .bay { padding: 20px 16px 23px; }
+      .route-plate { grid-template-columns: 1fr; }
+      .status-plate { justify-self: start; }
+      .session-bay .channel-ledger { grid-template-columns: 1fr; }
+      .rack-foot { padding-left: 16px; padding-right: 16px; }
+    }
+    @media (prefers-reduced-motion: reduce) {
+      *, *::before, *::after {
+        animation-duration: .001ms !important;
+        animation-iteration-count: 1 !important;
+        scroll-behavior: auto !important;
+        transition-duration: .001ms !important;
+      }
+    }
+  </style>
+</head>
+<body>
+  <div class="rack">
+    <section class="cabinet">
+      <span class="screw screw--tl" aria-hidden="true"></span>
+      <span class="screw screw--tr" aria-hidden="true"></span>
+      <span class="screw screw--bl" aria-hidden="true"></span>
+      <span class="screw screw--br" aria-hidden="true"></span>
+
+      <header class="cabinet-head">
+        <div class="rack-identity">
+          <span class="rack-mark" aria-hidden="true">A</span>
+          <p class="rack-name">Agentic Orchestration System<span class="rack-subname">control rack / research relay / unit 06</span></p>
+        </div>
+        <nav class="rack-nav" aria-label="Prototype variants">
+          <a href="../">variants</a>
+          <a href="../05-field-dossier/">05 dossier</a>
+          <a class="current" href="./" aria-current="page">06 relay rack</a>
+        </nav>
+        <div class="lamp-bank" aria-label="Rack state">
+          <span class="lamp-bank__item"><i class="lamp lamp--live" aria-hidden="true"></i>run</span>
+          <span class="lamp-bank__item"><i class="lamp" aria-hidden="true"></i>standby</span>
+          <span class="lamp-bank__item"><i class="lamp lamp--fault" aria-hidden="true"></i>intervention</span>
+        </div>
+      </header>
+
+      <div class="prototype-flag">VISUAL PROTOTYPE · SYNTHETIC RUNNING STATE</div>
+
+      <section class="rack-titlebar" aria-labelledby="rack-title">
+        <div>
+          <h1 id="rack-title">Dispatch is a patch.</h1>
+          <p>Trace a research run across its branch routes, keep the receipts beside the channels, and intervene at the rack face when new work must wait.</p>
+        </div>
+      <div class="capacity-plate">active channel count<strong>3 active / 4 cap</strong>model plate / gpt-5.6-luna / max</div>
+      </section>
+
+      <section class="service-rail" aria-label="Rack service controls">
+        <span class="service-label">service rail</span>
+        <label>
+          <span class="sr-only">Filter patch routes</span>
+          <input class="service-input" id="route-filter" type="search" placeholder="Filter route code or task title" autocomplete="off">
+        </label>
+        <button class="service-button service-button--primary" id="pause-rack" type="button" aria-pressed="false">Pause dispatch</button>
+        <span class="service-state" id="service-state" role="status">relay live / accepting work</span>
+      </section>
+
+      <main class="rack-workspace">
+        <aside class="bay task-bay">
+          <div class="bay-head"><h2 id="patch-heading">Patch routing</h2><span>branch map</span></div>
+          <p class="bay-caption">Select a channel to inspect its route and receipt.</p>
+          <p class="filter-empty" id="route-empty" role="status">No route matches that filter.</p>
+          <ul class="task-tree" id="patch-tree" role="tree" aria-labelledby="patch-heading">
+            <li class="task-row" role="treeitem" aria-expanded="true">
+              <button class="task-select" type="button" data-task="root" aria-current="false">
+                <i class="task-lamp" data-status="complete" aria-hidden="true"></i>
+                <span><span class="task-code">RUN-86 / bus</span><span class="task-title">Coordinate evidence review</span></span>
+                <span class="task-owner">lead</span>
+              </button>
+              <ul class="task-branch" role="group">
+                <li class="task-row" role="treeitem">
+                  <button class="task-select" type="button" data-task="frame" aria-current="false">
+                    <i class="task-lamp" data-status="complete" aria-hidden="true"></i>
+                    <span><span class="task-code">T-04 / closed</span><span class="task-title">Frame the research question</span></span>
+                    <span class="task-owner">done</span>
+                  </button>
+                </li>
+                <li class="task-row" role="treeitem" aria-expanded="true">
+                  <button class="task-select" type="button" data-task="compare" aria-current="true">
+                    <i class="task-lamp" data-status="running" aria-hidden="true"></i>
+                    <span><span class="task-code">T-09 / live</span><span class="task-title">Compare primary findings</span></span>
+                    <span class="task-owner">luna</span>
+                  </button>
+                  <ul class="task-branch" role="group">
+                    <li class="task-row" role="treeitem">
+                      <button class="task-select" type="button" data-task="ingest" aria-current="false">
+                        <i class="task-lamp" data-status="running" aria-hidden="true"></i>
+                        <span><span class="task-code">T-09a / live</span><span class="task-title">Ingest field notes</span></span>
+                        <span class="task-owner">worker 02</span>
+                      </button>
+                    </li>
+                    <li class="task-row" role="treeitem">
+                      <button class="task-select" type="button" data-task="counter" aria-current="false">
+                        <i class="task-lamp" data-status="waiting" aria-hidden="true"></i>
+                        <span><span class="task-code">T-09b / queue</span><span class="task-title">Trace counterexamples</span></span>
+                        <span class="task-owner">next</span>
+                      </button>
+                    </li>
+                  </ul>
+                </li>
+                <li class="task-row" role="treeitem">
+                  <button class="task-select" type="button" data-task="synthesis" aria-current="false">
+                    <i class="task-lamp" data-status="running" aria-hidden="true"></i>
+                    <span><span class="task-code">T-14 / live</span><span class="task-title">Draft synthesis memo</span></span>
+                    <span class="task-owner">luna</span>
+                  </button>
+                </li>
+                <li class="task-row" role="treeitem">
+                  <button class="task-select" type="button" data-task="verify" aria-current="false">
+                    <i class="task-lamp" data-status="running" aria-hidden="true"></i>
+                    <span><span class="task-code">T-18 / live</span><span class="task-title">Holdout verification</span></span>
+                    <span class="task-owner">luna</span>
+                  </button>
+                </li>
+                <li class="task-row" role="treeitem">
+                  <button class="task-select" type="button" data-task="archive" aria-current="false">
+                    <i class="task-lamp" data-status="waiting" aria-hidden="true"></i>
+                    <span><span class="task-code">T-22 / queue</span><span class="task-title">Archive decision record</span></span>
+                    <span class="task-owner">hold</span>
+                  </button>
+                </li>
+              </ul>
+            </li>
+          </ul>
+        </aside>
+
+        <section class="bay selected-bay" aria-labelledby="selected-title">
+          <div class="bay-head"><h2>Selected channel</h2><span id="selected-code">T-09 / live</span></div>
+          <div class="route-plate">
+            <div>
+              <p class="selected-kicker">Input relay / <span id="detail-route">S-021</span></p>
+              <h2 id="selected-title">Compare primary findings</h2>
+              <p class="selected-summary" id="selected-summary">Cross-check the two strongest findings against their source notes before the synthesis branch can claim agreement.</p>
+            </div>
+            <div class="status-plate" id="rack-status" data-status="RUNNING">Running</div>
+          </div>
+
+          <svg class="route-map" viewBox="0 0 620 122" role="img" aria-label="Selected task routing from lead bus through comparison to evidence join">
+            <path class="wire--quiet" d="M22 61H130M194 61H282M348 61H446M512 61H598"></path>
+            <path class="wire" d="M22 61H130M194 61H282M348 61H446"></path>
+            <circle class="node node--active" cx="22" cy="61" r="7"></circle>
+            <circle class="node node--active" cx="162" cy="61" r="7"></circle>
+            <circle class="node node--selected" cx="316" cy="61" r="8"></circle>
+            <circle class="node" cx="480" cy="61" r="7"></circle>
+            <circle class="node" cx="598" cy="61" r="7"></circle>
+            <text x="2" y="28">LEAD BUS</text>
+            <text x="125" y="98">T-09a</text>
+            <text x="276" y="28" class="label-active">T-09</text>
+            <text x="432" y="98">JOIN</text>
+            <text x="554" y="28">NEXT</text>
+          </svg>
+
+          <div class="trace-list" aria-label="Selected channel trace">
+            <div class="trace-cell"><span class="trace-label">owner</span><span class="trace-value" id="detail-owner">Branch lead</span></div>
+            <div class="trace-cell"><span class="trace-label">model / effort</span><span class="trace-value" id="detail-model">gpt-5.6-luna / max</span></div>
+            <div class="trace-cell"><span class="trace-label">session</span><span class="trace-value" id="detail-session">S-021</span></div>
+            <div class="trace-cell"><span class="trace-label">next gate</span><span class="trace-value" id="detail-gate">Evidence join</span></div>
+          </div>
+
+          <div class="token-counter-bank" aria-label="Aggregate token totals">
+            <div class="counter"><span class="counter-value">7.3M</span><span class="counter-label">input</span></div>
+            <div class="counter"><span class="counter-value">5.8M</span><span class="counter-label">cached</span></div>
+            <div class="counter"><span class="counter-value">381.3K</span><span class="counter-label">output</span></div>
+            <div class="counter"><span class="counter-value">311.7K</span><span class="counter-label">reasoning</span></div>
+          </div>
+          <p class="intervention" id="intervention"><strong>Intervention line</strong><span>Pause holds new dispatch; active provider work returns its receipt.</span></p>
+        </section>
+
+        <aside class="bay session-bay" aria-labelledby="session-heading">
+          <div class="bay-head"><h2 id="session-heading">Model-session ledger</h2><span>channel strips</span></div>
+          <div class="session-summary"><strong>27 verified sessions</strong><span>current run / 4 channels</span></div>
+          <div class="channel-ledger">
+            <div class="channel-strip is-selected" data-session="S-021">
+              <i class="lamp lamp--live" aria-hidden="true"></i>
+              <div><div class="channel-code"><span>S-021</span><span>live</span></div><span class="channel-model">luna / max</span><span class="channel-route">T-09 compare</span><span class="channel-note">Source join open; 2 findings held</span></div>
+            </div>
+            <div class="channel-strip" data-session="S-022">
+              <i class="lamp lamp--live" aria-hidden="true"></i>
+              <div><div class="channel-code"><span>S-022</span><span>live</span></div><span class="channel-model">luna / max</span><span class="channel-route">T-09a ingest</span><span class="channel-note">Field notes indexed; receipt verified</span></div>
+            </div>
+            <div class="channel-strip" data-session="S-024">
+              <i class="lamp" aria-hidden="true"></i>
+              <div><div class="channel-code"><span>S-024</span><span>queue</span></div><span class="channel-model">luna / max</span><span class="channel-route">T-14 synthesis</span><span class="channel-note">Draft waiting for comparison branch</span></div>
+            </div>
+            <div class="channel-strip" data-session="S-026">
+              <i class="lamp lamp--live" aria-hidden="true"></i>
+              <div><div class="channel-code"><span>S-026</span><span>live</span></div><span class="channel-model">luna / max</span><span class="channel-route">T-18 holdout</span><span class="channel-note">Counterexample check in progress</span></div>
+            </div>
+          </div>
+          <p class="ledger-footnote"><strong>Receipt rail:</strong> model-session ledger is read beside the route; totals belong to the run, not a single channel.</p>
+        </aside>
+      </main>
+
+      <footer class="rack-foot">
+        <p>AOS / control plane specimen / synthetic running state</p>
+        <p>Relay rack 06 / operator view / no provider action implied</p>
+      </footer>
+    </section>
+  </div>
+
+  <script>
+    (function () {
+      var tasks = {
+        root: { code: "RUN-86 / bus", title: "Coordinate evidence review", summary: "The lead coordinates a bounded run across comparison, synthesis, and holdout checks while preserving each worker receipt.", status: "COMPLETE", owner: "Lead agent", model: "gpt-5.6-luna / max", session: "S-019", gate: "Branch dispatch" },
+        frame: { code: "T-04 / closed", title: "Frame the research question", summary: "The opening question is closed and its assumptions are pinned before the active branches receive source material.", status: "COMPLETE", owner: "Intake lead", model: "gpt-5.6-luna / max", session: "S-020", gate: "Question pinned" },
+        compare: { code: "T-09 / live", title: "Compare primary findings", summary: "Cross-check the two strongest findings against their source notes before the synthesis branch can claim agreement.", status: "RUNNING", owner: "Branch lead", model: "gpt-5.6-luna / max", session: "S-021", gate: "Evidence join" },
+        ingest: { code: "T-09a / live", title: "Ingest field notes", summary: "Normalize field notes and attach each excerpt to a source receipt so downstream comparisons can be audited.", status: "RUNNING", owner: "Worker 02", model: "gpt-5.6-luna / max", session: "S-022", gate: "Receipt verified" },
+        counter: { code: "T-09b / queue", title: "Trace counterexamples", summary: "Queue counterexample checks behind the comparison branch; no new worker is dispatched while the branch is waiting.", status: "WAITING", owner: "Worker 03", model: "gpt-5.6-luna / max", session: "S-023", gate: "Compare clear" },
+        synthesis: { code: "T-14 / live", title: "Draft synthesis memo", summary: "Draft a concise conclusion from verified joins. The memo stays waiting until the comparison branch records its disposition.", status: "RUNNING", owner: "Synthesis lead", model: "gpt-5.6-luna / max", session: "S-024", gate: "Comparison clear" },
+        verify: { code: "T-18 / live", title: "Holdout verification", summary: "Test the working interpretation against reserved notes and record any contradiction as a separate finding.", status: "RUNNING", owner: "Verifier 01", model: "gpt-5.6-luna / max", session: "S-026", gate: "Holdout pass" },
+        archive: { code: "T-22 / queue", title: "Archive decision record", summary: "Prepare the final decision record, including open questions and receipts, after the active branches close.", status: "WAITING", owner: "Records lead", model: "gpt-5.6-luna / max", session: "S-027", gate: "Run complete" }
+      };
+      var tree = document.getElementById("patch-tree");
+      var filter = document.getElementById("route-filter");
+      var empty = document.getElementById("route-empty");
+      var pause = document.getElementById("pause-rack");
+      var state = document.getElementById("service-state");
+
+      function setText(id, value) {
+        var element = document.getElementById(id);
+        if (element) element.textContent = value;
+      }
+
+      function selectTask(key) {
+        var task = tasks[key];
+        if (!task) return;
+        Array.prototype.forEach.call(tree.querySelectorAll(".task-select"), function (button) {
+          button.setAttribute("aria-current", button.getAttribute("data-task") === key ? "true" : "false");
+        });
+        setText("selected-code", task.code);
+        setText("detail-route", task.session);
+        setText("selected-title", task.title);
+        setText("selected-summary", task.summary);
+        setText("detail-owner", task.owner);
+        setText("detail-model", task.model);
+        setText("detail-session", task.session);
+        setText("detail-gate", task.gate);
+        var status = document.getElementById("rack-status");
+        status.textContent = task.status.charAt(0) + task.status.slice(1).toLowerCase();
+        status.setAttribute("data-status", task.status);
+        Array.prototype.forEach.call(document.querySelectorAll(".channel-strip"), function (row) {
+          row.classList.toggle("is-selected", row.getAttribute("data-session") === task.session);
+        });
+      }
+
+      function filterTree() {
+        var query = filter.value.trim().toLowerCase();
+        var hasMatch = false;
+        function updateRow(row) {
+          var button = row.querySelector(":scope > .task-select");
+          if (!button) return false;
+          var isRoot = button.getAttribute("data-task") === "root";
+          var selfHit = Boolean(query) && button.textContent.toLowerCase().indexOf(query) !== -1;
+          var childHit = false;
+          var childGroup = row.querySelector(".task-branch");
+          if (childGroup) {
+            Array.prototype.forEach.call(childGroup.children, function (child) {
+              if (child.classList.contains("task-row")) childHit = updateRow(child) || childHit;
+            });
+          }
+          var visible = !query || isRoot || selfHit || childHit;
+          row.classList.toggle("is-hidden", !visible);
+          if (selfHit || childHit) hasMatch = true;
+          return selfHit || childHit;
+        }
+        Array.prototype.forEach.call(tree.children, function (row) {
+          if (row.classList.contains("task-row")) updateRow(row);
+        });
+        empty.classList.toggle("is-visible", Boolean(query) && !hasMatch);
+      }
+
+      tree.addEventListener("click", function (event) {
+        var button = event.target.closest(".task-select");
+        if (button) selectTask(button.getAttribute("data-task"));
+      });
+      filter.addEventListener("input", filterTree);
+      pause.addEventListener("click", function () {
+        var isPaused = document.body.classList.toggle("is-paused");
+        pause.setAttribute("aria-pressed", isPaused ? "true" : "false");
+        pause.textContent = isPaused ? "Resume dispatch" : "Pause dispatch";
+        state.textContent = isPaused ? "relay held / active work unchanged" : "relay live / accepting work";
+      });
+      selectTask("compare");
+    }());
+  </script>
+</body>
+</html>
