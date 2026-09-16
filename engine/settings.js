@@ -12,7 +12,7 @@ import { BLUEPRINT_INPUT_SCHEMA, BLUEPRINT_CONFIG_SCHEMA, HUMAN_GATE_TRIGGERS } 
 import { MEMORY_WRITE_SCHEMA, MEMORY_TYPES } from './memory/index.js';
 import { RESOURCE_ROUTES } from './api.js';
 import { CAPABILITY_INPUT_SCHEMA, CAPABILITY_KINDS, CAPABILITY_PERMISSIONS, CAPABILITY_SCOPES } from './capabilities.js';
-import { IMPROVEMENT_EVALUATION_INPUT_SCHEMA } from './improvements.js';
+import { DETERMINISTIC_IMPROVEMENT_EVALUATION_INPUT_SCHEMA, IMPROVEMENT_EVALUATION_INPUT_SCHEMA } from './improvements.js';
 
 export const SETTING_SCOPES = Object.freeze(['global', 'project', 'swarm', 'role', 'agent', 'run']);
 export const SETTINGS_EXPORT_FORMAT = 'aos-settings/1';
@@ -120,6 +120,7 @@ export class SettingsRegistry {
         memoryPolicy: describeSchema(memoryPolicySchema),
         capability: describeSchema(CAPABILITY_INPUT_SCHEMA),
         improvementEvaluation: describeSchema(IMPROVEMENT_EVALUATION_INPUT_SCHEMA),
+        deterministicImprovementEvaluation: describeSchema(DETERMINISTIC_IMPROVEMENT_EVALUATION_INPUT_SCHEMA),
       },
       routes: RESOURCE_ROUTES.map(([method, pattern, resource, action, params, status = 200]) => { const names = [...params]; return { method, path: pattern.source.replace(/^\^/, '').replace(/\$$/, '').replace(/\\\//g, '/').replace(/\(\[\^\/\]\+\)/g, () => `:${names.shift() || 'id'}`), resource, action, status, ...(DESTRUCTIVE[`${resource}.${action}`] ? { destructive: DESTRUCTIVE[`${resource}.${action}`] } : {}) }; }),
       registries: {
@@ -129,7 +130,7 @@ export class SettingsRegistry {
         memory: { group: 'memory', operations: ['stats', 'policy', 'search', 'show', 'add', 'correct', 'commit', 'pin', 'unpin', 'forget', 'promote', 'clear', 'retention', 'export', 'import'], http: '/api/v1/memory', cli: 'aos memory <action>' },
         capabilities: { group: 'capabilities', operations: ['list', 'get', 'history', 'create', 'edit', 'test', 'enable', 'revoke', 'permissions', 'grant', 'revoke-permission'], http: '/api/v1/capabilities', cli: 'aos capability <action>' },
         sessions: { group: 'models_harnesses', operations: ['list', 'get', 'reset', 'retention'], http: '/api/v1/sessions', cli: 'aos session <action>' },
-        improvements: { group: 'approvals_safety', operations: ['evaluate', 'evaluations', 'genome', 'rollback'], http: '/api/v1/improvements', cli: 'aos improvement <action>' },
+        improvements: { group: 'approvals_safety', operations: ['evaluate', 'run-deterministic', 'evaluations', 'genome', 'rollback'], http: '/api/v1/improvements', cli: 'aos improvement <action>' },
         runs: { group: 'budgets_concurrency', operations: ['patch', 'patches'], http: '/api/v1/runs/:id/patch', cli: 'aos run patch <runId> <key> <json>' },
       },
       diagnostics: this.diagnostics(),

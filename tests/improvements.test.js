@@ -49,10 +49,53 @@ test('an improvement cannot be approved before a passing comparable evaluation',
 
   const passed = aos.improvements.evaluate(proposal.id, evaluation('passed-eval'));
   assert.equal(passed.status, 'passed');
+  assert.equal(passed.evidence.source, 'operator_attested');
   assert.ok(passed.checks.every((item) => item.passed));
   assert.equal(passed.rollbackTarget.value, 2);
   aos.transact(() => { aos.defaultProject().maxRetries = 3; });
   assert.throws(() => aos.approveProposal(proposal.id), (error) => error.code === 'improvement_baseline_changed');
+});
+
+test('the engine-owned deterministic runner records a replay receipt for a maxConcurrency proposal', async () => {
+  const aos = engine();
+  aos.transact(() => { aos.defaultProject().maxConcurrency = 1; });
+  const { proposal } = await pendingImprovement(aos);
+  assert.equal(proposal.payload.key, 'maxConcurrency');
+  aos.transact(() => { proposal.payload.value = 2; });
+
+  const receipt = aos.improvements.runDeterministic(proposal.id, { requestId: 'deterministic-policy-eval' });
+  assert.equal(receipt.status, 'passed');
+  assert.equal(receipt.evidence.source, 'engine_owned_deterministic_replay');
+  assert.equal(receipt.evidence.baseline.maxConcurrency, 1);
+  assert.equal(receipt.evidence.candidate.maxConcurrency, 2);
+  assert.equal(receipt.baseline.verifiedRuntimeRate, 0);
+  assert.ok(receipt.candidate.latencyMs < receipt.baseline.latencyMs);
+  assert.match(receipt.artifactRefs[0], /^aos:deterministic-scheduler:[a-f0-9]{16}$/);
+  assert.deepEqual(aos.improvements.runDeterministic(proposal.id, { requestId: 'deterministic-policy-eval' }), receipt, 'request id is idempotent');
+  aos.approveProposal(proposal.id);
+  assert.equal(aos.getProposal(proposal.id).status, 'approved');
+});
+
+test('the deterministic runner refuses policy surfaces it does not measure', async () => {
+  const aos = engine();
+  const { proposal } = await pendingImprovement(aos);
+  aos.transact(() => { proposal.payload = { key: 'maxRetries', value: 2 }; });
+  assert.throws(
+    () => aos.improvements.runDeterministic(proposal.id, { requestId: 'unsupported-policy-eval' }),
+    (error) => error.code === 'deterministic_benchmark_unsupported',
+  );
+});
+
+test('a deterministic replay blocks a maxConcurrency regression', async () => {
+  const aos = engine();
+  aos.transact(() => { aos.defaultProject().maxConcurrency = 2; });
+  const { proposal } = await pendingImprovement(aos);
+  aos.transact(() => { proposal.payload.value = 1; });
+
+  const receipt = aos.improvements.runDeterministic(proposal.id, { requestId: 'regressing-policy-eval' });
+  assert.equal(receipt.status, 'failed');
+  assert.ok(receipt.checks.some((check) => check.metric === 'latencyMs' && !check.passed));
+  assert.throws(() => aos.approveProposal(proposal.id), (error) => error.code === 'improvement_evaluation_required');
 });
 
 test('promotion versions the policy genome and rollback appends a restoring version', async () => {
@@ -92,6 +135,27 @@ test('HTTP evaluation and CLI genome reads share the same immutable receipts', a
     const receipt = await response.json();
     assert.equal(receipt.status, 'passed');
     assert.deepEqual(aos.improvements.evaluate(proposal.id, evaluation('http-eval')), receipt, 'request id is idempotent');
+
+    const second = await pendingImprovement(aos);
+    aos.transact(() => {
+      aos.defaultProject().maxConcurrency = 1;
+      second.proposal.payload.value = 2;
+    });
+    const deterministic = await fetch(`${base}/proposals/${second.proposal.id}/evaluations/run-deterministic`, {
+      method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ input: { requestId: 'http-deterministic-eval' } }),
+    });
+    assert.equal(deterministic.status, 201);
+    assert.equal((await deterministic.json()).evidence.source, 'engine_owned_deterministic_replay');
+
+    const third = await pendingImprovement(aos);
+    aos.transact(() => {
+      aos.defaultProject().maxConcurrency = 1;
+      third.proposal.payload.value = 2;
+    });
+    const cliDeterministic = JSON.parse((await dispatch(aos, [
+      'improvement', 'run-deterministic', third.proposal.id, '--json', '{"requestId":"cli-deterministic-eval"}',
+    ])).join('\n'));
+    assert.equal(cliDeterministic.evidence.source, 'engine_owned_deterministic_replay');
 
     const listed = JSON.parse((await dispatch(aos, ['improvement', 'evaluations', '--proposal', proposal.id])).join('\n'));
     assert.equal(listed.length, 1);

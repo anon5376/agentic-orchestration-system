@@ -43,6 +43,7 @@ export function apiActions(engine) {
     improvements: {
       evaluations: (p = {}) => improvements.listEvaluations({ proposalId: p.proposalId ?? null, projectId: p.projectId ?? null }),
       evaluate: (p) => improvements.evaluate(need(p, 'proposalId'), need(p, 'input')),
+      runDeterministic: (p) => improvements.runDeterministic(need(p, 'proposalId'), need(p, 'input')),
       genome: (p = {}) => improvements.listGenome({ projectId: p.projectId ?? engine.defaultProject()?.id }),
       rollback: (p) => improvements.rollback(need(p, 'versionId'), { actor: p.actor ?? 'operator', reason: p.reason ?? 'operator rollback' }),
     },
@@ -155,6 +156,7 @@ export const RESOURCE_ROUTES = Object.freeze([
   ['POST', /^\/api\/v1\/tasks\/([^/]+)\/workspace-write\/approve$/, 'effects', 'approveWorkspaceWrite', ['taskId']],
   ['POST', /^\/api\/v1\/effects\/([^/]+)\/workspace-write\/rollback$/, 'effects', 'rollbackWorkspaceWrite', ['claimId']],
   ['GET', /^\/api\/v1\/improvements\/evaluations$/, 'improvements', 'evaluations', []],
+  ['POST', /^\/api\/v1\/proposals\/([^/]+)\/evaluations\/run-deterministic$/, 'improvements', 'runDeterministic', ['proposalId'], 201],
   ['POST', /^\/api\/v1\/proposals\/([^/]+)\/evaluations$/, 'improvements', 'evaluate', ['proposalId'], 201],
   ['GET', /^\/api\/v1\/improvements\/genome$/, 'improvements', 'genome', []],
   ['POST', /^\/api\/v1\/improvements\/genome\/([^/]+)\/rollback$/, 'improvements', 'rollback', ['versionId'], 201],

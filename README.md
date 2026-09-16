@@ -146,6 +146,17 @@ To return to deterministic local execution:
 npm run dev:all
 ```
 
+## Deterministic policy evaluation
+
+AOS can evaluate a pending `maxConcurrency` proposal by replaying a frozen scheduler suite through the baseline and candidate settings:
+
+```bash
+node bin/aos.mjs improvement run-deterministic <proposalId> \
+  --json '{"requestId":"scheduler-eval-1"}'
+```
+
+The receipt binds the proposal, policy baseline, fixture set, outputs, and promotion gate with content fingerprints. This evaluates AOS scheduler behavior only. It does not compare models, providers, Codex, OpenCode, or OpenClaw.
+
 ## CLI
 
 The CLI operates on the same state as the dashboard.

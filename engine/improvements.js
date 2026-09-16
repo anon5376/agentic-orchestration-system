@@ -1,5 +1,6 @@
 import { fingerprint, newId, nowIso } from './ids.js';
 import { AosError, check, identifier, invalid, notFound, t } from './schema.js';
+import { runDeterministicSchedulerBenchmark } from './evaluation-runner.js';
 
 export const IMPROVEMENT_SCHEMA_VERSION = 1;
 export const IMPROVABLE_POLICY_KEYS = Object.freeze(['maxConcurrency', 'maxRetries', 'retentionDays']);
@@ -23,6 +24,11 @@ export const IMPROVEMENT_EVALUATION_INPUT_SCHEMA = t.object({
   baseline: METRICS_SCHEMA,
   candidate: METRICS_SCHEMA,
   artifactRefs: t.array(t.string({ minLength: 1, maxLength: 300, pattern: /^[A-Za-z0-9][A-Za-z0-9._/@:+-]*$/, patternName: 'a credential-free artifact reference' }), { unique: true, minItems: 1, maxItems: 50 }),
+  actor: t.optional(t.string({ minLength: 1, maxLength: 120 })),
+});
+
+export const DETERMINISTIC_IMPROVEMENT_EVALUATION_INPUT_SCHEMA = t.object({
+  requestId: identifier(),
   actor: t.optional(t.string({ minLength: 1, maxLength: 120 })),
 });
 
@@ -90,58 +96,89 @@ export class ImprovementService {
 
   evaluate(proposalId, input) {
     validate(IMPROVEMENT_EVALUATION_INPUT_SCHEMA, input, 'improvement evaluation');
-    return this.engine.transact(() => {
-      const proposal = this.engine.state.proposals.find((item) => item.id === proposalId);
-      if (!proposal) throw notFound('proposal', proposalId);
-      if (proposal.evaluationRequired !== true) throw new AosError('improvement_evaluation_not_required', `Proposal ${proposalId} is not an improvement candidate`, { statusCode: 409 });
-      if (proposal.status !== 'proposed') throw new AosError('improvement_not_pending', `Proposal ${proposalId} is not pending`, { statusCode: 409 });
-      const existing = this.engine.state.improvementEvaluations.find((item) => item.requestId === input.requestId);
-      const inputFingerprint = fingerprint(JSON.stringify({ proposalId, ...input, actor: undefined }));
-      if (existing) {
-        if (existing.inputFingerprint !== inputFingerprint) throw new AosError('improvement_evaluation_request_conflict', `Evaluation request ${input.requestId} was already used`, { statusCode: 409 });
-        return clone(existing);
-      }
+    return this.engine.transact(() => this.#recordEvaluation(proposalId, input, {
+      source: 'operator_attested',
+      claimBoundary: 'AOS stored operator-supplied metrics and artifact references; it did not execute or verify this benchmark.',
+    }));
+  }
 
-      const verdict = evaluateMetrics(input.baseline, input.candidate);
+  runDeterministic(proposalId, input) {
+    validate(DETERMINISTIC_IMPROVEMENT_EVALUATION_INPUT_SCHEMA, input, 'deterministic improvement evaluation');
+    return this.engine.transact(() => {
+      const proposal = this.#pendingProposal(proposalId);
+      if (proposal.type !== 'policy' || proposal.payload?.key !== 'maxConcurrency') {
+        throw new AosError('deterministic_benchmark_unsupported', 'The deterministic scheduler benchmark supports only a pending maxConcurrency policy proposal', {
+          statusCode: 409,
+          details: { proposalId, type: proposal.type, key: proposal.payload?.key ?? null },
+        });
+      }
       const project = this.engine.state.projects.find((item) => item.id === proposal.projectId);
       if (!project) throw notFound('project', proposal.projectId);
-      const head = this.listGenome({ projectId: proposal.projectId }).at(-1) || null;
-      const baselinePolicy = policyValues(project);
-      const baselineGenomeVersion = head?.version || 0;
-      const record = {
-        id: newId('improvementEvaluation'),
-        schemaVersion: IMPROVEMENT_SCHEMA_VERSION,
-        requestId: input.requestId,
-        inputFingerprint,
-        proposalId,
-        proposalFingerprint: proposalFingerprint(proposal),
-        projectId: proposal.projectId,
-        runId: proposal.runId || null,
-        benchmark: clone(input.benchmark),
-        baseline: clone(input.baseline),
-        candidate: clone(input.candidate),
-        artifactRefs: [...input.artifactRefs],
-        status: verdict.status,
-        checks: verdict.checks,
-        baselinePolicy,
-        baselineGenomeVersion,
-        baselinePolicyFingerprint: baselineFingerprint(baselineGenomeVersion, baselinePolicy),
-        rollbackTarget: proposal.type === 'policy' && IMPROVABLE_POLICY_KEYS.includes(proposal.payload?.key)
-          ? { key: proposal.payload.key, value: project[proposal.payload.key] ?? null, genomeVersion: head?.version || 0 }
-          : null,
-        evaluatedAt: nowIso(this.clock),
-        actor: input.actor || 'operator',
-      };
-      this.engine.state.improvementEvaluations.push(record);
-      proposal.evaluationId = record.id;
-      proposal.evaluationStatus = record.status;
-      this.engine.recordEvent('improvement.evaluated', {
-        projectId: proposal.projectId,
-        runId: proposal.runId,
-        payload: { proposalId, evaluationId: record.id, status: record.status, benchmarkId: record.benchmark.id },
+      const generated = runDeterministicSchedulerBenchmark({
+        baselineMaxConcurrency: project.maxConcurrency ?? null,
+        candidateMaxConcurrency: proposal.payload.value,
       });
-      return clone(record);
+      return this.#recordEvaluation(proposalId, { ...generated.input, requestId: input.requestId, actor: input.actor }, generated.evidence);
     });
+  }
+
+  #pendingProposal(proposalId) {
+    const proposal = this.engine.state.proposals.find((item) => item.id === proposalId);
+    if (!proposal) throw notFound('proposal', proposalId);
+    if (proposal.evaluationRequired !== true) throw new AosError('improvement_evaluation_not_required', `Proposal ${proposalId} is not an improvement candidate`, { statusCode: 409 });
+    if (proposal.status !== 'proposed') throw new AosError('improvement_not_pending', `Proposal ${proposalId} is not pending`, { statusCode: 409 });
+    return proposal;
+  }
+
+  #recordEvaluation(proposalId, input, evidence) {
+    const proposal = this.#pendingProposal(proposalId);
+    const existing = this.engine.state.improvementEvaluations.find((item) => item.requestId === input.requestId);
+    const inputFingerprint = fingerprint(JSON.stringify({ proposalId, ...input, actor: undefined }));
+    if (existing) {
+      if (existing.inputFingerprint !== inputFingerprint) throw new AosError('improvement_evaluation_request_conflict', `Evaluation request ${input.requestId} was already used`, { statusCode: 409 });
+      return clone(existing);
+    }
+
+    const verdict = evaluateMetrics(input.baseline, input.candidate);
+    const project = this.engine.state.projects.find((item) => item.id === proposal.projectId);
+    if (!project) throw notFound('project', proposal.projectId);
+    const head = this.listGenome({ projectId: proposal.projectId }).at(-1) || null;
+    const baselinePolicy = policyValues(project);
+    const baselineGenomeVersion = head?.version || 0;
+    const record = {
+      id: newId('improvementEvaluation'),
+      schemaVersion: IMPROVEMENT_SCHEMA_VERSION,
+      requestId: input.requestId,
+      inputFingerprint,
+      proposalId,
+      proposalFingerprint: proposalFingerprint(proposal),
+      projectId: proposal.projectId,
+      runId: proposal.runId || null,
+      benchmark: clone(input.benchmark),
+      baseline: clone(input.baseline),
+      candidate: clone(input.candidate),
+      artifactRefs: [...input.artifactRefs],
+      evidence: clone(evidence),
+      status: verdict.status,
+      checks: verdict.checks,
+      baselinePolicy,
+      baselineGenomeVersion,
+      baselinePolicyFingerprint: baselineFingerprint(baselineGenomeVersion, baselinePolicy),
+      rollbackTarget: proposal.type === 'policy' && IMPROVABLE_POLICY_KEYS.includes(proposal.payload?.key)
+        ? { key: proposal.payload.key, value: project[proposal.payload.key] ?? null, genomeVersion: head?.version || 0 }
+        : null,
+      evaluatedAt: nowIso(this.clock),
+      actor: input.actor || 'operator',
+    };
+    this.engine.state.improvementEvaluations.push(record);
+    proposal.evaluationId = record.id;
+    proposal.evaluationStatus = record.status;
+    this.engine.recordEvent('improvement.evaluated', {
+      projectId: proposal.projectId,
+      runId: proposal.runId,
+      payload: { proposalId, evaluationId: record.id, status: record.status, benchmarkId: record.benchmark.id, evidenceSource: record.evidence.source },
+    });
+    return clone(record);
   }
 
   assertPromotionReady(proposal, { project = null } = {}) {

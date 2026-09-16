@@ -60,7 +60,7 @@ System access (every command below is also an HTTP route under /api/v1; same val
   aos capability permissions <id> --version N | grant <id> --version N --json J | revoke-permission <id> --version N --json J
   aos session list [--project ID] [--run ID] [--task ID] [--provider ID] [--status active|reset|expired]
   aos session show <id> | reset <id> [--reason R] | retention
-  aos improvement evaluate <proposalId> --json J | evaluations [--proposal ID] | genome [--project ID] | rollback <genomeVersionId> [--reason R]
+  aos improvement evaluate <proposalId> --json J | run-deterministic <proposalId> --json J | evaluations [--proposal ID] | genome [--project ID] | rollback <genomeVersionId> [--reason R]
   aos memory stats | policy [--scope S --scope-id ID] | policy set --json J [--scope S --scope-id ID]
   aos memory search [--scope S --namespace NS --query Q --tags a,b --limit N] | show <id> | add <scope> <namespace> --json J
   aos memory correct <id> --json J | commit <id> | pin <id> | unpin <id> | forget <id> [--reason R] | promote <id> <toScope>
@@ -380,10 +380,12 @@ async function resourceCommand(engine, cmd, action, rest, flags) {
   } else if (resource === 'improvements') {
     params = {
       evaluate: () => ({ proposalId: first, input: inputFrom(flags) }),
+      'run-deterministic': () => ({ proposalId: first, input: inputFrom(flags) }),
       evaluations: () => ({ proposalId: flags.proposal ?? null, projectId: flags.project ?? null }),
       genome: () => ({ projectId: flags.project ?? null }),
       rollback: () => ({ versionId: first, actor: flags.actor, reason: flags.reason }),
     }[action]?.();
+    if (action === 'run-deterministic') action = 'runDeterministic';
   } else if (resource === 'sessions') {
     params = {
       list: () => ({ projectId: flags.project ?? null, runId: flags.run ?? null, taskId: flags.task ?? null, provider: flags.provider ?? null, status: flags.status ?? null }),

@@ -16,7 +16,7 @@ Initially the founder conducting research with documents, existing project conte
 
 AOS is intended to coordinate a hierarchy of specialised agents around research objectives. It should interpret the initial request, narrow material ambiguities, organise and adapt the work, integrate results, and evaluate its own execution.
 
-The user values research quality, speed, efficiency, a unified engine, and extensive customisation. All capabilities below describe intended behaviour; this repository does not yet contain a functioning orchestration engine.
+The user values research quality, speed, efficiency, a unified engine, and extensive customisation. The repository now contains a functioning local orchestration engine, dashboard, and CLI. Native integrations, distributed execution, and cross-harness quality benchmarks remain incomplete.
 
 ## Operating Context
 
