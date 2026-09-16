@@ -128,7 +128,7 @@ export class SettingsRegistry {
         templates: { group: 'templates', operations: ['list', 'get', 'history', 'create', 'edit', 'fork', 'archive', 'restore', 'validate', 'from-task', 'export', 'import'], http: '/api/v1/templates', cli: 'aos template <action>' },
         blueprints: { group: 'swarms', operations: ['list', 'get', 'history', 'effective', 'estimate', 'create', 'edit', 'fork', 'archive', 'restore', 'validate', 'export', 'import'], http: '/api/v1/blueprints', cli: 'aos blueprint <action>' },
         memory: { group: 'memory', operations: ['stats', 'policy', 'search', 'show', 'add', 'correct', 'commit', 'pin', 'unpin', 'forget', 'promote', 'clear', 'retention', 'export', 'import'], http: '/api/v1/memory', cli: 'aos memory <action>' },
-        capabilities: { group: 'capabilities', operations: ['list', 'get', 'history', 'create', 'edit', 'test', 'enable', 'revoke', 'permissions', 'grant', 'revoke-permission'], http: '/api/v1/capabilities', cli: 'aos capability <action>' },
+        capabilities: { group: 'capabilities', operations: ['list', 'get', 'history', 'create', 'edit', 'test', 'probe', 'enable', 'revoke', 'permissions', 'grant', 'revoke-permission'], http: '/api/v1/capabilities', cli: 'aos capability <action>' },
         sessions: { group: 'models_harnesses', operations: ['list', 'get', 'reset', 'retention'], http: '/api/v1/sessions', cli: 'aos session <action>' },
         improvements: { group: 'approvals_safety', operations: ['evaluate', 'run-deterministic', 'evaluations', 'genome', 'rollback'], http: '/api/v1/improvements', cli: 'aos improvement <action>' },
         runs: { group: 'budgets_concurrency', operations: ['patch', 'patches'], http: '/api/v1/runs/:id/patch', cli: 'aos run patch <runId> <key> <json>' },

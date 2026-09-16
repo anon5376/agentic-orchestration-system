@@ -1,3 +1,7 @@
+import { createHash } from 'node:crypto';
+import { mkdtempSync, readFileSync, realpathSync, rmSync, statSync, writeFileSync } from 'node:fs';
+import { basename, isAbsolute, join } from 'node:path';
+import { tmpdir } from 'node:os';
 import { fileURLToPath } from 'node:url';
 import { fingerprint, newId, nowIso } from './ids.js';
 import { AosError, check, identifier, invalid, notFound, t } from './schema.js';
@@ -7,9 +11,9 @@ export const CAPABILITY_KINDS = Object.freeze(['skill', 'mcp', 'plugin', 'tool']
 export const CAPABILITY_PERMISSIONS = Object.freeze(['filesystem_read', 'filesystem_write', 'network', 'external_actions']);
 export const CAPABILITY_SCOPES = Object.freeze(['project', 'role', 'worker']);
 
-// MCP is deliberately a closed boundary in this engine slice. The source,
-// installation and wire contract are code-owned; none of these values may be
-// supplied by a user as an alternate process or transport configuration.
+// The built-in MCP stays a closed boundary. Its source, installation and wire
+// contract are code-owned; configurable local servers use the separate,
+// explicitly unisolated adapter below.
 export const BUILTIN_MCP_STAGED_TEXT_SOURCE = Object.freeze({
   type: 'builtin',
   reference: 'aos.mcp.staged-text-reader.v1',
@@ -20,6 +24,37 @@ export const MCP_TOOL = 'aos.read_staged_text';
 export const MCP_EFFECT_CLASS = 'read_only';
 export const MCP_INPUT_SELECTOR = 'first_declared_read_path';
 export const MCP_MAX_TIMEOUT_MS = 10_000;
+
+// An operator may add a local stdio MCP only through this deliberately narrow
+// adapter. It is a host-process disclosure tier: the declared read-only/offline
+// scope is policy, not an OS filesystem or network sandbox. The process gets
+// one engine-staged filename and no task-supplied argv, environment, or input.
+export const LOCAL_MCP_STDIO_SOURCE = Object.freeze({
+  type: 'local',
+  reference: 'aos.local-mcp-stdio.v1',
+});
+export const LOCAL_MCP_STDIO_INSTALLATION = 'operator.local-stdio';
+export const LOCAL_MCP_STDIO_EFFECT_CLASS = 'read_only_offline_declared';
+export const LOCAL_MCP_STDIO_ISOLATION = 'host_process_unisolated';
+export const LOCAL_MCP_STDIO_ADAPTER = 'local-mcp-stdio';
+export const LOCAL_MCP_STDIO_TEST_PROTOCOL = 'local_mcp_stdio_probe';
+
+// Both the shipped reader and the configurable local adapter accept exactly
+// this engine-derived input. V1 intentionally does not accept raw task text or
+// arbitrary JSON tool arguments.
+export const MCP_STAGED_TEXT_INPUT_SCHEMA = deepFreeze({
+  type: 'object',
+  properties: {
+    stagedFile: {
+      type: 'string',
+      minLength: 1,
+      maxLength: 255,
+      pattern: '^[^/\\\\\\x00-\\x1f<>:"|?*]+$',
+    },
+  },
+  required: ['stagedFile'],
+  additionalProperties: false,
+});
 
 // This is the only writable capability admitted by the current engine slice.
 // Its target, input bytes and rollback are all engine-derived; callers may not
@@ -63,7 +98,7 @@ Object.defineProperties(installationDescriptor, {
 export const BUILTIN_MCP_STAGED_TEXT_INSTALLATION_DESCRIPTOR = deepFreeze(installationDescriptor);
 export const BUILTIN_MCP_STAGED_TEXT_SERVER_MODULE = MCP_STAGED_TEXT_SERVER_MODULE;
 
-export const MCP_RUNTIME_SCHEMA = t.object({
+const BUILTIN_MCP_RUNTIME_SCHEMA = t.object({
   transport: t.literal('stdio'),
   installation: t.literal(BUILTIN_MCP_STAGED_TEXT_INSTALLATION),
   protocolVersion: t.literal(MCP_PROTOCOL_VERSION),
@@ -71,6 +106,31 @@ export const MCP_RUNTIME_SCHEMA = t.object({
   effectClass: t.literal(MCP_EFFECT_CLASS),
   inputSelector: t.literal(MCP_INPUT_SELECTOR),
 });
+
+const SHA256_HEX = /^[a-f0-9]{64}$/i;
+const MCP_TOOL_NAME = /^[A-Za-z][A-Za-z0-9_.-]{0,127}$/;
+const LOCAL_MCP_ARG_SCHEMA = t.object({
+  value: t.string({ minLength: 1, maxLength: 4096 }),
+  sha256: t.optional(t.string({ minLength: 64, maxLength: 64, pattern: SHA256_HEX, patternName: 'a SHA-256 hex digest' })),
+});
+export const LOCAL_MCP_STDIO_RUNTIME_SCHEMA = t.object({
+  transport: t.literal('stdio'),
+  installation: t.literal(LOCAL_MCP_STDIO_INSTALLATION),
+  command: t.object({
+    path: t.string({ minLength: 1, maxLength: 4096 }),
+    sha256: t.optional(t.string({ minLength: 64, maxLength: 64, pattern: SHA256_HEX, patternName: 'a SHA-256 hex digest' })),
+  }),
+  argv: t.array(LOCAL_MCP_ARG_SCHEMA, { maxItems: 32 }),
+  protocolVersion: t.literal(MCP_PROTOCOL_VERSION),
+  tool: t.object({
+    name: t.string({ minLength: 1, maxLength: 128, pattern: MCP_TOOL_NAME, patternName: 'an MCP tool name' }),
+    inputSchema: t.any(),
+  }),
+  effectClass: t.literal(LOCAL_MCP_STDIO_EFFECT_CLASS),
+  isolation: t.literal(LOCAL_MCP_STDIO_ISOLATION),
+  inputSelector: t.literal(MCP_INPUT_SELECTOR),
+});
+export const MCP_RUNTIME_SCHEMA = t.oneOf([BUILTIN_MCP_RUNTIME_SCHEMA, LOCAL_MCP_STDIO_RUNTIME_SCHEMA]);
 
 const SOURCE_REFERENCE = /^[A-Za-z0-9@][A-Za-z0-9@._/+\-]{0,399}$/;
 const CAPABILITY_REF = /^([A-Za-z][A-Za-z0-9_.-]{0,127})@([1-9][0-9]*)$/;
@@ -88,7 +148,7 @@ export const CAPABILITY_INPUT_SCHEMA = t.object({
   permissions: t.array(t.enumOf(CAPABILITY_PERMISSIONS), { unique: true, maxItems: CAPABILITY_PERMISSIONS.length }),
   test: t.object({
     required: t.literal(true),
-    protocol: t.enumOf(['operator_receipt', 'schema_check', 'command_check']),
+    protocol: t.enumOf(['operator_receipt', 'schema_check', 'command_check', LOCAL_MCP_STDIO_TEST_PROTOCOL]),
     description: t.string({ minLength: 1, maxLength: 500 }),
   }),
   createdBy: t.optional(t.string({ minLength: 1, maxLength: 120 })),
@@ -99,6 +159,12 @@ const TEST_INPUT_SCHEMA = t.object({
   status: t.enumOf(['passed', 'failed']),
   summary: t.string({ minLength: 1, maxLength: 1000 }),
   actor: t.optional(t.string({ minLength: 1, maxLength: 120 })),
+});
+
+const LOCAL_MCP_PROBE_INPUT_SCHEMA = t.object({
+  requestId: identifier(),
+  actor: t.optional(t.string({ minLength: 1, maxLength: 120 })),
+  timeoutMs: t.optional(t.integer({ min: 1, max: MCP_MAX_TIMEOUT_MS })),
 });
 
 const PERMISSION_INPUT_SCHEMA = t.object({
@@ -133,12 +199,160 @@ function sameObjectShape(value, expected) {
   return actualKeys.length === expectedKeys.length && expectedKeys.every((key) => value[key] === expected[key]);
 }
 
+function deepEqual(left, right) {
+  if (Object.is(left, right)) return true;
+  if (typeof left !== typeof right || left == null || right == null) return false;
+  if (Array.isArray(left)) return Array.isArray(right) && left.length === right.length && left.every((item, index) => deepEqual(item, right[index]));
+  if (typeof left !== 'object') return false;
+  const leftKeys = Object.keys(left).sort();
+  const rightKeys = Object.keys(right).sort();
+  return leftKeys.length === rightKeys.length
+    && leftKeys.every((key, index) => key === rightKeys[index] && deepEqual(left[key], right[key]));
+}
+
 function sameBuiltinMcpSource(value) {
   return sameObjectShape(value, BUILTIN_MCP_STAGED_TEXT_SOURCE);
 }
 
 function sameBuiltinMcpRuntime(value) {
   return sameObjectShape(value, BUILTIN_MCP_STAGED_TEXT_RUNTIME);
+}
+
+function sameLocalMcpSource(value) {
+  return sameObjectShape(value, LOCAL_MCP_STDIO_SOURCE);
+}
+
+const MAX_LOCAL_MCP_FILE_BYTES = 128 * 1024 * 1024;
+const UNSAFE_LOCAL_MCP_ARG = /^(?:-e|-p|-r|-c|\/c|\/k|--(?:eval|print|require|loader|experimental-loader|import|input-type|command)(?:=|$))/i;
+const SECRET_LIKE_LOCAL_MCP_ARG = /(?:api[_-]?key|access[_-]?key|private[_-]?key|client[_-]?secret|secret|token|password|authorization|credential|cookie)\s*[:=]|\b(?:sk|rk|pk|ghp|gho|ghs|ghr|AIza)[A-Za-z0-9_-]{16,}|\beyJ[A-Za-z0-9_-]{8,}\.[A-Za-z0-9_-]{8,}\.[A-Za-z0-9_-]{8,}/i;
+const SHELL_OR_LAUNCHER_EXECUTABLES = new Set([
+  'bash', 'busybox', 'cmd', 'cmd.exe', 'command.com', 'csh', 'dash', 'env',
+  'fish', 'ksh', 'nu', 'powershell', 'powershell.exe', 'pwsh', 'sh', 'tcsh', 'zsh',
+]);
+
+function localMcpValidationError(message, field, details = null) {
+  return invalid(message, { field, ...(details || {}) });
+}
+
+function snapshotLocalMcpFile(path, expectedSha256, { executable, field }) {
+  if (typeof path !== 'string' || !path || !isAbsolute(path) || /[\u0000-\u001f\u007f]/.test(path)) {
+    throw localMcpValidationError('local MCP file paths must be absolute and control-character free', field);
+  }
+  let canonical;
+  let stat;
+  let bytes;
+  try {
+    canonical = realpathSync(path);
+    stat = statSync(canonical);
+    if (!stat.isFile() || stat.size < 1 || stat.size > MAX_LOCAL_MCP_FILE_BYTES) {
+      throw localMcpValidationError('local MCP files must be bounded regular files', field);
+    }
+    if (executable && process.platform !== 'win32' && (stat.mode & 0o111) === 0) {
+      throw localMcpValidationError('local MCP command must be executable', field);
+    }
+    bytes = readFileSync(canonical);
+  } catch (error) {
+    if (error instanceof AosError) throw error;
+    throw localMcpValidationError('local MCP file could not be resolved and fingerprinted', field);
+  }
+  const sha256 = createHash('sha256').update(bytes).digest('hex');
+  if (expectedSha256 !== undefined && String(expectedSha256).toLowerCase() !== sha256) {
+    throw localMcpValidationError('local MCP file no longer matches its pinned SHA-256', field, { expectedSha256, observedSha256: sha256 });
+  }
+  return { path: canonical, sha256 };
+}
+
+function assertNonShellLocalMcpCommand(command) {
+  const name = basename(command.path).toLowerCase();
+  if (SHELL_OR_LAUNCHER_EXECUTABLES.has(name)) {
+    throw localMcpValidationError('local MCP command may not be a shell or command launcher', 'runtime.command.path');
+  }
+  return command;
+}
+
+function normalizeLocalMcpArg(input, index) {
+  const value = input?.value;
+  const field = `runtime.argv[${index}]`;
+  if (typeof value !== 'string' || !value || value.length > 4096 || /[\u0000-\u001f\u007f]/.test(value)) {
+    throw localMcpValidationError('local MCP argv values must be bounded, non-empty literals', field);
+  }
+  if (SECRET_LIKE_LOCAL_MCP_ARG.test(value)) {
+    throw localMcpValidationError('local MCP argv may not contain secret-like values', field);
+  }
+  if (UNSAFE_LOCAL_MCP_ARG.test(value)) {
+    throw localMcpValidationError('local MCP argv may not enable interpreter evaluation, dynamic loading, or shell commands', field);
+  }
+  if (isAbsolute(value)) {
+    const snapshot = snapshotLocalMcpFile(value, input.sha256, { executable: false, field });
+    return { value: snapshot.path, sha256: snapshot.sha256 };
+  }
+  if (value.includes('/') || value.includes('\\') || value === '.' || value === '..' || value.startsWith('~')) {
+    throw localMcpValidationError('local MCP argv permits absolute pinned files or non-path literals only', field);
+  }
+  if (input.sha256 !== undefined) {
+    throw localMcpValidationError('only absolute local MCP argv files may carry a SHA-256 pin', field);
+  }
+  return { value };
+}
+
+function normalizeLocalMcpRuntime(value) {
+  const errors = check(LOCAL_MCP_STDIO_RUNTIME_SCHEMA, value);
+  if (errors.length || !deepEqual(value?.tool?.inputSchema, MCP_STAGED_TEXT_INPUT_SCHEMA)) {
+    throw localMcpValidationError('local MCP runtime must pin the staged-file tool schema', 'runtime', { errors });
+  }
+  const command = assertNonShellLocalMcpCommand(snapshotLocalMcpFile(value.command.path, value.command.sha256, { executable: true, field: 'runtime.command.path' }));
+  const argv = value.argv.map((item, index) => normalizeLocalMcpArg(item, index));
+  return {
+    transport: 'stdio',
+    installation: LOCAL_MCP_STDIO_INSTALLATION,
+    command,
+    argv,
+    protocolVersion: MCP_PROTOCOL_VERSION,
+    tool: { name: value.tool.name, inputSchema: clone(MCP_STAGED_TEXT_INPUT_SCHEMA) },
+    effectClass: LOCAL_MCP_STDIO_EFFECT_CLASS,
+    isolation: LOCAL_MCP_STDIO_ISOLATION,
+    inputSelector: MCP_INPUT_SELECTOR,
+  };
+}
+
+export function isLocalMcpRuntime(value) {
+  if (check(LOCAL_MCP_STDIO_RUNTIME_SCHEMA, value).length || !deepEqual(value?.tool?.inputSchema, MCP_STAGED_TEXT_INPUT_SCHEMA)) return false;
+  if (!isAbsolute(value.command?.path || '') || /[\u0000-\u001f\u007f]/.test(value.command.path)
+    || SHELL_OR_LAUNCHER_EXECUTABLES.has(basename(value.command.path).toLowerCase())
+    || !SHA256_HEX.test(value.command?.sha256 || '')) return false;
+  return value.argv.every((item) => {
+    if (!item || typeof item !== 'object' || typeof item.value !== 'string') return false;
+    if (!item.value || item.value.length > 4096 || /[\u0000-\u001f\u007f]/.test(item.value)
+      || SECRET_LIKE_LOCAL_MCP_ARG.test(item.value) || UNSAFE_LOCAL_MCP_ARG.test(item.value)) return false;
+    if (isAbsolute(item.value)) return SHA256_HEX.test(item.sha256 || '');
+    return item.sha256 === undefined && !item.value.includes('/') && !item.value.includes('\\')
+      && item.value !== '.' && item.value !== '..' && !item.value.startsWith('~');
+  });
+}
+
+// Re-fingerprint the command and any absolute argv file immediately before a
+// host-process launch. The caller gets no path interpolation or fallback.
+export function assertLocalMcpRuntimeCurrent(value) {
+  if (!isLocalMcpRuntime(value)) {
+    throw new AosError('local_mcp_runtime_invalid', 'Local MCP runtime is not a canonical pinned local stdio descriptor', { statusCode: 409 });
+  }
+  try {
+    const observed = normalizeLocalMcpRuntime(value);
+    if (!deepEqual(observed, value)) {
+      throw new AosError('local_mcp_installation_changed', 'Local MCP executable or pinned argv changed after registration', { statusCode: 409 });
+    }
+    return clone(observed);
+  } catch (error) {
+    if (error?.code === 'local_mcp_installation_changed') throw error;
+    throw new AosError('local_mcp_installation_changed', 'Local MCP executable or pinned argv is unavailable or changed', { statusCode: 409 });
+  }
+}
+
+export function localMcpLaunchFingerprint(value) {
+  if (!isLocalMcpRuntime(value)) {
+    throw new AosError('local_mcp_runtime_invalid', 'Local MCP runtime is not a canonical pinned local stdio descriptor', { statusCode: 409 });
+  }
+  return fingerprint(JSON.stringify({ command: value.command.sha256, argv: value.argv.map((item) => ({ value: item.value, sha256: item.sha256 || null })) }));
 }
 
 function materialFingerprint(record) {
@@ -205,6 +419,7 @@ export class CapabilityRegistry {
         summary: latestTest.summary,
         testedAt: latestTest.testedAt,
         actor: latestTest.actor,
+        ...(latestTest.probeFingerprint ? { probeFingerprint: latestTest.probeFingerprint } : {}),
       } : null,
     };
   }
@@ -236,23 +451,31 @@ export class CapabilityRegistry {
     if (input.source.type === 'local' && (input.source.reference.startsWith('/') || input.source.reference.split('/').includes('..'))) {
       throw invalid('local capability source must be a relative path without parent traversal', { field: 'source.reference' });
     }
+    let runtime = null;
     if (input.kind === 'mcp') {
-      if (!sameBuiltinMcpSource(input.source)) {
-        throw invalid('mcp capabilities may use only the AOS staged-text builtin source', {
-          field: 'source',
-          expected: BUILTIN_MCP_STAGED_TEXT_SOURCE,
-        });
-      }
-      if (!sameBuiltinMcpRuntime(input.runtime)) {
-        throw invalid('mcp capabilities require the immutable AOS staged-text runtime', {
-          field: 'runtime',
-          expected: BUILTIN_MCP_STAGED_TEXT_RUNTIME,
+      if (sameBuiltinMcpSource(input.source)) {
+        if (!sameBuiltinMcpRuntime(input.runtime)) {
+          throw invalid('builtin mcp capabilities require the immutable AOS staged-text runtime', {
+            field: 'runtime',
+            expected: BUILTIN_MCP_STAGED_TEXT_RUNTIME,
+          });
+        }
+        runtime = clone(BUILTIN_MCP_STAGED_TEXT_RUNTIME);
+      } else if (sameLocalMcpSource(input.source)) {
+        if (input.test.protocol !== LOCAL_MCP_STDIO_TEST_PROTOCOL) {
+          throw invalid('local stdio MCP capabilities require the engine local_mcp_stdio_probe test protocol', {
+            field: 'test.protocol', expected: LOCAL_MCP_STDIO_TEST_PROTOCOL,
+          });
+        }
+        runtime = normalizeLocalMcpRuntime(input.runtime);
+      } else {
+        throw invalid('mcp capabilities may use only the AOS staged-text builtin or the bounded local stdio source', {
+          field: 'source', expected: [BUILTIN_MCP_STAGED_TEXT_SOURCE, LOCAL_MCP_STDIO_SOURCE],
         });
       }
       if (input.permissions.length !== 1 || input.permissions[0] !== 'filesystem_read') {
         throw invalid('mcp capabilities may request only filesystem_read permission', {
-          field: 'permissions',
-          expected: ['filesystem_read'],
+          field: 'permissions', expected: ['filesystem_read'],
         });
       }
     } else if (input.runtime !== undefined) {
@@ -268,7 +491,7 @@ export class CapabilityRegistry {
       name: input.name.trim(),
       description: input.description?.trim() || null,
       source: clone(input.source),
-      runtime: input.kind === 'mcp' ? clone(input.runtime) : null,
+      runtime: input.kind === 'mcp' ? clone(runtime) : null,
       permissions: [...input.permissions],
       test: clone(input.test),
       createdAt: nowIso(this.clock),
@@ -358,6 +581,16 @@ export class CapabilityRegistry {
 
   recordTest(id, version, input) {
     validate(TEST_INPUT_SCHEMA, input, 'capability test receipt');
+    const capability = this.get(id, version);
+    if (sameLocalMcpSource(capability.source) && isLocalMcpRuntime(capability.runtime) && input.status === 'passed') {
+      throw invalid('local stdio MCP passing tests must use the engine probe', { field: 'status' });
+    }
+    return this.#recordTest(id, version, input);
+  }
+
+  #recordTest(id, version, input, { probe = null } = {}) {
+    validate(TEST_INPUT_SCHEMA, input, 'capability test receipt');
+    const probeFingerprint = probe ? fingerprint(JSON.stringify(probe)) : null;
     return this.engine.transact(() => {
       const capability = this.get(id, version);
       const existing = this.engine.state.capabilityTests.find((item) => item.requestId === input.requestId);
@@ -365,7 +598,8 @@ export class CapabilityRegistry {
         const same = existing.capabilityId === capability.id
           && existing.capabilityVersion === capability.version
           && existing.status === input.status
-          && existing.summary === input.summary;
+          && existing.summary === input.summary
+          && (existing.probeFingerprint || null) === probeFingerprint;
         if (!same) throw new AosError('capability_test_request_conflict', `Test request ${input.requestId} was already used`, { statusCode: 409 });
         return clone(existing);
       }
@@ -379,11 +613,94 @@ export class CapabilityRegistry {
         summary: input.summary.trim(),
         actor: input.actor || 'operator',
         testedAt: nowIso(this.clock),
+        ...(probeFingerprint ? { probeFingerprint } : {}),
       };
       this.engine.state.capabilityTests.push(receipt);
       this.engine.recordEvent('capability.tested', { payload: { capabilityId: capability.id, version: capability.version, status: receipt.status, receiptId: receipt.id } });
       return clone(receipt);
     });
+  }
+
+  async probeLocalMcp(id, version, input) {
+    validate(LOCAL_MCP_PROBE_INPUT_SCHEMA, input, 'local MCP probe');
+    const capability = this.get(id, version);
+    if (!sameLocalMcpSource(capability.source) || !isLocalMcpRuntime(capability.runtime)
+      || capability.test?.protocol !== LOCAL_MCP_STDIO_TEST_PROTOCOL) {
+      throw invalid('capability is not a bounded local stdio MCP probe target', { field: 'capability' });
+    }
+    if (capability.state === 'revoked') {
+      throw new AosError('capability_revoked', `Capability ${capability.reference} is revoked`, { statusCode: 409, details: { reference: capability.reference } });
+    }
+    // A request id is an immutable probe receipt, not a retry token. Check
+    // before launching the operator-pinned host process so a replay cannot
+    // execute it a second time after a receipt has been recorded.
+    const existing = this.engine.state.capabilityTests.find((item) => item.requestId === input.requestId);
+    if (existing) {
+      if (existing.capabilityId === capability.id && existing.capabilityVersion === capability.version) return clone(existing);
+      throw new AosError('capability_test_request_conflict', `Test request ${input.requestId} was already used`, { statusCode: 409 });
+    }
+    const workspaceDir = mkdtempSync(join(tmpdir(), 'aos-local-mcp-probe-'));
+    const stagedFile = '__aos_local_mcp_probe__.txt';
+    const scope = {
+      projectId: 'local-mcp-probe',
+      runId: 'local-mcp-probe',
+      taskId: `probe-${capability.id}`,
+      agentId: 'engine',
+      invocationId: `probe:${input.requestId}`,
+      attempt: 1,
+      harnessSessionId: null,
+    };
+    const mount = {
+      reference: capability.reference,
+      id: capability.id,
+      version: capability.version,
+      kind: 'mcp',
+      fingerprint: capability.fingerprint,
+      runtime: capability.runtime,
+      adapter: capability.source,
+      permissions: capability.permissions,
+    };
+    try {
+      writeFileSync(join(workspaceDir, stagedFile), 'aos-local-mcp-probe', { encoding: 'utf8', mode: 0o600 });
+      const { LocalMcpStdioRuntime } = await import('./mcp-stdio.js');
+      const runtime = new LocalMcpStdioRuntime({ clock: this.clock });
+      try {
+        const result = await runtime.execute({
+          mount,
+          scope,
+          workspaceDir,
+          stagedFile,
+          idempotencyKey: `probe:${input.requestId}`,
+          timeoutMs: input.timeoutMs ?? Math.min(2_000, MCP_MAX_TIMEOUT_MS),
+        });
+        const probe = {
+          adapter: LOCAL_MCP_STDIO_ADAPTER,
+          launchFingerprint: result.receipt?.launchFingerprint || null,
+          tool: capability.runtime.tool.name,
+          protocol: MCP_PROTOCOL_VERSION,
+          effect: LOCAL_MCP_STDIO_EFFECT_CLASS,
+          isolation: LOCAL_MCP_STDIO_ISOLATION,
+          outputFingerprint: result.receipt?.outputFingerprint || null,
+        };
+        return this.#recordTest(id, version, {
+          requestId: input.requestId,
+          status: 'passed',
+          summary: `Local stdio MCP probe passed for ${capability.runtime.tool.name}.`,
+          actor: input.actor,
+        }, { probe });
+      } catch (error) {
+        const code = typeof error?.code === 'string' && /^[a-z0-9_]{1,120}$/.test(error.code)
+          ? error.code : 'local_mcp_probe_failed';
+        return this.#recordTest(id, version, {
+          requestId: input.requestId,
+          status: 'failed',
+          summary: `Local stdio MCP probe failed: ${code}.`,
+          actor: input.actor,
+        }, { probe: { adapter: LOCAL_MCP_STDIO_ADAPTER, errorCode: code } });
+      }
+    } finally {
+      try { rmSync(workspaceDir, { recursive: true, force: true, maxRetries: 1 }); } catch { /* probe cleanup is best effort */ }
+    }
   }
 
   #permissionRecords(id, version, scope = null, scopeId = null) {
@@ -544,11 +861,12 @@ export function isTaskWorkspaceWriteRequested(task) {
 }
 
 /**
- * Pure admission check for the one AOS-shipped MCP read tool.
+ * Pure admission check for a bounded MCP staged-file read invocation.
  *
  * The registry must resolve tests, permissions, enablement and revocation
- * before this function is called. This helper intentionally receives only a
- * task and its resolved mount receipt; it never reaches into an engine/store.
+ * before this function is called. The shipped reader stays a read_only
+ * sandbox; an operator-local server must explicitly select host_process so
+ * callers cannot mistake a declared scope for OS-enforced isolation.
  */
 export function assertMcpTaskAdmission(taskOrInput = {}, mountsOrTask = undefined) {
   const { task, mounts } = admissionArguments(taskOrInput, mountsOrTask);
@@ -580,23 +898,33 @@ export function assertMcpTaskAdmission(taskOrInput = {}, mountsOrTask = undefine
   if (typeof mount.fingerprint !== 'string' || !mount.fingerprint) {
     throw admissionError('mcp_mount_fingerprint_invalid', 'MCP mount requires an exact capability fingerprint', { reference: mount.reference });
   }
-  if (!sameBuiltinMcpRuntime(mount.runtime)) {
-    throw admissionError('mcp_mount_runtime_invalid', 'MCP mount runtime does not match the AOS staged-text contract', { reference: mount.reference, expected: BUILTIN_MCP_STAGED_TEXT_RUNTIME });
+  const builtinMcp = sameBuiltinMcpRuntime(mount.runtime);
+  const localMcp = isLocalMcpRuntime(mount.runtime);
+  if (!builtinMcp && !localMcp) {
+    throw admissionError('mcp_mount_runtime_invalid', 'MCP mount runtime is not an admitted staged-file contract', { reference: mount.reference });
   }
   for (const source of [mount.adapter, mount.source]) {
-    if (source !== undefined && !sameBuiltinMcpSource(source)) {
-      throw admissionError('mcp_mount_source_invalid', 'MCP mount source does not match the AOS staged-text builtin', { reference: mount.reference });
+    if (source !== undefined && !(builtinMcp ? sameBuiltinMcpSource(source) : sameLocalMcpSource(source))) {
+      throw admissionError('mcp_mount_source_invalid', builtinMcp
+        ? 'MCP mount source does not match the AOS staged-text builtin'
+        : 'MCP mount source does not match the bounded local stdio adapter', { reference: mount.reference });
     }
+  }
+  if (localMcp && !sameLocalMcpSource(mount.adapter)) {
+    throw admissionError('mcp_mount_source_invalid', 'Local MCP mount requires the bounded local stdio adapter', { reference: mount.reference });
   }
 
   const effective = taskEffectiveConfig(task);
   const filesystem = task.filesystem || effective.filesystem || {};
   const sandbox = task.sandbox ?? filesystem.sandbox;
-  if (sandbox !== 'read_only') {
-    throw admissionError('mcp_sandbox_invalid', 'MCP staged-text execution requires a read_only sandbox', { sandbox: sandbox ?? null });
+  const expectedSandbox = localMcp ? 'host_process' : 'read_only';
+  if (sandbox !== expectedSandbox) {
+    throw admissionError(localMcp ? 'local_mcp_sandbox_invalid' : 'mcp_sandbox_invalid', localMcp
+      ? 'Local MCP execution requires explicit host_process disclosure; it is not filesystem or network isolation'
+      : 'MCP staged-text execution requires a read_only sandbox', { sandbox: sandbox ?? null, expectedSandbox });
   }
   const readPaths = task.readPaths ?? filesystem.readPaths;
-  if (!Array.isArray(readPaths) || !readPaths.length || !isRelativeDeclaredPath(readPaths[0])) {
+  if (!Array.isArray(readPaths) || readPaths.length !== 1 || !isRelativeDeclaredPath(readPaths[0])) {
     throw admissionError('mcp_read_paths_invalid', 'MCP staged-text execution requires a relative first declared read path');
   }
   const writePaths = task.writePaths ?? filesystem.writePaths;
@@ -614,6 +942,9 @@ export function assertMcpTaskAdmission(taskOrInput = {}, mountsOrTask = undefine
       || (network.allowlist !== undefined && (!Array.isArray(network.allowlist) || network.allowlist.length))) {
       throw admissionError('mcp_network_invalid', 'MCP network policy must be disabled');
     }
+  }
+  if (localMcp && (task.worker ?? effective.harness?.id ?? 'local') !== 'local') {
+    throw admissionError('local_mcp_worker_invalid', 'Local MCP execution runs only through the local deterministic engine path');
   }
 
   const permissionLists = [mount.permissions, task.permissions, task.capabilityPermissions, effective.permissions]

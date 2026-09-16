@@ -89,6 +89,12 @@ Mixed mode preserves the worker named in each task. A failed provider preflight 
 
 One limit remains: provider workers can read any file allowed by their CLI sandbox and the paths supplied by the operator.
 
+## Local stdio MCP tools
+
+The capability registry can mount one operator-pinned local stdio MCP tool for deterministic local tasks. Registration canonicalizes and hashes the executable and absolute file arguments. The engine rechecks those pins before its probe and every launch, requires the fixed staged-file input schema, and bounds protocol traffic, output, time, and receipts. The task must use the local worker, one relative read path, the exact capability version, a scoped `filesystem_read` grant, and the explicit `host_process` sandbox label.
+
+This is a host-process integration, not filesystem or network isolation. A registered program can still exercise the operating-system authority of the current user. Remote transports, task-supplied commands or arguments, writes, external actions, and worker-pool execution are refused.
+
 ## Product decisions (reversible)
 
 1. **Illustrative remains the dashboard default.** Live mode is explicit so the Electric Archive preview is not replaced by an empty store.

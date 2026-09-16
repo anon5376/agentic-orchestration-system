@@ -2,10 +2,17 @@ import { fingerprint, nowIso } from './ids.js';
 import { AosError } from './schema.js';
 import {
   BUILTIN_MCP_STAGED_TEXT_RUNTIME,
+  LOCAL_MCP_STDIO_ADAPTER,
+  LOCAL_MCP_STDIO_EFFECT_CLASS,
+  LOCAL_MCP_STDIO_INSTALLATION,
+  LOCAL_MCP_STDIO_ISOLATION,
+  LOCAL_MCP_STDIO_SOURCE,
   MCP_MAX_TIMEOUT_MS,
   MCP_PROTOCOL_VERSION,
   MCP_TOOL,
   MCP_EFFECT_CLASS,
+  isLocalMcpRuntime,
+  localMcpLaunchFingerprint,
 } from './capabilities.js';
 
 export const BOUNDED_ECHO_SOURCE = 'aos.bounded-echo-v1';
@@ -63,16 +70,22 @@ function validateMount(mount) {
     return 'echo';
   }
   if (mount.kind === 'mcp') {
-    if (!sameObjectShape(mount.runtime, BUILTIN_MCP_STAGED_TEXT_RUNTIME)) {
-      throw fail('mcp_runtime_invalid', 'MCP execution requires the immutable AOS staged-text runtime');
-    }
-    if (mount.adapter?.type !== 'builtin' || mount.adapter?.reference !== MCP_STAGED_TEXT_SOURCE) {
-      throw fail('mcp_source_invalid', 'MCP execution requires the immutable AOS staged-text source');
-    }
     if (!Array.isArray(mount.permissions) || mount.permissions.length !== 1 || mount.permissions[0] !== 'filesystem_read') {
       throw fail('mcp_permissions_invalid', 'MCP execution requires only filesystem_read permission');
     }
-    return 'mcp';
+    if (sameObjectShape(mount.runtime, BUILTIN_MCP_STAGED_TEXT_RUNTIME)) {
+      if (mount.adapter?.type !== 'builtin' || mount.adapter?.reference !== MCP_STAGED_TEXT_SOURCE) {
+        throw fail('mcp_source_invalid', 'MCP execution requires the immutable AOS staged-text source');
+      }
+      return 'builtin-mcp';
+    }
+    if (isLocalMcpRuntime(mount.runtime)) {
+      if (!sameObjectShape(mount.adapter, LOCAL_MCP_STDIO_SOURCE)) {
+        throw fail('mcp_source_invalid', 'MCP execution requires the bounded local stdio source');
+      }
+      return 'local-mcp';
+    }
+    throw fail('mcp_runtime_invalid', 'MCP execution requires an admitted staged-file runtime');
   }
   throw fail('capability_adapter_unsupported', `No local runtime adapter is implemented for ${mount.reference}`);
 }
@@ -101,12 +114,12 @@ export class CapabilityRuntime {
     if (typeof idempotencyKey !== 'string' || !idempotencyKey || idempotencyKey.length > 300) {
       throw fail('capability_idempotency_invalid', 'Capability execution requires a bounded idempotency key');
     }
-    const timeoutLimit = adapter === 'mcp' ? MCP_MAX_TIMEOUT_MS : MAX_TIMEOUT_MS;
+    const timeoutLimit = adapter.endsWith('mcp') ? MCP_MAX_TIMEOUT_MS : MAX_TIMEOUT_MS;
     if (!Number.isInteger(timeoutMs) || timeoutMs < 1 || timeoutMs > timeoutLimit) {
       throw fail('capability_timeout_invalid', `Capability timeout must be an integer from 1 to ${timeoutLimit} ms`);
     }
-    if (adapter === 'mcp') {
-      return this.#executeMcp({ mount, scope: exactScope, idempotencyKey, timeoutMs, signal, workspaceDir, stagedFile, sourceFingerprint });
+    if (adapter.endsWith('mcp')) {
+      return this.#executeMcp({ adapter, mount, scope: exactScope, idempotencyKey, timeoutMs, signal, workspaceDir, stagedFile, sourceFingerprint });
     }
 
     const inputJson = json(input, 'Capability input', MAX_INPUT_BYTES);
@@ -132,28 +145,30 @@ export class CapabilityRuntime {
     } finally { if (timeoutTimer) clearTimeout(timeoutTimer); }
   }
 
-  async #loadMcpRuntime() {
+  async #loadMcpRuntime(adapter) {
     if (this.mcpRuntime) {
       if (typeof this.mcpRuntime === 'function') return new this.mcpRuntime({ clock: this.clock });
       return this.mcpRuntime;
     }
-    if (!this.mcpRuntimePromise) {
-      this.mcpRuntimePromise = import('./mcp-stdio.js').then((module) => {
-        const Runtime = module.McpStdioRuntime || module.default;
+    if (!this.mcpRuntimePromise) this.mcpRuntimePromise = new Map();
+    if (!this.mcpRuntimePromise.has(adapter)) {
+      const promise = import('./mcp-stdio.js').then((module) => {
+        const Runtime = adapter === 'local-mcp' ? module.LocalMcpStdioRuntime : (module.McpStdioRuntime || module.default);
         if (!Runtime) throw fail('mcp_runtime_unavailable', 'The shipped MCP runtime is unavailable');
         if (typeof Runtime === 'function' && Runtime.prototype?.execute) return new Runtime({ clock: this.clock });
         if (typeof Runtime.execute === 'function') return Runtime;
         throw fail('mcp_runtime_unavailable', 'The shipped MCP runtime is unavailable');
       }).catch((error) => {
-        this.mcpRuntimePromise = null;
+        this.mcpRuntimePromise.delete(adapter);
         if (error?.code) throw error;
         throw fail('mcp_runtime_unavailable', 'The shipped MCP runtime is unavailable');
       });
+      this.mcpRuntimePromise.set(adapter, promise);
     }
-    return this.mcpRuntimePromise;
+    return this.mcpRuntimePromise.get(adapter);
   }
 
-  async #executeMcp({ mount, scope, idempotencyKey, timeoutMs, signal, workspaceDir, stagedFile, sourceFingerprint }) {
+  async #executeMcp({ adapter, mount, scope, idempotencyKey, timeoutMs, signal, workspaceDir, stagedFile, sourceFingerprint }) {
     if (typeof workspaceDir !== 'string' || !workspaceDir || typeof stagedFile !== 'string' || !stagedFile) {
       throw fail('mcp_staging_invalid', 'MCP execution requires an engine-owned staged file');
     }
@@ -173,7 +188,7 @@ export class CapabilityRuntime {
     const startedAt = nowIso(this.clock);
     const started = this.clock();
     try {
-      const runtime = await this.#loadMcpRuntime();
+      const runtime = await this.#loadMcpRuntime(adapter);
       // Keep this call shape deliberately narrow: the stdio sibling owns the
       // protocol and receives no task prompt, argv, environment or raw source.
       const result = await runtime.execute({ mount, scope, workspaceDir, stagedFile, idempotencyKey, timeoutMs, signal });
@@ -209,20 +224,30 @@ function boundedHash(value) {
 }
 
 function sanitizeMcpReceipt(receipt, fallback) {
+  const local = isLocalMcpRuntime(fallback.mount.runtime);
+  const runtime = local ? fallback.mount.runtime : BUILTIN_MCP_STAGED_TEXT_RUNTIME;
+  const adapter = local ? LOCAL_MCP_STDIO_ADAPTER : MCP_STAGED_TEXT_ADAPTER;
+  const installation = local ? LOCAL_MCP_STDIO_INSTALLATION : 'aos.staged-text-reader';
+  const version = local ? fallback.mount.version ?? null : 1;
+  const tool = local ? runtime.tool.name : MCP_TOOL;
+  const effect = local ? LOCAL_MCP_STDIO_EFFECT_CLASS : MCP_EFFECT_CLASS;
   const status = ['succeeded', 'failed', 'cancelled'].includes(receipt?.status) ? receipt.status : fallback.status || 'succeeded';
   const outputFingerprint = boundedHash(receipt?.outputFingerprint) || boundedHash(receipt?.fingerprints?.output) || (fallback.output == null ? null : fingerprint(JSON.stringify(fallback.output)));
   const inputFingerprint = boundedHash(receipt?.inputFingerprint) || boundedHash(receipt?.fingerprints?.input) || fallback.requestFingerprint;
   const source = boundedHash(receipt?.sourceFingerprint) || boundedHash(receipt?.stagedFingerprint) || boundedHash(fallback.sourceFingerprint) || inputFingerprint;
-  const installationFingerprint = boundedHash(receipt?.installationFingerprint) || boundedHash(receipt?.fingerprints?.installation) || fingerprint(JSON.stringify(BUILTIN_MCP_STAGED_TEXT_RUNTIME));
+  const installationFingerprint = boundedHash(receipt?.installationFingerprint) || boundedHash(receipt?.fingerprints?.installation) || fingerprint(JSON.stringify(runtime));
   const scopeFingerprint = boundedHash(receipt?.scopeFingerprint) || boundedHash(receipt?.fingerprints?.scope) || fingerprint(JSON.stringify(fallback.scope));
   const requestFingerprint = boundedHash(receipt?.requestFingerprint) || boundedHash(receipt?.fingerprints?.request) || fallback.requestFingerprint;
+  const launchFingerprint = local
+    ? boundedHash(receipt?.launchFingerprint) || boundedHash(receipt?.fingerprints?.launch) || localMcpLaunchFingerprint(runtime)
+    : null;
   const clock = fallback.clock || (() => Date.now());
   const endedAt = typeof receipt?.endedAt === 'string' ? receipt.endedAt : nowIso(clock);
   const durationMs = Number.isFinite(receipt?.durationMs) ? Math.max(0, Math.min(60_000, Number(receipt.durationMs))) : Math.max(0, clock() - fallback.started);
   return {
     reference: fallback.mount.reference,
     capabilityFingerprint: fallback.mount.fingerprint,
-    adapter: MCP_STAGED_TEXT_ADAPTER,
+    adapter,
     adapterVersion: 1,
     status,
     scope: fallback.scope,
@@ -230,11 +255,12 @@ function sanitizeMcpReceipt(receipt, fallback) {
     inputFingerprint,
     outputFingerprint,
     sourceFingerprint: source,
-    installation: 'aos.staged-text-reader',
-    version: 1,
+    installation,
+    version,
     protocol: MCP_PROTOCOL_VERSION,
-    tool: MCP_TOOL,
-    effect: MCP_EFFECT_CLASS,
+    tool,
+    effect,
+    ...(local ? { isolation: LOCAL_MCP_STDIO_ISOLATION, launchFingerprint } : {}),
     fingerprints: {
       installation: installationFingerprint,
       mount: fallback.mount.fingerprint,
@@ -242,6 +268,7 @@ function sanitizeMcpReceipt(receipt, fallback) {
       input: inputFingerprint,
       request: requestFingerprint,
       output: outputFingerprint,
+      ...(local ? { launch: launchFingerprint } : {}),
     },
     startedAt: typeof receipt?.startedAt === 'string' ? receipt.startedAt : fallback.startedAt,
     endedAt,

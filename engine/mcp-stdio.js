@@ -38,19 +38,7 @@ const ENGINE_INSTALLATION_DESCRIPTOR = capabilityRegistry.BUILTIN_MCP_STAGED_TEX
 export const STAGED_TEXT_READER_SERVER_MODULE = ENGINE_INSTALLATION_DESCRIPTOR?.argv?.[0] || null;
 
 const STAGED_FILE_PATTERN = '^[^/\\\\\\x00-\\x1f<>:"|?*]+$';
-export const STAGED_TEXT_READER_INPUT_SCHEMA = Object.freeze({
-  type: 'object',
-  properties: Object.freeze({
-    stagedFile: Object.freeze({
-      type: 'string',
-      minLength: 1,
-      maxLength: 255,
-      pattern: STAGED_FILE_PATTERN,
-    }),
-  }),
-  required: Object.freeze(['stagedFile']),
-  additionalProperties: false,
-});
+export const STAGED_TEXT_READER_INPUT_SCHEMA = capabilityRegistry.MCP_STAGED_TEXT_INPUT_SCHEMA;
 
 export const STAGED_TEXT_READER_TOOL = Object.freeze({
   name: MCP_TOOL_NAME,
@@ -384,6 +372,25 @@ function validateMount(mount, installation) {
   return mount.fingerprint;
 }
 
+function validateLocalMount(mount) {
+  if (!isRecord(mount) || mount.kind !== 'mcp' || !boundedString(mount.reference, 300) || !boundedString(mount.fingerprint, 300)) {
+    throw fail('capability_mount_invalid');
+  }
+  const parsedReference = mount.reference.match(/^([A-Za-z][A-Za-z0-9_.-]{0,127})@([1-9][0-9]*)$/);
+  if (!parsedReference || mount.id !== parsedReference?.[1] || mount.version !== Number(parsedReference?.[2])) {
+    throw fail('capability_mount_mismatch');
+  }
+  if (!capabilityRegistry.isLocalMcpRuntime(mount.runtime)
+    || !deepEqual(mount.adapter, capabilityRegistry.LOCAL_MCP_STDIO_SOURCE)
+    || (mount.source !== undefined && !deepEqual(mount.source, capabilityRegistry.LOCAL_MCP_STDIO_SOURCE))) {
+    throw fail('capability_mount_mismatch');
+  }
+  if (!Array.isArray(mount.permissions) || mount.permissions.length !== 1 || mount.permissions[0] !== 'filesystem_read') {
+    throw fail('capability_mount_mismatch');
+  }
+  return { mountFingerprint: mount.fingerprint, runtime: capabilityRegistry.assertLocalMcpRuntimeCurrent(mount.runtime) };
+}
+
 function validateTimeout(timeoutMs) {
   if (!Number.isInteger(timeoutMs) || timeoutMs < 1 || timeoutMs > MAX_MCP_TIMEOUT_MS) throw fail('capability_timeout_invalid');
   return timeoutMs;
@@ -535,19 +542,13 @@ async function stopProcess(processState, { graceMs = MCP_KILL_GRACE_MS, terminat
   return waitForClose(processState);
 }
 
-function launchProcess({ workspaceDir, stagedFile, serverModule, mode = null }) {
-  const descriptorArgv = mode === null ? ENGINE_INSTALLATION_DESCRIPTOR?.argv : [serverModule];
-  const command = mode === null ? ENGINE_INSTALLATION_DESCRIPTOR?.command : process.execPath;
-  if (command !== process.execPath || !Array.isArray(descriptorArgv) || descriptorArgv.length !== 1 || !isAbsolute(descriptorArgv[0])
-    || !within(REPOSITORY_DIR, resolve(descriptorArgv[0]))) {
-    throw fail('capability_installation_invalid');
-  }
-  const args = [...descriptorArgv, '--workspace-dir', workspaceDir, '--staged-file', stagedFile];
-  if (mode !== null) args.push('--mode', mode);
+function launchChild({ command, args, workspaceDir }) {
   try {
-    const child = spawn(process.execPath, args, {
+    const child = spawn(command, args, {
       cwd: workspaceDir,
-      env: Object.freeze({ NODE_ENV: 'production', NO_COLOR: '1' }),
+      // Do not inherit HOME, PATH, Node flags, proxy settings, or credential
+      // variables. This is sanitization, not a filesystem/network sandbox.
+      env: Object.freeze({ NODE_ENV: 'production', NO_COLOR: '1', PATH: '' }),
       shell: false,
       stdio: ['pipe', 'pipe', 'pipe'],
     });
@@ -584,6 +585,27 @@ function launchProcess({ workspaceDir, stagedFile, serverModule, mode = null }) 
   }
 }
 
+function launchProcess({ workspaceDir, stagedFile, serverModule, mode = null }) {
+  const descriptorArgv = mode === null ? ENGINE_INSTALLATION_DESCRIPTOR?.argv : [serverModule];
+  const command = mode === null ? ENGINE_INSTALLATION_DESCRIPTOR?.command : process.execPath;
+  if (command !== process.execPath || !Array.isArray(descriptorArgv) || descriptorArgv.length !== 1 || !isAbsolute(descriptorArgv[0])
+    || !within(REPOSITORY_DIR, resolve(descriptorArgv[0]))) {
+    throw fail('capability_installation_invalid');
+  }
+  const args = [...descriptorArgv, '--workspace-dir', workspaceDir, '--staged-file', stagedFile];
+  if (mode !== null) args.push('--mode', mode);
+  return launchChild({ command, args, workspaceDir });
+}
+
+function launchLocalProcess({ workspaceDir, runtime }) {
+  const current = capabilityRegistry.assertLocalMcpRuntimeCurrent(runtime);
+  return launchChild({
+    command: current.command.path,
+    args: current.argv.map((item) => item.value),
+    workspaceDir,
+  });
+}
+
 function sendLine(processState, value) {
   let line;
   try { line = JSON.stringify(value); } catch { throw fail('capability_protocol_result'); }
@@ -591,8 +613,8 @@ function sendLine(processState, value) {
   try { processState.child.stdin.write(`${line}\n`); } catch { throw fail('capability_process_failed'); }
 }
 
-async function executeLifecycle({ workspaceDir, stagedFile, timeoutMs, signal, serverModule, mode }) {
-  const processState = launchProcess({ workspaceDir, stagedFile, serverModule, mode });
+async function executeLifecycle({ workspaceDir, stagedFile, timeoutMs, signal, serverModule, mode, launch = null, tool = STAGED_TEXT_READER_TOOL }) {
+  const processState = launch ? launch() : launchProcess({ workspaceDir, stagedFile, serverModule, mode });
   let stopPromise = null;
   let terminalError = null;
   const stop = (error) => {
@@ -623,11 +645,11 @@ async function executeLifecycle({ workspaceDir, stagedFile, timeoutMs, signal, s
     notification('notifications/initialized');
     request(2, 'tools/list', {});
     const listResult = validateRpcResponse(await processState.channel.next(), 2);
-    if (!exactKeys(listResult, ['tools']) || !Array.isArray(listResult.tools) || listResult.tools.length !== 1 || !deepEqual(listResult.tools[0], STAGED_TEXT_READER_TOOL)) {
+    if (!exactKeys(listResult, ['tools']) || !Array.isArray(listResult.tools) || listResult.tools.length !== 1 || !deepEqual(listResult.tools[0], tool)) {
       throw fail('capability_tool_list_drift');
     }
 
-    request(3, 'tools/call', { name: MCP_TOOL_NAME, arguments: { stagedFile } });
+    request(3, 'tools/call', { name: tool.name, arguments: { stagedFile } });
     const callResult = validateRpcResponse(await processState.channel.next(), 3);
     output = outputTextFromResult(callResult);
     if (terminalError) throw terminalError;
@@ -659,14 +681,35 @@ async function executeLifecycle({ workspaceDir, stagedFile, timeoutMs, signal, s
   }
 }
 
-function makeReceipt({ installation, scope, mountFingerprint, requestFingerprint, inputFingerprint, outputFingerprint, startedAt, endedAt, processInfo, errorCode }) {
+function makeReceipt({
+  installation,
+  scope,
+  mountFingerprint,
+  requestFingerprint,
+  inputFingerprint,
+  outputFingerprint,
+  startedAt,
+  endedAt,
+  processInfo,
+  errorCode,
+  tool = MCP_TOOL_NAME,
+  effect = MCP_EFFECT,
+  adapter = null,
+  isolation = null,
+  launchFingerprint = null,
+}) {
   return {
     installation: installation.id,
     version: installation.version,
     protocol: MCP_PROTOCOL_VERSION,
-    tool: MCP_TOOL_NAME,
-    effect: MCP_EFFECT,
+    tool,
+    effect,
+    ...(adapter ? { adapter, adapterVersion: 1 } : {}),
+    ...(isolation ? { isolation } : {}),
     scope: clone(scope),
+    inputFingerprint,
+    outputFingerprint,
+    ...(launchFingerprint ? { launchFingerprint } : {}),
     fingerprints: {
       installation: installation.fingerprint,
       mount: mountFingerprint,
@@ -674,6 +717,7 @@ function makeReceipt({ installation, scope, mountFingerprint, requestFingerprint
       input: inputFingerprint,
       request: requestFingerprint,
       output: outputFingerprint,
+      ...(launchFingerprint ? { launch: launchFingerprint } : {}),
     },
     startedAt,
     endedAt,
@@ -784,6 +828,120 @@ export class McpStdioRuntime {
         endedAt: nowIso(this.clock),
         processInfo,
         errorCode: typed.code,
+      });
+      typed.receipt = receipt;
+      typed.requestFingerprint = requestFingerprint;
+      this.#attempts.set(key, { requestFingerprint, output: null, receipt, errorCode: typed.code });
+      throw typed;
+    }
+  }
+}
+
+// The configurable adapter deliberately reuses the same bounded lifecycle as
+// the shipped reader, but its executable identity is operator-pinned and
+// rechecked at launch. `host_process_unisolated` is carried in every receipt
+// so its declared read-only/offline scope cannot be mistaken for OS isolation.
+export class LocalMcpStdioRuntime {
+  #attempts = new Map();
+
+  constructor({ clock = () => Date.now() } = {}) {
+    this.clock = clock;
+  }
+
+  async execute({ mount, scope, workspaceDir, stagedFile, idempotencyKey, timeoutMs = DEFAULT_MCP_TIMEOUT_MS, signal = null } = {}) {
+    const exactScope = normalizeScope(scope);
+    const key = normalizeIdempotencyKey(idempotencyKey);
+    const exactTimeout = validateTimeout(timeoutMs);
+    const { mountFingerprint, runtime } = validateLocalMount(mount);
+    const workspace = canonicalWorkspace(workspaceDir);
+    const file = normalizeStagedFile(stagedFile);
+    const bytes = readStagedFile(workspace, file);
+    const inputFingerprint = fingerprint(Buffer.from(bytes).toString('base64'));
+    const launchFingerprint = capabilityRegistry.localMcpLaunchFingerprint(runtime);
+    const installation = {
+      id: capabilityRegistry.LOCAL_MCP_STDIO_INSTALLATION,
+      version: mount.version,
+      reference: mount.reference,
+      kind: 'mcp',
+      protocolVersion: MCP_PROTOCOL_VERSION,
+      tool: runtime.tool,
+      fingerprint: launchFingerprint,
+    };
+    const requestFingerprint = fingerprint(stableJson({
+      installation: installation.reference,
+      installationFingerprint: installation.fingerprint,
+      mountFingerprint,
+      scope: exactScope,
+      timeoutMs: exactTimeout,
+      workspace: fingerprint(workspace),
+      stagedFile: file,
+      inputFingerprint,
+    }));
+    const prior = this.#attempts.get(key);
+    if (prior) {
+      if (prior.requestFingerprint !== requestFingerprint) throw fail('capability_idempotency_conflict');
+      if (prior.errorCode) throw cloneFailure(prior.errorCode, prior.receipt, requestFingerprint);
+      return { output: prior.output, receipt: clone(prior.receipt), requestFingerprint, idempotent: true };
+    }
+
+    const startedAt = nowIso(this.clock);
+    let outputFingerprint = null;
+    let processInfo = null;
+    try {
+      if (signal?.aborted) throw fail('capability_cancelled');
+      const lifecycle = await executeLifecycle({
+        workspaceDir: workspace,
+        stagedFile: file,
+        timeoutMs: exactTimeout,
+        signal,
+        launch: () => launchLocalProcess({ workspaceDir: workspace, runtime }),
+        tool: runtime.tool,
+      });
+      outputFingerprint = fingerprint(lifecycle.output);
+      processInfo = lifecycle.processInfo;
+      const receipt = makeReceipt({
+        installation,
+        scope: exactScope,
+        mountFingerprint,
+        requestFingerprint,
+        inputFingerprint,
+        outputFingerprint,
+        startedAt,
+        endedAt: nowIso(this.clock),
+        processInfo,
+        errorCode: null,
+        tool: runtime.tool.name,
+        effect: capabilityRegistry.LOCAL_MCP_STDIO_EFFECT_CLASS,
+        adapter: capabilityRegistry.LOCAL_MCP_STDIO_ADAPTER,
+        isolation: capabilityRegistry.LOCAL_MCP_STDIO_ISOLATION,
+        launchFingerprint,
+      });
+      const result = { output: lifecycle.output, receipt, requestFingerprint };
+      this.#attempts.set(key, { requestFingerprint, output: lifecycle.output, receipt, errorCode: null });
+      return result;
+    } catch (error) {
+      const typed = error instanceof McpCapabilityError
+        ? error
+        : typeof error?.code === 'string' && /^[a-z0-9_]{1,120}$/.test(error.code)
+          ? fail(error.code)
+          : fail('capability_process_failed');
+      processInfo = typed.processInfo || error?.processInfo || processInfo;
+      const receipt = makeReceipt({
+        installation,
+        scope: exactScope,
+        mountFingerprint,
+        requestFingerprint,
+        inputFingerprint,
+        outputFingerprint,
+        startedAt,
+        endedAt: nowIso(this.clock),
+        processInfo,
+        errorCode: typed.code,
+        tool: runtime.tool.name,
+        effect: capabilityRegistry.LOCAL_MCP_STDIO_EFFECT_CLASS,
+        adapter: capabilityRegistry.LOCAL_MCP_STDIO_ADAPTER,
+        isolation: capabilityRegistry.LOCAL_MCP_STDIO_ISOLATION,
+        launchFingerprint,
       });
       typed.receipt = receipt;
       typed.requestFingerprint = requestFingerprint;

@@ -55,7 +55,7 @@ System access (every command below is also an HTTP route under /api/v1; same val
   aos blueprint list | show <id> | history <id> | effective <id> | estimate <id> [--depth N] | create --json J | edit <id> --json J
   aos blueprint fork <id> <newId> | archive <id> | restore <id> | validate --json J | export | import --file F
   aos capability list [--kind skill|mcp|plugin|tool] | show <id> [--version N] | history <id>
-  aos capability create --json J | edit <id> --json J | test <id> --version N --json J
+  aos capability create --json J | edit <id> --json J | test <id> --version N --json J | probe <id> --version N --json J
   aos capability enable <id> --version N | revoke <id> --version N [--reason R]
   aos capability permissions <id> --version N | grant <id> --version N --json J | revoke-permission <id> --version N --json J
   aos session list [--project ID] [--run ID] [--task ID] [--provider ID] [--status active|reset|expired]
@@ -413,6 +413,7 @@ async function resourceCommand(engine, cmd, action, rest, flags) {
       create: () => ({ input: inputFrom(flags) }),
       edit: () => ({ id: first, input: inputFrom(flags) }),
       test: () => ({ id: first, version: flags.version, input: inputFrom(flags) }),
+      probe: () => ({ id: first, version: flags.version, input: inputFrom(flags) }),
       enable: () => ({ ...common, id: first, version: flags.version }),
       revoke: () => ({ ...common, id: first, version: flags.version }),
       permissions: () => ({ id: first, version: flags.version }),

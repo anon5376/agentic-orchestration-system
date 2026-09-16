@@ -13,7 +13,7 @@ The dashboard and CLI use the same on-disk state in `.aos/`.
 - Live Codex and Claude Code execution through existing account logins
 - Disabled-by-default fixed-argv external-harness protocol for operator-owned CLI wrappers
 - Per-worker budgets, sandbox access, capabilities, memory, and delegation limits
-- One engine-owned, read-only MCP capability for bounded staged-text reads
+- Engine-owned and operator-pinned local MCP capabilities for bounded staged-text reads
 - Optional scoped memory across agents, roles, runs, swarms, projects, and the global system
 - Run telemetry, token accounting, artifacts, evidence, approval gates, and retrospectives
 - Proposal-only self-improvement with explicit approval and rollback boundaries
@@ -134,9 +134,9 @@ This is a `host_process` disclosure tier, not filesystem or network isolation. A
 
 ## MCP execution boundary
 
-AOS ships one executable MCP capability: `aos.staged-text-reader@1`. It reads exactly the first declared relative project path through an engine-staged file and records fingerprints instead of raw content in state and events. The task must be read-only, offline, explicitly permissioned, tested, enabled, and bound to that exact version.
+AOS ships the engine-owned `aos.staged-text-reader@1` and a configurable local stdio MCP adapter. Both expose exactly one registered read-only tool, receive one engine-staged file name, and record fingerprints instead of raw content in state and events. A local server is registered with a canonical executable, fixed arguments, and SHA-256 pins; AOS rechecks those files before every probe and launch. Its exact version must pass the engine probe, receive a scoped `filesystem_read` grant, and be enabled before assignment.
 
-Arbitrary task-provided local commands, package-provided MCP servers, remote MCP transports, writable tools, and effectful MCP actions are not executable. The only generic CLI path is the explicit fixed-argv external-harness wrapper above.
+The configurable adapter runs only through the in-process local worker with an explicit `host_process` sandbox label. Its environment, protocol, input, output, time, and receipts are bounded, but it is not OS-level filesystem or network isolation. Arbitrary task-provided commands or arguments, remote MCP transports, writable tools, effectful MCP actions, and local MCP execution through the worker pool remain unavailable.
 
 One deterministic writable exception is shipped. The local task-workspace writer changes one fixed engine-owned file with engine-derived bytes. It accepts no task path or content. An operator must approve the exact upcoming attempt, capability, input, workspace isolation, and rollback plan before a fenced claim can mutate the file. The engine stores prior bytes only in a bounded private journal, publishes fingerprinted receipts, recovers a verified post-write interruption, and can idempotently restore or remove the prior file. The generic task approval endpoint refuses this effect; use the exact workspace-write approval and rollback actions in the loopback API or CLI. This does not enable generic file writing or external effects.
 

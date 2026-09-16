@@ -33,6 +33,8 @@ import {
   BUILTIN_MCP_STAGED_TEXT_RUNTIME,
   CapabilityRegistry,
   isTaskWorkspaceWriteRequested,
+  isLocalMcpRuntime,
+  LOCAL_MCP_STDIO_ADAPTER,
   MCP_INPUT_SELECTOR,
   MCP_MAX_TIMEOUT_MS,
 } from './capabilities.js';
@@ -2196,6 +2198,9 @@ export class AosEngine {
     ));
     let mcpSource = null;
     if (mcpRequested) {
+      if (capabilityMounts.some((mount) => mount.kind === 'mcp' && isLocalMcpRuntime(mount.runtime))) {
+        throw new AosError('local_mcp_pool_forbidden', 'Local stdio MCP capabilities run only in the in-process deterministic engine path', { statusCode: 409, details: { taskId: task.id } });
+      }
       assertMcpTaskAdmission(task, capabilityMounts);
       mcpSource = this.#inspectMcpSource(task);
     }
@@ -2366,6 +2371,9 @@ export class AosEngine {
         throw new AosError('pool_claim_capability_changed', 'The claimed capability set changed before completion', { statusCode: 409 });
       }
       if (currentMounts.some((mount) => mount.kind === 'mcp')) {
+        if (currentMounts.some((mount) => mount.kind === 'mcp' && isLocalMcpRuntime(mount.runtime))) {
+          throw new AosError('local_mcp_pool_forbidden', 'Local stdio MCP capabilities run only in the in-process deterministic engine path', { statusCode: 409 });
+        }
         assertMcpTaskAdmission(task, currentMounts);
         const source = this.#inspectMcpSource(task);
         if (!task.lease?.mcpSource || source.relativePath !== task.lease.mcpSource.relativePath
@@ -3517,11 +3525,14 @@ export class AosEngine {
   #mcpTaskResult(capabilityExecution, workspace, stagedMcp) {
     const artifact = 'mcp-output.json';
     const output = capabilityExecution.output ?? null;
+    const localMcp = capabilityExecution.receipt?.adapter === LOCAL_MCP_STDIO_ADAPTER;
     workspace.write(artifact, { output, outputFingerprint: capabilityExecution.receipt?.outputFingerprint || null });
     const serialized = JSON.stringify({ output });
     return {
       status: TASK_STATUS.succeeded,
-      summary: 'Read one declared project file through the AOS staged-text MCP capability.',
+      summary: localMcp
+        ? 'Ran one operator-pinned local stdio MCP tool against an engine-staged project file.'
+        : 'Read one declared project file through the AOS staged-text MCP capability.',
       artifacts: [artifact],
       result: {
         capability: capabilityExecution.receipt?.reference || null,
@@ -3529,6 +3540,11 @@ export class AosEngine {
         stagedFile: stagedMcp.relativePath,
         bytes: Buffer.byteLength(serialized, 'utf8'),
         outputFingerprint: capabilityExecution.receipt?.outputFingerprint || null,
+        ...(localMcp ? {
+          tool: capabilityExecution.receipt?.tool || null,
+          effect: capabilityExecution.receipt?.effect || null,
+          isolation: capabilityExecution.receipt?.isolation || null,
+        } : {}),
       },
     };
   }
@@ -3720,6 +3736,7 @@ export class AosEngine {
     };
     const mounted = mounts.length === 1 ? mounts[0] : null;
     const mcp = mounted?.kind === 'mcp' || mounts.some((mount) => mount?.kind === 'mcp');
+    const mcpAdapter = mcp && isLocalMcpRuntime(mounted?.runtime) ? LOCAL_MCP_STDIO_ADAPTER : 'mcp-stdio';
     const acceptedKeys = mcp ? ['selector', 'reference', 'timeoutMs'] : ['timeoutMs'];
     const invalidConfig = requested !== true && (!requested || typeof requested !== 'object' || Array.isArray(requested)
       || Object.keys(requested).some((key) => !acceptedKeys.includes(key)));
@@ -3733,7 +3750,7 @@ export class AosEngine {
         id: newId('capabilityExecution'),
         reference: mounted?.reference || null,
         capabilityFingerprint: mounted?.fingerprint || null,
-        adapter: mcp ? 'mcp-stdio' : mounted?.adapter?.reference || null,
+        adapter: mcp ? mcpAdapter : mounted?.adapter?.reference || null,
         adapterVersion: mcp ? 1 : null,
         status: 'refused',
         scope,
@@ -3806,7 +3823,7 @@ export class AosEngine {
       return { ...result, receipt: this.#appendCapabilityExecution(receipt, run, task) };
     } catch (error) {
       const receipt = error.receipt || {
-        reference: mounted.reference, capabilityFingerprint: mounted.fingerprint, adapter: mcp ? 'mcp-stdio' : mounted.adapter?.reference || null,
+        reference: mounted.reference, capabilityFingerprint: mounted.fingerprint, adapter: mcp ? mcpAdapter : mounted.adapter?.reference || null,
         adapterVersion: mcp ? 1 : null, status: 'failed', scope, idempotencyKey, inputFingerprint, outputFingerprint: null,
         startedAt: this.now(), endedAt: this.now(), durationMs: 0, errorCode: error.code || 'capability_execution_failed',
       };
