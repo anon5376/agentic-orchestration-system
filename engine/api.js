@@ -24,6 +24,16 @@ export function apiActions(engine) {
   const sessions = engine.sessions;
   const improvements = engine.improvements;
   return {
+    effects: {
+      approveWorkspaceWrite: (p) => engine.approveTaskWorkspaceWrite(need(p, 'taskId'), {
+        requestId: need(p, 'requestId'),
+        actor: p.actor ?? 'operator',
+      }),
+      rollbackWorkspaceWrite: (p) => engine.rollbackTaskWorkspaceWrite(need(p, 'claimId'), {
+        requestId: need(p, 'requestId'),
+        actor: p.actor ?? 'operator',
+      }),
+    },
     delegations: {
       list: (p) => engine.listDelegationExpansions(need(p, 'runId')),
       decide: (p) => decideDelegationExpansion(engine, p),
@@ -142,6 +152,8 @@ export function apiActions(engine) {
 // Resource routes shared by HTTP and CLI: [method, path pattern, resource, action, param names, status].
 // Literal paths come before parameterised ones so "export" is never read as an id.
 export const RESOURCE_ROUTES = Object.freeze([
+  ['POST', /^\/api\/v1\/tasks\/([^/]+)\/workspace-write\/approve$/, 'effects', 'approveWorkspaceWrite', ['taskId']],
+  ['POST', /^\/api\/v1\/effects\/([^/]+)\/workspace-write\/rollback$/, 'effects', 'rollbackWorkspaceWrite', ['claimId']],
   ['GET', /^\/api\/v1\/improvements\/evaluations$/, 'improvements', 'evaluations', []],
   ['POST', /^\/api\/v1\/proposals\/([^/]+)\/evaluations$/, 'improvements', 'evaluate', ['proposalId'], 201],
   ['GET', /^\/api\/v1\/improvements\/genome$/, 'improvements', 'genome', []],

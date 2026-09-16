@@ -21,6 +21,17 @@ export const MCP_EFFECT_CLASS = 'read_only';
 export const MCP_INPUT_SELECTOR = 'first_declared_read_path';
 export const MCP_MAX_TIMEOUT_MS = 10_000;
 
+// This is the only writable capability admitted by the current engine slice.
+// Its target, input bytes and rollback are all engine-derived; callers may not
+// supply a path, content selector, process, network or external-action option.
+export const TASK_WORKSPACE_WRITE_SOURCE = 'aos.task-workspace-write-v1';
+export const TASK_WORKSPACE_WRITE_EFFECT = 'task_workspace_write';
+export const TASK_WORKSPACE_WRITE_TARGET_KIND = 'engine_task_workspace_file';
+export const BUILTIN_TASK_WORKSPACE_WRITE_SOURCE = Object.freeze({
+  type: 'generated',
+  reference: TASK_WORKSPACE_WRITE_SOURCE,
+});
+
 export const BUILTIN_MCP_STAGED_TEXT_RUNTIME = Object.freeze({
   transport: 'stdio',
   installation: BUILTIN_MCP_STAGED_TEXT_INSTALLATION,
@@ -526,6 +537,12 @@ function taskEffectiveConfig(task) {
   return task?.config?.effective || task?.effective || {};
 }
 
+export function isTaskWorkspaceWriteRequested(task) {
+  const requested = task?.capabilityExecution ?? taskEffectiveConfig(task)?.capabilityExecution;
+  return Boolean(requested && typeof requested === 'object' && !Array.isArray(requested)
+    && requested.effect === TASK_WORKSPACE_WRITE_EFFECT);
+}
+
 /**
  * Pure admission check for the one AOS-shipped MCP read tool.
  *
@@ -627,6 +644,80 @@ export function assertMcpTaskAdmission(taskOrInput = {}, mountsOrTask = undefine
   }
   if (!Number.isInteger(requested.timeoutMs) || requested.timeoutMs < 1 || requested.timeoutMs > MCP_MAX_TIMEOUT_MS) {
     throw admissionError('mcp_timeout_invalid', `MCP capabilityExecution timeout must be an integer from 1 to ${MCP_MAX_TIMEOUT_MS} ms`, { timeoutMs: requested.timeoutMs ?? null });
+  }
+  return true;
+}
+
+/**
+ * Pure admission check for the one AOS-owned deterministic workspace writer.
+ * Registry resolution happens separately; this function keeps the executable
+ * contract narrow enough that a plan cannot turn it into a generic file writer.
+ */
+export function assertTaskWorkspaceWriteAdmission(taskOrInput = {}, mountsOrTask = undefined) {
+  const { task, mounts } = admissionArguments(taskOrInput, mountsOrTask);
+  if (!task || typeof task !== 'object' || Array.isArray(task)) {
+    throw admissionError('workspace_write_task_admission_invalid', 'Task-workspace write admission requires a task object');
+  }
+  if (!Array.isArray(mounts) || mounts.length !== 1) {
+    throw admissionError('workspace_write_mount_count_invalid', 'Task-workspace write admission requires exactly one resolved mount', { mountCount: Array.isArray(mounts) ? mounts.length : null });
+  }
+  const [mount] = mounts;
+  if (!mount || typeof mount !== 'object' || Array.isArray(mount) || mount.kind !== 'tool') {
+    throw admissionError('workspace_write_mount_invalid', 'Task-workspace write admission requires one resolved tool mount');
+  }
+  if (typeof mount.reference !== 'string' || typeof mount.fingerprint !== 'string' || !mount.fingerprint) {
+    throw admissionError('workspace_write_mount_invalid', 'Task-workspace write mount requires an exact versioned reference and fingerprint');
+  }
+  if (!sameObjectShape(mount.adapter, BUILTIN_TASK_WORKSPACE_WRITE_SOURCE)
+    || (mount.source !== undefined && !sameObjectShape(mount.source, BUILTIN_TASK_WORKSPACE_WRITE_SOURCE))) {
+    throw admissionError('workspace_write_source_invalid', 'Task-workspace write requires the immutable AOS generated source', { reference: mount.reference });
+  }
+  if (!Array.isArray(mount.permissions) || mount.permissions.length !== 1 || mount.permissions[0] !== 'filesystem_write') {
+    throw admissionError('workspace_write_permissions_invalid', 'Task-workspace write requires only filesystem_write permission');
+  }
+
+  const effective = taskEffectiveConfig(task);
+  const filesystem = task.filesystem || effective.filesystem || {};
+  const sandbox = task.sandbox ?? filesystem.sandbox;
+  if (sandbox !== 'workspace_write') {
+    throw admissionError('workspace_write_sandbox_invalid', 'Task-workspace write requires the workspace_write sandbox', { sandbox: sandbox ?? null });
+  }
+  const pathLists = [task.readPaths, task.writePaths, task.filesystem?.readPaths, task.filesystem?.writePaths,
+    effective.readPaths, effective.writePaths, effective.filesystem?.readPaths, effective.filesystem?.writePaths]
+    .filter((value) => value !== undefined && value !== null);
+  if (pathLists.some((paths) => !Array.isArray(paths) || paths.length)) {
+    throw admissionError('workspace_write_paths_invalid', 'Task-workspace write does not accept declared read or write paths');
+  }
+  const networkPolicies = [task.network, effective.network].filter((value) => value !== undefined && value !== null);
+  if (networkPolicies.some((network) => network !== false)) {
+    throw admissionError('workspace_write_network_invalid', 'Task-workspace write requires network disabled');
+  }
+  const externalActionPolicies = [task.externalActions, effective.externalActions].filter((value) => value !== undefined && value !== null);
+  if (externalActionPolicies.some((value) => value !== false)) {
+    throw admissionError('workspace_write_external_actions_invalid', 'Task-workspace write cannot enable external actions');
+  }
+  const permissionLists = [task.permissions, task.capabilityPermissions, effective.permissions]
+    .filter((value) => value !== undefined && value !== null);
+  for (const permissions of permissionLists) {
+    if (!Array.isArray(permissions) || permissions.length !== 1 || permissions[0] !== 'filesystem_write') {
+      throw admissionError('workspace_write_permissions_invalid', 'Task-workspace write may request only filesystem_write permission');
+    }
+  }
+  const declaredTools = [task.capabilities?.tools, effective.capabilities?.tools]
+    .filter((value) => value !== undefined && value !== null);
+  if (!declaredTools.length || declaredTools.some((tools) => !Array.isArray(tools) || tools.length !== 1 || tools[0] !== mount.reference)) {
+    throw admissionError('workspace_write_mount_unbound', 'Task-workspace write capability declaration must bind the exact mounted reference', { reference: mount.reference });
+  }
+  const requested = task.capabilityExecution ?? effective.capabilityExecution;
+  if (!requested || typeof requested !== 'object' || Array.isArray(requested)
+    || Object.keys(requested).length !== 1 || requested.effect !== TASK_WORKSPACE_WRITE_EFFECT) {
+    throw admissionError('workspace_write_execution_invalid', 'Task-workspace write capabilityExecution must be the exact engine-owned effect selector');
+  }
+  if (task.requiresApproval !== true) {
+    throw admissionError('workspace_write_approval_required', 'Task-workspace write requires an exact operator approval gate');
+  }
+  if ((task.worker || effective.harness?.id || 'local') !== 'local') {
+    throw admissionError('workspace_write_worker_invalid', 'Task-workspace write executes only through the local deterministic engine path');
   }
   return true;
 }

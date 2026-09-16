@@ -140,6 +140,30 @@ test('rollback is explicit, fingerprinted, durable, and idempotent', () => {
   assert.equal(reloaded.state.effectRollbackReceipts.length, 1);
 });
 
+test('rollback request replay rejects a changed actor or receipt fingerprint', () => {
+  const { aos, identity } = setup();
+  const approval = aos.effects.approve({ ...identity, requestId: 'approve-rollback-conflict', actor: 'operator' });
+  const claim = aos.effects.claim({ ...identity, approvalId: approval.id, ownerId: 'engine-a', requestId: 'claim-rollback-conflict' });
+  aos.effects.complete(claim.id, {
+    ownerId: 'engine-a', fence: claim.fence, status: 'succeeded', receiptFingerprint: fingerprint('applied-conflict'),
+  });
+  aos.effects.rollback(claim.id, {
+    requestId: 'rollback-conflict', actor: 'operator', receiptFingerprint: fingerprint('restored-conflict'),
+  });
+  assert.throws(
+    () => aos.effects.rollback(claim.id, {
+      requestId: 'rollback-conflict', actor: 'another-operator', receiptFingerprint: fingerprint('restored-conflict'),
+    }),
+    (error) => error.code === 'effect_rollback_request_conflict',
+  );
+  assert.throws(
+    () => aos.effects.rollback(claim.id, {
+      requestId: 'rollback-conflict', actor: 'operator', receiptFingerprint: fingerprint('different-restoration'),
+    }),
+    (error) => error.code === 'effect_rollback_request_conflict',
+  );
+});
+
 test('approval and completion fail closed after capability policy changes', () => {
   const { aos, capability, identity } = setup();
   const approval = aos.effects.approve({ ...identity, requestId: 'approve-revoke', actor: 'operator' });

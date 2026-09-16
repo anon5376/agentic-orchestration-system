@@ -28,13 +28,21 @@ import { normalizeDelegationProposal } from './delegation.js';
 import { LeadPlanningService, leadPlanFingerprint, validateLeadAnswerEntries } from './lead-planning.js';
 import {
   assertMcpTaskAdmission,
+  assertTaskWorkspaceWriteAdmission,
   BUILTIN_MCP_STAGED_TEXT_RUNTIME,
   CapabilityRegistry,
+  isTaskWorkspaceWriteRequested,
   MCP_INPUT_SELECTOR,
   MCP_MAX_TIMEOUT_MS,
 } from './capabilities.js';
 import { CapabilityRuntime } from './capability-runtime.js';
 import { EffectClaimService } from './effect-claims.js';
+import {
+  buildTaskWorkspaceWriteIdentity,
+  taskWorkspaceWriteBytes,
+  TaskWorkspaceWriteAdapter,
+  TASK_WORKSPACE_WRITE_JOURNAL_DIR,
+} from './task-workspace-write.js';
 import { ResourceGovernor, ResourceGovernorError } from './resources.js';
 import { HarnessSessionRegistry } from './sessions.js';
 import { ImprovementService, IMPROVABLE_POLICY_KEYS } from './improvements.js';
@@ -234,6 +242,7 @@ export class AosEngine {
     this.capabilities = new CapabilityRegistry({ engine: this, clock });
     this.capabilityRuntime = new CapabilityRuntime({ clock });
     this.effects = new EffectClaimService({ engine: this, clock });
+    this.taskWorkspaceWrites = new TaskWorkspaceWriteAdapter({ effects: this.effects, clock });
     this.sessions = new HarnessSessionRegistry({ engine: this, clock });
     this.improvements = new ImprovementService({ engine: this, clock });
   }
@@ -284,7 +293,15 @@ export class AosEngine {
   load() {
     this.store.load();
     this.leadPlanning.recoverGenerating();
+    // A write can reach the fixed target before its terminal receipt. Recover
+    // that exact fenced attempt while its lease is still valid, before generic
+    // expiry/orphan handling turns it into a new attempt.
+    this.#recoverTaskWorkspaceWrites();
     this.effects.recoverExpired();
+    // An exact post-byte attempt may have expired while the engine was down.
+    // Reclaim its same approved identity before orphan recovery clears that
+    // approval for a genuinely new attempt.
+    this.#recoverTaskWorkspaceWrites({ reclaimRecoverable: true });
     let changed = false;
     if (!this.state.providers.length) {
       this.state.providers = defaultProviders();
@@ -699,6 +716,7 @@ export class AosEngine {
         this.#refreshReady(run.id);
         const task = this.#tasks(run.id).find((item) => item.status === TASK_STATUS.ready
           && (item.worker || 'local') === workerId
+          && !isTaskWorkspaceWriteRequested(item)
           && this.#depsSatisfied(item)
           && (!claimProtocol || this.#providerAdapterPoolEligible(run, item, owner)));
         if (!task) continue;
@@ -920,11 +938,9 @@ export class AosEngine {
   cancelRun(runId) {
     return this.transact(() => {
     const run = this.#require('runs', runId, 'run');
-    run.status = RUN_STATUS.cancelled;
-    run.endedAt = this.now();
-    run.updatedAt = this.now();
     for (const task of this.#tasks(run.id)) {
       if (!TERMINAL.has(task.status)) {
+        this.#reconcileTaskWorkspaceWriteBeforeTerminal(run, task, 'run_cancelled');
         if (task.lease?.executorKind === 'pool') this.#reap(run, task);
         if (task.resourceReservationId) this.#settleResource(run, task, 'cancelled');
         task.status = TASK_STATUS.cancelled;
@@ -936,6 +952,9 @@ export class AosEngine {
         this.#event('task.cancelled', { projectId: run.projectId, runId: run.id, taskId: task.id });
       }
     }
+    run.status = RUN_STATUS.cancelled;
+    run.endedAt = this.now();
+    run.updatedAt = this.now();
     this.#event('run.cancelled', { projectId: run.projectId, runId: run.id });
     return run;
     });
@@ -946,6 +965,7 @@ export class AosEngine {
     const task = this.#require('tasks', taskId, 'task');
     if (!TERMINAL.has(task.status)) {
       const run = this.#require('runs', task.runId, 'run');
+      this.#reconcileTaskWorkspaceWriteBeforeTerminal(run, task, 'task_cancelled');
       if (task.lease?.executorKind === 'pool') this.#reap(run, task);
       if (task.resourceReservationId) this.#settleResource(run, task, 'cancelled');
       task.status = TASK_STATUS.cancelled;
@@ -963,6 +983,9 @@ export class AosEngine {
   approveTask(taskId) {
     return this.transact(() => {
     const task = this.#require('tasks', taskId, 'task');
+    if (isTaskWorkspaceWriteRequested(task)) {
+      throw new AosError('workspace_write_exact_approval_required', 'Task-workspace writes require an exact approval bound to the upcoming attempt', { statusCode: 409, details: { taskId } });
+    }
     if (task.status !== TASK_STATUS.awaiting_approval) {
       throw new Error(`Task ${taskId} is not awaiting approval`);
     }
@@ -971,6 +994,115 @@ export class AosEngine {
     const run = this.#require('runs', task.runId, 'run');
     if (run.status === RUN_STATUS.awaiting_approval) run.status = RUN_STATUS.running;
     return task;
+    });
+  }
+
+  // This is intentionally separate from approveTask(): a generic task gate
+  // cannot prove the capability, bytes, workspace isolation and rollback plan
+  // that this effect will use on its next attempt.
+  approveTaskWorkspaceWrite(taskId, { requestId, actor = 'operator' } = {}) {
+    return this.transact(() => {
+      const task = this.#require('tasks', taskId, 'task');
+      const previous = task.workspaceWriteApproval || null;
+      const requestedActor = typeof actor === 'string' ? actor.trim() : actor ?? 'operator';
+      const requestedId = typeof requestId === 'string' ? requestId.trim() : requestId;
+      if (previous) {
+        if (previous.requestId === requestedId && previous.actor === requestedActor) {
+          return workspaceWriteApprovalView(previous);
+        }
+        throw new AosError('workspace_write_approval_conflict', 'Task-workspace write already has an approval for this attempt', {
+          statusCode: 409,
+          details: { taskId, attempt: previous.attempt },
+        });
+      }
+      if (task.status !== TASK_STATUS.awaiting_approval) {
+        throw new AosError('workspace_write_not_awaiting_approval', `Task ${taskId} is not awaiting a workspace-write approval`, {
+          statusCode: 409,
+          details: { taskId, status: task.status },
+        });
+      }
+      const run = this.#require('runs', task.runId, 'run');
+      if (run.status === RUN_STATUS.cancelled || run.status === RUN_STATUS.failed || run.status === RUN_STATUS.completed) {
+        throw new AosError('workspace_write_run_terminal', 'Task-workspace write cannot be approved on a terminal run', { statusCode: 409, details: { runId: run.id, status: run.status } });
+      }
+      const agent = this.state.agents.find((item) => item.id === task.agentId);
+      const attempt = task.attempts + 1;
+      const mounted = this.capabilities.resolveTask(task, {
+        projectId: run.projectId,
+        roleId: task.presetId || task.kind,
+        workerId: agent?.id || null,
+        runId: run.id,
+      });
+      assertTaskWorkspaceWriteAdmission(task, mounted);
+      const identity = buildTaskWorkspaceWriteIdentity({
+        projectId: run.projectId,
+        runId: run.id,
+        taskId: task.id,
+        attempt,
+        capabilityReference: mounted[0].reference,
+        capabilityFingerprint: mounted[0].fingerprint,
+      });
+      const approval = this.effects.approve({ ...identity, requestId: requestedId, actor: requestedActor });
+      const record = {
+        approvalId: approval.id,
+        requestId: approval.requestId,
+        actor: approval.actor,
+        attempt,
+        actionFingerprint: approval.actionFingerprint,
+        capabilityReference: identity.capabilityReference,
+        capabilityFingerprint: identity.capabilityFingerprint,
+        inputFingerprint: identity.inputFingerprint,
+        isolationFingerprint: identity.isolationFingerprint,
+        rollbackPlanFingerprint: identity.rollbackPlanFingerprint,
+      };
+      task.workspaceWriteApproval = record;
+      task.capabilityMounts = mounted;
+      task.status = TASK_STATUS.ready;
+      task.error = null;
+      task.errorCode = null;
+      if (agent) agent.status = 'queued';
+      if (run.status === RUN_STATUS.awaiting_approval) run.status = RUN_STATUS.running;
+      this.#event('task.workspace_write_approved', {
+        projectId: run.projectId,
+        runId: run.id,
+        taskId: task.id,
+        actor: approval.actor,
+        payload: {
+          approvalId: approval.id,
+          actionFingerprint: approval.actionFingerprint,
+          capabilityReference: identity.capabilityReference,
+          attempt,
+        },
+      });
+      this.#event('task.approved', { projectId: task.projectId, runId: task.runId, taskId: task.id, actor: approval.actor });
+      return workspaceWriteApprovalView(record);
+    });
+  }
+
+  rollbackTaskWorkspaceWrite(claimId, { requestId, actor = 'operator' } = {}) {
+    this.sync();
+    const claim = this.effects.get(claimId);
+    const task = this.#require('tasks', claim.identity.taskId, 'task');
+    const run = this.#require('runs', claim.identity.runId, 'run');
+    if (task.runId !== run.id || task.projectId !== run.projectId
+      || claim.identity.projectId !== run.projectId || claim.identity.runId !== run.id || claim.identity.taskId !== task.id
+      || !isTaskWorkspaceWriteRequested(task)) {
+      throw new AosError('workspace_write_claim_scope_invalid', 'Effect claim is not a task-workspace write', { statusCode: 409, details: { claimId } });
+    }
+    const revalidateRollback = (activeClaim = claim) => this.#revalidateTaskWorkspaceWriteRollback({
+      runId: run.id,
+      taskId: task.id,
+      claim: activeClaim,
+    });
+    revalidateRollback(claim);
+    return this.taskWorkspaceWrites.rollback({
+      claim,
+      workspaceRoot: this.store.workspacesDir,
+      workspaceDir: this.store.workspacePath(run.id, task.id),
+      journalRoot: join(this.store.dataDir, TASK_WORKSPACE_WRITE_JOURNAL_DIR),
+      requestId,
+      actor,
+      revalidate: revalidateRollback,
     });
   }
 
@@ -1946,6 +2078,9 @@ export class AosEngine {
   }
 
   #claimPoolTaskInTransaction(run, task, workerId, ownerId, requestId, { protocol = null } = {}) {
+    if (isTaskWorkspaceWriteRequested(task)) {
+      throw new AosError('workspace_write_pool_forbidden', 'Task-workspace writes run only in the in-process deterministic engine path', { statusCode: 409, details: { taskId: task.id } });
+    }
     const worker = this.workers.get(workerId);
     const refusal = this.#refuseWorker(task, worker);
     if (refusal) {
@@ -2116,6 +2251,9 @@ export class AosEngine {
 
   #revalidatePoolClaim(run, task, worker, agent) {
     try {
+      if (isTaskWorkspaceWriteRequested(task)) {
+        throw new AosError('workspace_write_pool_forbidden', 'Task-workspace writes run only in the in-process deterministic engine path', { statusCode: 409 });
+      }
       const refusal = this.#refuseWorker(task, worker);
       if (refusal) throw new AosError('pool_claim_worker_changed', refusal, { statusCode: 409 });
       if (worker.id !== 'engine') {
@@ -2501,11 +2639,24 @@ export class AosEngine {
   #orphanTask(run, task, reason) {
     const agent = this.state.agents.find((item) => item.id === task.agentId);
     const attempt = task.attempts;
+    this.#reconcileTaskWorkspaceWriteBeforeTerminal(run, task, 'orphan_recovery');
     if (task.resourceReservationId) this.#settleResource(run, task, 'recovered');
     task.lease = null;
     task.error = reason;
     this.inflight.delete(task.id);
     if (attempt <= (task.maxRetries ?? 1)) {
+      if (isTaskWorkspaceWriteRequested(task)) {
+        task.workspaceWriteApproval = null;
+        task.status = TASK_STATUS.awaiting_approval;
+        if (agent) agent.status = 'waiting_approval';
+        this.#event('task.workspace_write_approval_required', {
+          projectId: run.projectId,
+          runId: run.id,
+          taskId: task.id,
+          payload: { attempt: attempt + 1, key: task.key || null, reason: 'orphan_recovery' },
+        });
+        return;
+      }
       task.status = TASK_STATUS.ready;
       if (agent) agent.status = 'queued';
       this.#event('task.requeued', { projectId: run.projectId, runId: run.id, taskId: task.id, payload: { attempt, key: task.key || null, reason } });
@@ -2536,6 +2687,122 @@ export class AosEngine {
       }
       return recovered;
     });
+  }
+
+  // This runs before generic lease expiry and orphan recovery. It is narrowly
+  // limited to a still-claimed deterministic workspace effect whose target can
+  // be proved byte-for-byte against its original identity and private journal.
+  #recoverTaskWorkspaceWrites({ reclaimRecoverable = false } = {}) {
+    let recovered = 0;
+    const claims = this.effects.list({ status: reclaimRecoverable ? 'recoverable' : 'claimed' });
+    for (const claim of claims) {
+      try {
+        const identity = claim.identity;
+        const run = this.state.runs.find((item) => item.id === identity.runId);
+        const task = this.state.tasks.find((item) => item.id === identity.taskId);
+        if (!run || !task || task.runId !== run.id || !isTaskWorkspaceWriteRequested(task)
+          || task.status !== TASK_STATUS.running || task.attempts !== identity.attempt) continue;
+        let activeClaim = claim;
+        if (reclaimRecoverable) {
+          if (!workspaceWriteApprovalMatches(task.workspaceWriteApproval, identity)) continue;
+          activeClaim = this.effects.claim({
+            ...identity,
+            approvalId: task.workspaceWriteApproval.approvalId,
+            ownerId: this.driverId,
+            requestId: `${task.nonce}:workspace-write-recovery:${identity.attempt}:${claim.fence + 1}`,
+          });
+        }
+        const receipt = this.taskWorkspaceWrites.recover({
+          claim: activeClaim,
+          workspaceRoot: this.store.workspacesDir,
+          workspaceDir: this.store.workspacePath(run.id, task.id),
+          journalRoot: join(this.store.dataDir, TASK_WORKSPACE_WRITE_JOURNAL_DIR),
+          expectedBytes: taskWorkspaceWriteBytes(identity),
+          revalidate: () => this.#revalidateTaskWorkspaceWrite({ runId: run.id, taskId: task.id, attempt: identity.attempt, identity, phase: 'recovery' }),
+        });
+        if (!receipt) continue;
+        this.transact(() => {
+          const freshRun = this.#require('runs', run.id, 'run');
+          const freshTask = this.#require('tasks', task.id, 'task');
+          if (freshTask.status !== TASK_STATUS.running || freshTask.attempts !== identity.attempt) return;
+          const agent = this.state.agents.find((item) => item.id === freshTask.agentId);
+          if (freshTask.resourceReservationId) {
+            const settled = this.#settleResource(freshRun, freshTask, 'succeeded');
+            if (settled) this.#event('resource.settled', {
+              projectId: freshRun.projectId,
+              runId: freshRun.id,
+              taskId: freshTask.id,
+              payload: { attempt: identity.attempt, reservationId: settled.id, status: settled.status, consumed: settled.consumed },
+            });
+          }
+          freshTask.lease = null;
+          freshTask.status = TASK_STATUS.succeeded;
+          freshTask.output = this.#workspaceWriteTaskResult(receipt);
+          freshTask.endedAt = this.now();
+          freshTask.error = null;
+          freshTask.errorCode = null;
+          if (agent) agent.status = 'complete';
+          this.#event('task.completed', {
+            projectId: freshRun.projectId,
+            runId: freshRun.id,
+            taskId: freshTask.id,
+            payload: { summary: freshTask.output.summary, attempt: identity.attempt, key: freshTask.key || null, recovered: true },
+          });
+          this.#settleRun(freshRun);
+        });
+        recovered += 1;
+      } catch {
+        // Missing bytes, a revoked capability, or a stale lease must fall into
+        // normal recovery. Never fabricate a terminal receipt from ambiguity.
+      }
+    }
+    return recovered;
+  }
+
+  // Terminal task transitions cannot hide a post-byte, pre-receipt window.
+  // While the task is still running and its exact approval is current, finish
+  // only a claim whose private journal and fixed target prove the original
+  // bytes. Any ambiguity or revalidation refusal aborts the outer transition,
+  // leaving the task/claim intact rather than stranding an unreceipted write.
+  #reconcileTaskWorkspaceWriteBeforeTerminal(run, task, reason) {
+    if (!isTaskWorkspaceWriteRequested(task) || task.status !== TASK_STATUS.running) return null;
+    const claim = this.effects.list({ runId: run.id, taskId: task.id, status: 'claimed' }).find((item) => (
+      item.identity?.projectId === run.projectId
+      && item.identity?.runId === run.id
+      && item.identity?.taskId === task.id
+      && item.identity?.attempt === task.attempts
+    ));
+    if (!claim) return null;
+    const receipt = this.taskWorkspaceWrites.recover({
+      claim,
+      workspaceRoot: this.store.workspacesDir,
+      workspaceDir: this.store.workspacePath(run.id, task.id),
+      journalRoot: join(this.store.dataDir, TASK_WORKSPACE_WRITE_JOURNAL_DIR),
+      expectedBytes: taskWorkspaceWriteBytes(claim.identity),
+      revalidate: () => this.#revalidateTaskWorkspaceWrite({
+        runId: run.id,
+        taskId: task.id,
+        attempt: claim.identity.attempt,
+        identity: claim.identity,
+        phase: 'recovery',
+      }),
+    });
+    if (!receipt) return null;
+    task.output = this.#workspaceWriteTaskResult(receipt);
+    this.#event('task.workspace_write_reconciled', {
+      projectId: run.projectId,
+      runId: run.id,
+      taskId: task.id,
+      payload: {
+        attempt: task.attempts,
+        claimId: receipt.claimId,
+        receiptId: receipt.receiptId,
+        status: receipt.status,
+        receiptFingerprint: receipt.receiptFingerprint,
+        reason,
+      },
+    });
+    return receipt;
   }
 
   #freeSlots(run) {
@@ -2730,6 +2997,29 @@ export class AosEngine {
         emitNow('capability.refused', { code, reason: error.message });
         this.#failTask(run, task, agent, error.message, { retryable: false, code });
         return null;
+      }
+
+      if (isTaskWorkspaceWriteRequested(task)) {
+        try {
+          assertTaskWorkspaceWriteAdmission(task, task.capabilityMounts);
+          const identity = buildTaskWorkspaceWriteIdentity({
+            projectId: run.projectId,
+            runId: run.id,
+            taskId: task.id,
+            attempt,
+            capabilityReference: task.capabilityMounts[0].reference,
+            capabilityFingerprint: task.capabilityMounts[0].fingerprint,
+          });
+          if (!workspaceWriteApprovalMatches(task.workspaceWriteApproval, identity)) {
+            this.#requireWorkspaceWriteApproval(run, task, agent, attempt, 'approval_missing_or_stale');
+            return null;
+          }
+        } catch (error) {
+          const code = error.code || 'workspace_write_admission_refused';
+          emitNow('capability.refused', { code, reason: String(error.message || 'Task-workspace write admission failed').slice(0, 500) });
+          this.#failTask(run, task, agent, String(error.message || 'Task-workspace write admission failed').slice(0, 500), { retryable: false, code });
+          return null;
+        }
       }
 
       let mcpSource = null;
@@ -2956,7 +3246,9 @@ export class AosEngine {
       const capabilityExecution = await this.#executeMountedCapability({
         run: freshRun(), task, agentId, attempt, signal: controller.signal, workspace, stagedMcp,
       });
-      if (capabilityExecution && stagedMcp) {
+      if (capabilityExecution?.taskWorkspaceWrite) {
+        result = capabilityExecution.taskResult;
+      } else if (capabilityExecution && stagedMcp) {
         result = this.#mcpTaskResult(capabilityExecution, workspace, stagedMcp);
       } else {
         if (capabilityExecution) ctx.capabilityExecution = capabilityExecution;
@@ -3143,12 +3435,181 @@ export class AosEngine {
     };
   }
 
+  #workspaceWriteTaskResult(receipt) {
+    return {
+      status: TASK_STATUS.succeeded,
+      summary: 'Applied the approved deterministic task-workspace write.',
+      artifacts: [],
+      result: {
+        workspaceWrite: {
+          claimId: receipt.claimId,
+          receiptId: receipt.receiptId,
+          status: receipt.status,
+          idempotent: receipt.idempotent,
+          recovered: receipt.recovered,
+          adapter: receipt.adapter,
+          targetKind: receipt.targetKind,
+          inputFingerprint: receipt.inputFingerprint,
+          rollbackPlanFingerprint: receipt.rollbackPlanFingerprint,
+          priorStateFingerprint: receipt.priorStateFingerprint,
+          receiptFingerprint: receipt.receiptFingerprint,
+        },
+      },
+    };
+  }
+
+  #requireWorkspaceWriteApproval(run, task, agent, attempted, reason) {
+    // This branch is reached before workspace/reservation mutation. Restore the
+    // counter so the next exact approval binds the same upcoming attempt.
+    task.attempts = Math.max(0, attempted - 1);
+    if (task.attempts === 0) task.startedAt = null;
+    task.sessionId = null;
+    task.workspaceWriteApproval = null;
+    task.status = TASK_STATUS.awaiting_approval;
+    task.error = null;
+    task.errorCode = 'workspace_write_exact_approval_required';
+    if (agent) agent.status = 'waiting_approval';
+    this.#event('task.workspace_write_approval_required', {
+      projectId: run.projectId,
+      runId: run.id,
+      taskId: task.id,
+      payload: { attempt: attempted, key: task.key || null, reason },
+    });
+  }
+
+  #revalidateTaskWorkspaceWrite({ runId, taskId, attempt, identity, phase = 'apply' } = {}) {
+    const run = this.#require('runs', runId, 'run');
+    const task = this.#require('tasks', taskId, 'task');
+    const agent = this.state.agents.find((item) => item.id === task.agentId);
+    const expectedRunning = phase === 'apply' || phase === 'recovery';
+    if (expectedRunning) {
+      if (run.status !== RUN_STATUS.running || task.status !== TASK_STATUS.running || task.attempts !== attempt) {
+        throw new AosError('workspace_write_state_changed', 'Task-workspace write state changed before mutation or receipt completion', {
+          statusCode: 409,
+          details: { runId, taskId, phase },
+        });
+      }
+    }
+    const current = this.capabilities.resolve(identity.capabilityReference, {
+      projectId: run.projectId,
+      roleId: task.presetId || task.kind,
+      workerId: agent?.id || null,
+      runId: run.id,
+    });
+    assertTaskWorkspaceWriteAdmission(task, [current]);
+    const derived = buildTaskWorkspaceWriteIdentity({
+      projectId: run.projectId,
+      runId: run.id,
+      taskId: task.id,
+      attempt,
+      capabilityReference: current.reference,
+      capabilityFingerprint: current.fingerprint,
+    });
+    if (!sameWorkspaceWriteIdentity(derived, identity)
+      || (expectedRunning && !workspaceWriteApprovalMatches(task.workspaceWriteApproval, identity))) {
+      throw new AosError('workspace_write_identity_stale', 'Task-workspace write approval no longer matches the current exact effect identity', {
+        statusCode: 409,
+        details: { runId, taskId, phase },
+      });
+    }
+    return current;
+  }
+
+  // Rollback is compensating action for an already-authorized, already-written
+  // effect—not a new capability invocation. It must remain available after an
+  // operator cancels/retries the task or revokes the capability, but only for
+  // the exact stored claim/approval/mount and only while no attempt is running.
+  #revalidateTaskWorkspaceWriteRollback({ runId, taskId, claim } = {}) {
+    const run = this.#require('runs', runId, 'run');
+    const task = this.#require('tasks', taskId, 'task');
+    const identity = claim?.identity;
+    if (!identity || task.runId !== run.id || task.projectId !== run.projectId
+      || identity.projectId !== run.projectId || identity.runId !== run.id || identity.taskId !== task.id
+      || !isTaskWorkspaceWriteRequested(task)) {
+      throw new AosError('workspace_write_claim_scope_invalid', 'Task-workspace rollback does not match its durable task scope', {
+        statusCode: 409,
+        details: { runId, taskId },
+      });
+    }
+    if (task.status === TASK_STATUS.running || task.attempts !== identity.attempt) {
+      throw new AosError('workspace_write_rollback_attempt_changed', 'Task-workspace rollback is unavailable while this task has a running or newer attempt', {
+        statusCode: 409,
+        details: { runId, taskId, claimAttempt: identity.attempt, taskAttempt: task.attempts, taskStatus: task.status },
+      });
+    }
+    const mounts = Array.isArray(task.capabilityMounts) ? task.capabilityMounts : [];
+    const mount = mounts.length === 1 ? mounts[0] : null;
+    if (!mount || mount.reference !== identity.capabilityReference || mount.fingerprint !== identity.capabilityFingerprint) {
+      throw new AosError('workspace_write_rollback_mount_mismatch', 'Task-workspace rollback no longer has the exact stored capability mount', {
+        statusCode: 409,
+        details: { runId, taskId },
+      });
+    }
+    assertTaskWorkspaceWriteAdmission(task, [mount]);
+    const derived = buildTaskWorkspaceWriteIdentity({
+      projectId: run.projectId,
+      runId: run.id,
+      taskId: task.id,
+      attempt: identity.attempt,
+      capabilityReference: mount.reference,
+      capabilityFingerprint: mount.fingerprint,
+    });
+    const approval = this.state.effectApprovals.find((item) => item.id === claim.approvalId);
+    if (!approval || approval.decision !== 'approved' || approval.actionFingerprint !== claim.actionFingerprint
+      || !sameWorkspaceWriteIdentity(derived, identity) || !sameWorkspaceWriteIdentity(approval.identity, identity)) {
+      throw new AosError('workspace_write_rollback_identity_stale', 'Task-workspace rollback no longer matches its exact durable approval and effect identity', {
+        statusCode: 409,
+        details: { runId, taskId },
+      });
+    }
+    return mount;
+  }
+
+  #executeTaskWorkspaceWriteCapability({ run, task, agentId, attempt, signal, workspace }) {
+    if (!workspace) {
+      throw new AosError('workspace_write_workspace_missing', 'Task-workspace write requires a claimed task workspace', { statusCode: 409 });
+    }
+    const mounted = Array.isArray(task.capabilityMounts) ? task.capabilityMounts : [];
+    assertTaskWorkspaceWriteAdmission(task, mounted);
+    const mount = mounted[0];
+    const identity = buildTaskWorkspaceWriteIdentity({
+      projectId: run.projectId,
+      runId: run.id,
+      taskId: task.id,
+      attempt,
+      capabilityReference: mount.reference,
+      capabilityFingerprint: mount.fingerprint,
+    });
+    if (!workspaceWriteApprovalMatches(task.workspaceWriteApproval, identity)) {
+      throw new AosError('workspace_write_exact_approval_required', 'No current exact approval exists for this task-workspace write attempt', {
+        statusCode: 409,
+        details: { taskId: task.id, attempt },
+      });
+    }
+    const receipt = this.taskWorkspaceWrites.apply({
+      identity,
+      approvalId: task.workspaceWriteApproval.approvalId,
+      ownerId: this.driverId,
+      requestId: `${task.nonce}:workspace-write:${attempt}`,
+      workspaceRoot: this.store.workspacesDir,
+      workspaceDir: workspace.dir,
+      journalRoot: join(this.store.dataDir, TASK_WORKSPACE_WRITE_JOURNAL_DIR),
+      expectedBytes: taskWorkspaceWriteBytes(identity),
+      signal,
+      revalidate: () => this.#revalidateTaskWorkspaceWrite({ runId: run.id, taskId: task.id, attempt, identity, phase: 'apply' }),
+    });
+    return { taskWorkspaceWrite: true, receipt, taskResult: this.#workspaceWriteTaskResult(receipt) };
+  }
+
   // A task opts into exactly one bounded capability call. The mounted receipt is
   // immutable, while the registry is resolved again here so revoke/test/permission
   // changes between dispatch and invocation fail closed.
   async #executeMountedCapability({ run, task, agentId, attempt, signal, workspace = null, stagedMcp = null }) {
     const requested = task.capabilityExecution;
     if (!requested) return null;
+    if (isTaskWorkspaceWriteRequested(task)) {
+      return this.#executeTaskWorkspaceWriteCapability({ run, task, agentId, attempt, signal, workspace });
+    }
     const mounts = Array.isArray(task.capabilityMounts) ? task.capabilityMounts : [];
     const scope = {
       projectId: run.projectId,
@@ -3321,10 +3782,24 @@ export class AosEngine {
   }
 
   #failTask(run, task, agent, error, { retryable = true, injected = false, fatal = false, code = null } = {}) {
+    this.#reconcileTaskWorkspaceWriteBeforeTerminal(run, task, 'task_failed');
     task.error = error;
     task.errorCode = code || null;
     const payload = { attempt: task.attempts, key: task.key || null, error, retryable, injected, fatal, ...(code ? { code } : {}) };
     if (retryable && !fatal && task.attempts <= (task.maxRetries ?? 1)) {
+      if (isTaskWorkspaceWriteRequested(task)) {
+        task.workspaceWriteApproval = null;
+        task.status = TASK_STATUS.awaiting_approval;
+        if (agent) agent.status = 'waiting_approval';
+        this.#event('task.retried', { projectId: run.projectId, runId: run.id, taskId: task.id, payload: { ...payload, requiresApproval: true } });
+        this.#event('task.workspace_write_approval_required', {
+          projectId: run.projectId,
+          runId: run.id,
+          taskId: task.id,
+          payload: { attempt: task.attempts + 1, key: task.key || null, reason: 'retry' },
+        });
+        return;
+      }
       task.status = TASK_STATUS.ready;
       if (agent) agent.status = 'queued';
       this.#event('task.retried', { projectId: run.projectId, runId: run.id, taskId: task.id, payload });
@@ -3339,13 +3814,10 @@ export class AosEngine {
   // Fatal provider problems (not logged in, model substituted) stop the whole run.
   #abortRun(run, reason, details = null) {
     if (run.error) return;
-    run.status = RUN_STATUS.failed;
-    run.error = redactSecrets({ reason, details: details || null });
-    run.endedAt = this.now();
-    run.updatedAt = this.now();
     for (const task of this.#tasks(run.id)) {
       this.inflight.get(task.id)?.controller.abort();
       if (!TERMINAL.has(task.status)) {
+        this.#reconcileTaskWorkspaceWriteBeforeTerminal(run, task, 'run_aborted');
         if (task.lease?.executorKind === 'pool') this.#reap(run, task);
         if (task.resourceReservationId) this.#settleResource(run, task, 'aborted');
         task.status = TASK_STATUS.cancelled;
@@ -3356,6 +3828,10 @@ export class AosEngine {
         this.#event('task.cancelled', { projectId: run.projectId, runId: run.id, taskId: task.id, payload: { reason: 'run aborted' } });
       }
     }
+    run.status = RUN_STATUS.failed;
+    run.error = redactSecrets({ reason, details: details || null });
+    run.endedAt = this.now();
+    run.updatedAt = this.now();
     this.#event('run.aborted', { projectId: run.projectId, runId: run.id, payload: run.error });
   }
 
@@ -4813,6 +5289,48 @@ function boundedTelemetryLeaseId(value) {
   if (typeof value !== 'string') return null;
   const normalized = value.trim();
   return normalized && normalized.length <= POOL_ID_MAX_CHARS ? normalized : null;
+}
+
+function sameWorkspaceWriteIdentity(left, right) {
+  if (!left || !right || typeof left !== 'object' || typeof right !== 'object') return false;
+  return [
+    'projectId',
+    'runId',
+    'taskId',
+    'attempt',
+    'capabilityReference',
+    'capabilityFingerprint',
+    'inputFingerprint',
+    'effectType',
+    'isolationMode',
+    'isolationFingerprint',
+    'rollbackPlanFingerprint',
+  ].every((field) => left[field] === right[field]);
+}
+
+function workspaceWriteApprovalMatches(approval, identity) {
+  if (!approval || typeof approval !== 'object' || !approval.approvalId) return false;
+  return approval.attempt === identity.attempt
+    && approval.capabilityReference === identity.capabilityReference
+    && approval.capabilityFingerprint === identity.capabilityFingerprint
+    && approval.inputFingerprint === identity.inputFingerprint
+    && approval.isolationFingerprint === identity.isolationFingerprint
+    && approval.rollbackPlanFingerprint === identity.rollbackPlanFingerprint;
+}
+
+function workspaceWriteApprovalView(record) {
+  return {
+    approvalId: record.approvalId,
+    requestId: record.requestId,
+    actor: record.actor,
+    attempt: record.attempt,
+    actionFingerprint: record.actionFingerprint,
+    capabilityReference: record.capabilityReference,
+    capabilityFingerprint: record.capabilityFingerprint,
+    inputFingerprint: record.inputFingerprint,
+    isolationFingerprint: record.isolationFingerprint,
+    rollbackPlanFingerprint: record.rollbackPlanFingerprint,
+  };
 }
 
 function publicTaskView(task) {

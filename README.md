@@ -136,7 +136,9 @@ This is a `host_process` disclosure tier, not filesystem or network isolation. A
 
 AOS ships one executable MCP capability: `aos.staged-text-reader@1`. It reads exactly the first declared relative project path through an engine-staged file and records fingerprints instead of raw content in state and events. The task must be read-only, offline, explicitly permissioned, tested, enabled, and bound to that exact version.
 
-Arbitrary task-provided local commands, package-provided MCP servers, remote MCP transports, writable tools, and effectful MCP actions are not executable. The only generic CLI path is the explicit fixed-argv external-harness wrapper above. AOS now has a durable task-workspace effect-claim kernel: an operator approval is bound to the exact capability, task attempt, input, isolation, and rollback fingerprints before a cross-engine fenced lease can be acquired; terminal and rollback receipts survive restart. No writable adapter is connected to it yet, so this is a safety boundary, not a claim that arbitrary effects can run.
+Arbitrary task-provided local commands, package-provided MCP servers, remote MCP transports, writable tools, and effectful MCP actions are not executable. The only generic CLI path is the explicit fixed-argv external-harness wrapper above.
+
+One deterministic writable exception is shipped. The local task-workspace writer changes one fixed engine-owned file with engine-derived bytes. It accepts no task path or content. An operator must approve the exact upcoming attempt, capability, input, workspace isolation, and rollback plan before a fenced claim can mutate the file. The engine stores prior bytes only in a bounded private journal, publishes fingerprinted receipts, recovers a verified post-write interruption, and can idempotently restore or remove the prior file. The generic task approval endpoint refuses this effect; use the exact workspace-write approval and rollback actions in the loopback API or CLI. This does not enable generic file writing or external effects.
 
 To return to deterministic local execution:
 

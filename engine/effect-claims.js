@@ -252,33 +252,65 @@ export class EffectClaimService {
 
   rollback(id, input = {}) {
     return this.engine.transact(() => {
-      const claim = this.#requireClaim(id);
-      const requestId = requiredString(input.requestId, 'requestId');
-      const existing = this.engine.state.effectRollbackReceipts.find((item) => item.claimId === id && item.requestId === requestId);
-      if (existing) return { claim: clone(claim), receipt: clone(existing), idempotent: true };
-      if (claim.status !== 'succeeded') throw new AosError('effect_rollback_unavailable', 'Only a succeeded effect claim may record rollback', { statusCode: 409 });
-      const actor = requiredString(input.actor ?? 'operator', 'actor');
-      const receipt = {
-        id: newId('effectRollbackReceipt'),
-        claimId: claim.id,
-        requestId,
-        actor,
-        rollbackPlanFingerprint: claim.identity.rollbackPlanFingerprint,
-        receiptFingerprint: exactFingerprint(input.receiptFingerprint, 'receiptFingerprint'),
-        status: 'succeeded',
-        rolledBackAt: this.#now(),
-      };
-      this.engine.state.effectRollbackReceipts.push(receipt);
-      claim.status = 'rolled_back';
-      claim.rollbackReceiptId = receipt.id;
-      claim.rolledBackAt = receipt.rolledBackAt;
-      this.engine.recordEvent('effect.rolled_back', {
-        projectId: claim.identity.projectId, runId: claim.identity.runId, taskId: claim.identity.taskId,
-        actor,
-        payload: { claimId: claim.id, receiptId: receipt.id },
-      });
-      return { claim: clone(claim), receipt: clone(receipt), idempotent: false };
+      const prepared = this.#prepareRollback(id, input);
+      if (prepared.existing) return { claim: clone(prepared.claim), receipt: clone(prepared.existing), idempotent: true };
+      return this.#recordRollback(prepared);
     });
+  }
+
+  // The fixed workspace adapter must verify a rollback request before changing
+  // bytes. Keeping that check, the bounded restore, and its receipt under the
+  // same engine transaction prevents a competing request from changing the
+  // receipt between authorization and mutation.
+  rollbackWith(id, input = {}, mutate, revalidate = null) {
+    if (typeof mutate !== 'function') throw invalid('rollback mutation must be a function', { field: 'mutate' });
+    if (revalidate !== null && typeof revalidate !== 'function') throw invalid('rollback revalidation must be a function', { field: 'revalidate' });
+    return this.engine.transact(() => {
+      const prepared = this.#prepareRollback(id, input);
+      if (revalidate) revalidate(clone(prepared.claim));
+      if (prepared.existing) return { claim: clone(prepared.claim), receipt: clone(prepared.existing), idempotent: true };
+      mutate(clone(prepared.claim));
+      return this.#recordRollback(prepared);
+    });
+  }
+
+  #prepareRollback(id, input) {
+    const claim = this.#requireClaim(id);
+    const requestId = requiredString(input.requestId, 'requestId');
+    const actor = requiredString(input.actor ?? 'operator', 'actor');
+    const receiptFingerprint = exactFingerprint(input.receiptFingerprint, 'receiptFingerprint');
+    const existing = this.engine.state.effectRollbackReceipts.find((item) => item.claimId === id && item.requestId === requestId);
+    if (existing) {
+      if (existing.actor !== actor || existing.receiptFingerprint !== receiptFingerprint) {
+        throw new AosError('effect_rollback_request_conflict', `Rollback request ${requestId} was already used`, { statusCode: 409 });
+      }
+      return { claim, requestId, actor, receiptFingerprint, existing };
+    }
+    if (claim.status !== 'succeeded') throw new AosError('effect_rollback_unavailable', 'Only a succeeded effect claim may record rollback', { statusCode: 409 });
+    return { claim, requestId, actor, receiptFingerprint, existing: null };
+  }
+
+  #recordRollback({ claim, requestId, actor, receiptFingerprint }) {
+    const receipt = {
+      id: newId('effectRollbackReceipt'),
+      claimId: claim.id,
+      requestId,
+      actor,
+      rollbackPlanFingerprint: claim.identity.rollbackPlanFingerprint,
+      receiptFingerprint,
+      status: 'succeeded',
+      rolledBackAt: this.#now(),
+    };
+    this.engine.state.effectRollbackReceipts.push(receipt);
+    claim.status = 'rolled_back';
+    claim.rollbackReceiptId = receipt.id;
+    claim.rolledBackAt = receipt.rolledBackAt;
+    this.engine.recordEvent('effect.rolled_back', {
+      projectId: claim.identity.projectId, runId: claim.identity.runId, taskId: claim.identity.taskId,
+      actor,
+      payload: { claimId: claim.id, receiptId: receipt.id },
+    });
+    return { claim: clone(claim), receipt: clone(receipt), idempotent: false };
   }
 
   recoverExpired() {

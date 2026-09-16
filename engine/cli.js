@@ -22,6 +22,8 @@ Usage:
   aos goal answer <goalId> <questionId> "<answer>"
   aos lead-plan show <id> | accept <id> [--actor A] | reject <id> [--reason R] [--actor A]
   aos task answer <taskId> <questionId> "<answer>"
+  aos task workspace-write approve <taskId> --request-id ID [--actor A]
+  aos task workspace-write rollback <claimId> --request-id ID [--actor A]
   aos delegation list <runId> | approve <receiptId> --request-id ID | reject <receiptId> --request-id ID
   aos goals
   aos run start <goalId> [--concurrency N] [--blueprint ID]
@@ -262,6 +264,17 @@ export async function dispatch(engine, argv) {
     const task = engine.answerTaskQuestions(taskId, [{ id: questionId, answer: answerParts.join(' ') }]);
     const remaining = (task.questions || []).filter((question) => question.required !== false && !String(question.answer || '').trim()).length;
     return [`task ${task.id}`, `status  ${task.status}`, `remaining required  ${remaining}`];
+  }
+  if (cmd === 'task' && sub === 'workspace-write') {
+    const [action, id] = rest;
+    const effects = apiActions(engine).effects;
+    if (action === 'approve') {
+      return compactJson(await effects.approveWorkspaceWrite({ taskId: id, requestId: flags['request-id'], actor: flags.actor ?? 'operator' }));
+    }
+    if (action === 'rollback') {
+      return compactJson(await effects.rollbackWorkspaceWrite({ claimId: id, requestId: flags['request-id'], actor: flags.actor ?? 'operator' }));
+    }
+    throw new Error(`unknown task workspace-write action: ${action || '(missing)'}`);
   }
   if (cmd === 'delegation') return delegationCommand(engine, sub, rest, flags);
   if (cmd === 'goal' && sub === 'show') return goalLines(engine.getGoal(subArg(sub, rest, 'goal id')));
