@@ -15,8 +15,8 @@ function runtime(overrides = {}) {
     authPath: CODEX_AUTH_PATH,
     verified: true,
     threadId: 'thread-lead-test',
-    requested: { model: 'gpt-5.6-luna', effort: 'max', sandbox: 'read-only' },
-    effective: { model: 'gpt-5.6-luna', effort: 'max', sandbox: 'read-only', modelProvider: 'openai' },
+    requested: { model: 'gpt-5.6-terra', effort: 'max', sandbox: 'read-only' },
+    effective: { model: 'gpt-5.6-terra', effort: 'max', sandbox: 'read-only', modelProvider: 'openai' },
     startedAt: '2026-01-01T00:00:00.000Z',
     endedAt: '2026-01-01T00:00:00.010Z',
     durationMs: 10,
@@ -64,15 +64,17 @@ function planner(outputs = [], { preflight = null, missingPreflight = false, wai
   const worker = {
     id: 'codex',
     calls,
-    async preflight() {
+    async preflight(config = {}) {
       if (missingPreflight) return null;
+      const model = config.model || 'gpt-5.6-terra';
+      const effort = config.effort || 'max';
       return preflight || {
         checkedAt: '2026-01-01T00:00:00.000Z',
         login: 'Logged in using ChatGPT',
         authPath: CODEX_AUTH_PATH,
         cliVersion: 'codex-cli test',
-        model: { slug: 'gpt-5.6-luna', efforts: ['max'], upgrade: null },
-        requested: { model: 'gpt-5.6-luna', effort: 'max' },
+        model: { slug: model, efforts: ['max'], upgrade: null },
+        requested: { model, effort },
         strippedEnv: ['OPENAI_API_KEY'],
         disabledFeatures: ['multi_agent'],
       };
@@ -289,7 +291,7 @@ test('accept/reject is compare-and-set: exactly one decision wins across stale e
 test('missing preflight, login, and runtime attestation fail closed and retain only a redacted receipt', async () => {
   const cases = [
     { name: 'preflight', options: { missingPreflight: true }, code: 'lead_planner_preflight_invalid' },
-    { name: 'login', options: { preflight: { login: 'Logged in using API key', model: { slug: 'gpt-5.6-luna' }, requested: { model: 'gpt-5.6-luna', effort: 'max' } } }, code: 'lead_planner_auth_invalid' },
+    { name: 'login', options: { preflight: { login: 'Logged in using API key', model: { slug: 'gpt-5.6-terra' }, requested: { model: 'gpt-5.6-terra', effort: 'max' } } }, code: 'lead_planner_auth_invalid' },
     { name: 'runtime', options: {}, output: { runtime: null }, code: 'lead_planner_unverified' },
   ];
   for (const item of cases) {

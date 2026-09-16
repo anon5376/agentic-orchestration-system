@@ -13,10 +13,15 @@ import {
   DELEGATION_LIMITS,
   normalizeDelegationProposal,
 } from './delegation.js';
+import { ROLE_RUNTIME_PROFILES } from './role-runtime.js';
 
-// Live Codex execution is deliberately narrow: one model, one effort, a ChatGPT
-// account session, and a read-only sandbox. Widening any of these is a code change.
-export const CODEX_MODEL_ALLOWLIST = Object.freeze(['gpt-5.6-luna']);
+// Live Codex execution is deliberately narrow: two exact role-bound models at
+// one effort, a ChatGPT account session, and a read-only sandbox. Widening any
+// of these is a code change.
+export const CODEX_MODEL_ALLOWLIST = Object.freeze([
+  ROLE_RUNTIME_PROFILES.manager.model,
+  ROLE_RUNTIME_PROFILES.worker.model,
+]);
 export const CODEX_EFFORT_ALLOWLIST = Object.freeze(['max']);
 export const CODEX_LIVE_CONCURRENCY_CAP = 4;
 
@@ -79,7 +84,7 @@ export function redactText(value) {
 }
 
 export function resolveCodexConfig(input = {}) {
-  const model = input.model || CODEX_MODEL_ALLOWLIST[0];
+  const model = input.model || ROLE_RUNTIME_PROFILES.worker.model;
   const effort = input.effort || CODEX_EFFORT_ALLOWLIST[0];
   if (!CODEX_MODEL_ALLOWLIST.includes(model)) {
     throw new CodexConfigError(`Model "${model}" is not allowlisted for live Codex execution. Allowed: ${CODEX_MODEL_ALLOWLIST.join(', ')}`);
@@ -104,6 +109,21 @@ export function resolveCodexConfig(input = {}) {
     codexBin: input.codexBin || 'codex',
     codexHome: input.codexHome || null,
     repoRoot: input.repoRoot || null,
+  });
+}
+
+// The engine derives the role-bound task profile before execution. This helper
+// preserves all configured transport/auth limits while refusing any model or
+// effort outside the adapter allowlist.
+export function resolveCodexTaskConfig(baseConfig = {}, task = {}, context = {}) {
+  const profile = context?.providerProfile && typeof context.providerProfile === 'object'
+    ? context.providerProfile
+    : null;
+  const effective = task?.config?.effective?.harness || {};
+  return resolveCodexConfig({
+    ...baseConfig,
+    model: profile?.model ?? task?.model ?? effective.model ?? baseConfig.model,
+    effort: profile?.effort ?? task?.effort ?? effective.effort ?? baseConfig.effort,
   });
 }
 
@@ -718,22 +738,25 @@ export class CodexCliWorker {
   constructor(config, { preflight = preflightCodex } = {}) {
     this.config = resolveCodexConfig(config);
     this.preflightFn = preflight;
-    this.preflightPromise = null;
+    this.preflightPromises = new Map();
   }
 
-  preflight() {
-    if (!this.preflightPromise) {
-      this.preflightPromise = this.preflightFn(this.config).catch((error) => {
-        this.preflightPromise = null;
+  preflight(config = this.config) {
+    const resolved = resolveCodexConfig(config);
+    const key = `${resolved.model}/${resolved.effort}`;
+    if (!this.preflightPromises.has(key)) {
+      const promise = this.preflightFn(resolved).catch((error) => {
+        this.preflightPromises.delete(key);
         throw error;
       });
+      this.preflightPromises.set(key, promise);
     }
-    return this.preflightPromise;
+    return this.preflightPromises.get(key);
   }
 
   async execute(task, ctx) {
-    const config = this.config;
-    const preflight = await this.preflight();
+    const config = resolveCodexTaskConfig(this.config, task, ctx);
+    const preflight = await this.preflight(config);
     const attempt = task.attempts;
     const attemptDir = `attempt-${attempt}`;
     const workspace = ctx.workspace;
@@ -753,6 +776,8 @@ export class CodexCliWorker {
       spawned: false,
       injected: false,
       provider: 'codex',
+      role: task.roleRuntime?.role || null,
+      roleClass: task.roleRuntime?.class || null,
       authPath: CODEX_AUTH_PATH,
       login: preflight.login,
       codexBin: preflight.codexBin,

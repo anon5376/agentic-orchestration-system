@@ -31,9 +31,9 @@ const CUSTOM_SECTIONS = {
 test('every built-in role preset composes with all required sections and renders without leftovers', () => {
   const aos = engine();
   const list = aos.presets.list();
-  assert.equal(list.length, 18);
+  assert.equal(list.length, 20);
   const concrete = list.filter((item) => !item.abstract);
-  assert.equal(concrete.length, 17);
+  assert.equal(concrete.length, 19);
   assert.deepEqual([...new Set(concrete.map((item) => item.role))].sort(), ROLE_KINDS.filter((role) => role !== 'base').sort());
   for (const item of concrete) {
     const composed = aos.presets.effective(item.id);

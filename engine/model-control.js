@@ -4,6 +4,7 @@
 // fork for a built-in or a new version for a user template.
 import { CODEX_EFFORT_ALLOWLIST, CODEX_MODEL_ALLOWLIST } from './codex.js';
 import { isProviderMounted } from './provider-contracts.js';
+import { roleRuntimeFor, roleRuntimePolicyView } from './role-runtime.js';
 import { KNOWN_HARNESSES } from './templates.js';
 import { AosError, check, identifier, invalid, notFound, t } from './schema.js';
 import { redactSecrets } from './providers.js';
@@ -196,6 +197,17 @@ function policyFor(engine, projectId = null, presetId = null) {
   };
 }
 
+function roleRuntimeForTemplate(engine, template) {
+  const preset = template?.config?.preset;
+  if (!preset?.id || !engine.presets?.effective) return null;
+  try {
+    const role = engine.presets.effective(preset.id, preset.version ?? null).role;
+    return roleRuntimeFor(role);
+  } catch {
+    return null;
+  }
+}
+
 function providerById(providers, id) {
   return providers.find((provider) => provider.id === id) || adapterView(syntheticProvider(id));
 }
@@ -223,7 +235,7 @@ function hardAdapterRule(harness, model, effort) {
   };
 }
 
-function selectionView({ template, harness, model, effort, policy, providers }) {
+function selectionView({ template, harness, model, effort, policy, providers, roleRuntime = null }) {
   const modelPolicy = modelRule(policy.allowedModels, harness, model);
   const hard = hardAdapterRule(harness, model, effort);
   const harnessAllowed = policy.allowedHarnesses.includes(harness);
@@ -244,6 +256,7 @@ function selectionView({ template, harness, model, effort, policy, providers }) 
     model: model ?? null,
     effort: effort ?? null,
     requested: { harness, model: model ?? null, effort: effort ?? null },
+    roleRuntime: roleRuntime ? { ...roleRuntime } : null,
     status,
     adapterStatus: adapter.status,
     adapter: clone(adapter),
@@ -260,9 +273,10 @@ function selectionView({ template, harness, model, effort, policy, providers }) 
   };
 }
 
-function templateView(template, policy, providers, defaultEffort) {
+function templateView(engine, template, policy, providers, defaultEffort) {
   const config = template.config || {};
   const harnessConfig = config.harness || {};
+  const roleRuntime = roleRuntimeForTemplate(engine, template);
   const assignment = selectionView({
     template,
     harness: harnessConfig.id || 'local',
@@ -270,6 +284,7 @@ function templateView(template, policy, providers, defaultEffort) {
     effort: harnessConfig.effort ?? defaultEffort ?? null,
     policy,
     providers,
+    roleRuntime,
   });
   return {
     id: template.id,
@@ -294,6 +309,7 @@ function templateView(template, policy, providers, defaultEffort) {
       effort: harnessConfig.effort ?? null,
       fallback: publicClone(harnessConfig.fallback || []),
     },
+    roleRuntime: roleRuntime ? { ...roleRuntime } : null,
     assignment,
   };
 }
@@ -356,7 +372,7 @@ export class ModelControlService {
       if (summary.headVersion == null) return null;
       const template = this.engine.templates.get(summary.id, summary.headVersion);
       const templatePolicy = policyFor(this.engine, resolvedProjectId, template.config?.preset?.id || null);
-      return templateView(template, templatePolicy, providers, templatePolicy.defaultEffort);
+      return templateView(this.engine, template, templatePolicy, providers, templatePolicy.defaultEffort);
     }).filter(Boolean);
     const assignments = templates.map((template) => template.assignment);
     const policy = {
@@ -385,6 +401,7 @@ export class ModelControlService {
           efforts: [...CODEX_EFFORT_ALLOWLIST],
         },
       },
+      roleRuntimePolicy: roleRuntimePolicyView(),
       providers,
       adapters: providers,
       templates,
@@ -424,15 +441,29 @@ export class ModelControlService {
     // version above is an optimistic-concurrency check, not a way to edit history.
     if (!origin.builtin) origin = this.engine.templates.get(origin.id);
     const currentHarness = origin.config?.harness || {};
-    const nextModel = hasOwn(request, 'model')
+    let nextModel = hasOwn(request, 'model')
       ? request.model
       : request.harness === currentHarness.id ? (currentHarness.model ?? null) : null;
     const rolePolicy = policyFor(this.engine, projectId, origin.config?.preset?.id || null);
-    const nextEffort = hasOwn(request, 'effort')
+    let nextEffort = hasOwn(request, 'effort')
       ? request.effort
       : (currentHarness.effort ?? rolePolicy.defaultEffort ?? null);
+    const roleRuntime = roleRuntimeForTemplate(this.engine, origin);
+    if (request.harness === 'codex') {
+      if (!roleRuntime) {
+        throw new AosError('role_runtime_unbound', `Codex assignment for ${origin.id} has no resolved preset role`, { statusCode: 409, details: { templateId: origin.id } });
+      }
+      if (nextModel != null && nextModel !== roleRuntime.model) {
+        throw new AosError('role_runtime_violation', `Role ${roleRuntime.role} must use ${roleRuntime.model}/${roleRuntime.effort} on Codex`, { statusCode: 409, details: { templateId: origin.id, roleRuntime, requested: { model: nextModel, effort: nextEffort } } });
+      }
+      if (nextEffort != null && nextEffort !== roleRuntime.effort) {
+        throw new AosError('role_runtime_violation', `Role ${roleRuntime.role} must use ${roleRuntime.model}/${roleRuntime.effort} on Codex`, { statusCode: 409, details: { templateId: origin.id, roleRuntime, requested: { model: nextModel, effort: nextEffort } } });
+      }
+      nextModel = roleRuntime.model;
+      nextEffort = roleRuntime.effort;
+    }
     const providers = buildProviderViews(this.engine.listProviders?.() || []);
-    const selection = selectionView({ template: origin, harness: request.harness, model: nextModel, effort: nextEffort, policy: rolePolicy, providers });
+    const selection = selectionView({ template: origin, harness: request.harness, model: nextModel, effort: nextEffort, policy: rolePolicy, providers, roleRuntime });
     if (!selection.policyAllowed) {
       throw new AosError('assignment_not_allowed', `Assignment ${request.harness}/${nextModel ?? 'default model'} is outside execution policy`, { statusCode: 409, details: { templateId: origin.id, ...selection.policy, allowedHarnesses: rolePolicy.allowedHarnesses, allowedModels: rolePolicy.allowedModels } });
     }
@@ -525,6 +556,7 @@ export class ModelControlService {
       effort: record.config.harness.effort,
       policy: rolePolicy,
       providers,
+      roleRuntime: roleRuntimeForTemplate(this.engine, record),
     });
     const result = {
       ok: true,

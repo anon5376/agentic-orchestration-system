@@ -16,8 +16,8 @@ function runtime(overrides = {}) {
     authPath: CODEX_AUTH_PATH,
     verified: true,
     threadId: 'thread-lead-api',
-    requested: { model: 'gpt-5.6-luna', effort: 'max', sandbox: 'read-only' },
-    effective: { model: 'gpt-5.6-luna', effort: 'max', sandbox: 'read-only', modelProvider: 'openai' },
+    requested: { model: 'gpt-5.6-terra', effort: 'max', sandbox: 'read-only' },
+    effective: { model: 'gpt-5.6-terra', effort: 'max', sandbox: 'read-only', modelProvider: 'openai' },
     startedAt: '2026-01-01T00:00:00.000Z',
     endedAt: '2026-01-01T00:00:00.010Z',
     durationMs: 10,
@@ -55,14 +55,16 @@ function planner(outputs = []) {
   let index = 0;
   return {
     calls: [],
-    async preflight() {
+    async preflight(config = {}) {
+      const model = config.model || 'gpt-5.6-terra';
+      const effort = config.effort || 'max';
       return {
         checkedAt: '2026-01-01T00:00:00.000Z',
         login: 'Logged in using ChatGPT',
         authPath: CODEX_AUTH_PATH,
         cliVersion: 'codex-cli test',
-        model: { slug: 'gpt-5.6-luna', efforts: ['max'], upgrade: null },
-        requested: { model: 'gpt-5.6-luna', effort: 'max' },
+        model: { slug: model, efforts: ['max'], upgrade: null },
+        requested: { model, effort },
       };
     },
     async execute(task, ctx) {

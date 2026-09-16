@@ -43,7 +43,7 @@ test('snapshot separates policy, adapter truth, and template worker assignment',
   const snapshot = control(aos).snapshot();
 
   assert.deepEqual(snapshot.allowedHarnesses, ['local', 'codex', 'claude']);
-  assert.deepEqual(snapshot.allowedModels, { codex: ['gpt-5.6-luna'], claude: ['opus'] });
+  assert.deepEqual(snapshot.allowedModels, { codex: ['gpt-5.6-terra', 'gpt-5.6-luna'], claude: ['opus'] });
   assert.equal(snapshot.defaultEffort, null);
   assert.equal(snapshot.execution.mode, 'local');
   assert.equal(snapshot.policy.effective.allowedHarnesses.provenance.layer, 'builtin');
@@ -94,6 +94,26 @@ test('built-in assignment forks to the supplied id/name and versions the fork at
   assert.deepEqual(result.template.config.harness, { id: 'codex', model: 'gpt-5.6-luna', effort: 'max', fallback: [] });
   assert.deepEqual(aos.templates.get('codex-worker').config.harness, result.template.config.harness);
   assert.ok(aos.store.readEventLog().some((event) => event.type === 'template.assigned' && event.payload.templateId === 'codex-worker'));
+});
+
+test('manager assignments bind Terra/max and refuse a worker profile', () => {
+  const aos = engine();
+  const service = control(aos);
+  const result = service.assign({
+    templateId: 'default-branch-manager',
+    harness: 'codex',
+    model: 'gpt-5.6-terra',
+    effort: 'max',
+    fork: { id: 'codex-manager', name: 'Codex manager' },
+  });
+  assert.deepEqual(result.template.config.harness, { id: 'codex', model: 'gpt-5.6-terra', effort: 'max', fallback: [] });
+  assert.deepEqual(result.assignment.roleRuntime, {
+    role: 'branch-manager', class: 'manager', model: 'gpt-5.6-terra', effort: 'max',
+  });
+  assert.throws(
+    () => service.assign({ templateId: 'codex-manager', harness: 'codex', model: 'gpt-5.6-luna', effort: 'max' }),
+    (error) => error.code === 'role_runtime_violation' && error.statusCode === 409,
+  );
 });
 
 test('a failed built-in fork leaves no forked template in memory or the registry', () => {
@@ -218,7 +238,7 @@ test('assignment rejects missing ids, invalid fork requests, malformed input, po
   allow(aos, ['local', 'codex'], { codex: ['gpt-5.6-sol'] });
   assert.throws(
     () => service.assign({ templateId: source.id, harness: 'codex', model: 'gpt-5.6-sol', effort: 'max' }),
-    (error) => error.code === 'adapter_constraint' && error.statusCode === 409,
+    (error) => error.code === 'role_runtime_violation' && error.statusCode === 409,
   );
   assert.equal(aos.templates.history(source.id).length, 1, 'rejected assignments do not create versions');
 });
@@ -232,7 +252,7 @@ test('model control HTTP routes expose one truthful snapshot and one validated a
     const snapshotResponse = await fetch(`${base}/models`);
     const snapshot = await snapshotResponse.json();
     assert.equal(snapshotResponse.status, 200);
-    assert.deepEqual(snapshot.constraints.codex.models, ['gpt-5.6-luna']);
+    assert.deepEqual(snapshot.constraints.codex.models, ['gpt-5.6-terra', 'gpt-5.6-luna']);
     assert.equal(snapshot.providers.find((item) => item.id === 'local').runnable, true);
 
     const assignmentResponse = await fetch(`${base}/models/assign`, {
@@ -262,7 +282,7 @@ test('model control HTTP routes expose one truthful snapshot and one validated a
       }),
     });
     assert.equal(rejectedResponse.status, 409);
-    assert.equal((await rejectedResponse.json()).code, 'assignment_not_allowed');
+    assert.equal((await rejectedResponse.json()).code, 'role_runtime_violation');
   } finally {
     await close();
   }

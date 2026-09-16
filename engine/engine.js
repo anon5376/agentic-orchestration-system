@@ -18,8 +18,9 @@ import {
 } from './external-harness.js';
 import { notFound, validateTaskQuestions } from './schema.js';
 import { PresetRegistry } from './presets/registry.js';
-import { TemplateRegistry, applyTemplateToTask } from './templates.js';
+import { TemplateRegistry, applyTemplateToTask, PRESET_FOR_KIND } from './templates.js';
 import { BlueprintRegistry } from './blueprints.js';
+import { MANAGER_ROLE_TASK_LIMIT, roleRuntimeFor, roleRuntimePolicyView } from './role-runtime.js';
 import { MemoryService } from './memory/index.js';
 import { SettingsRegistry } from './settings.js';
 import { ModelControlService } from './model-control.js';
@@ -175,10 +176,13 @@ function resolveProjectReadRoot({ projectReadRoot, readRoot, repoRoot, execution
   return resolve(configured || process.cwd());
 }
 
-function providerProfile(execution, providerId) {
+function providerProfile(execution, providerId, task = null) {
   const config = executionAdapterConfig(execution, providerId) || {};
-  const model = config.model || (providerId === 'local' ? null : null);
-  const effort = config.effort || null;
+  const roleRuntime = providerId === 'codex' && task?.roleRuntime?.requested
+    ? task.roleRuntime.requested
+    : null;
+  const model = roleRuntime?.model || task?.model || config.model || (providerId === 'local' ? null : null);
+  const effort = roleRuntime?.effort || task?.effort || config.effort || null;
   const sandbox = providerId === 'codex'
     ? 'read-only'
     : providerId === 'claude'
@@ -527,6 +531,7 @@ export class AosEngine {
       throw new AosError('blueprint_ceiling', `Plan has ${plannedTasks.length} tasks; blueprint ${blueprint.id} allows ${settings.ceilings.tasks}`, { statusCode: 409, details: { blueprintId: blueprint.id, tasks: plannedTasks.length, ceiling: settings.ceilings.tasks } });
     }
     this.#validatePlannedTasks(goal, plannedTasks);
+    this.assertManagerRoleTaskLimit(null, plannedTasks);
     const run = {
       id: newId('run'),
       projectId: project.id,
@@ -540,6 +545,7 @@ export class AosEngine {
       maxConcurrency: cap,
       execution: this.executionSummary(),
       blueprint: settings?.blueprint ?? null,
+      roleRuntimePolicy: roleRuntimePolicyView(),
       ceilings: settings?.ceilings ?? null,
       policies: settings ? { depth: settings.depth, perBranchConcurrency: settings.perBranchConcurrency, gates: settings.gates, failure: settings.failure, stop: settings.stop, memory: settings.memory, contextPartition: settings.contextPartition, messaging: settings.messaging, artifacts: settings.artifacts, routing: settings.routing, priority: settings.priority } : null,
     };
@@ -565,6 +571,7 @@ export class AosEngine {
   // Shared instantiation path for initial plans and operator additions. The caller owns
   // the surrounding transaction; this method never rewrites an existing runtime task.
   materializePlanTasks(run, plannedTasks = [], dependencies = [], planVersion = run?.plan?.version ?? null) {
+    this.assertManagerRoleTaskLimit(run, plannedTasks);
     const existing = this.state.tasks.filter((item) => item.runId === run.id);
     const idMap = new Map(existing.filter((item) => item.planTaskId).map((item) => [item.planTaskId, item.id]));
     const added = [];
@@ -605,6 +612,8 @@ export class AosEngine {
         task.presetId = planned.presetId;
         task.presetVersion = planned.presetVersion ?? null;
       }
+      if (task.worker === 'codex') this.#bindCodexRoleRuntime(task);
+      if (run.execution?.mode === 'mixed') task.providerProfile = providerProfile(this.execution, task.worker || 'local', task);
       // applyTemplateToTask intentionally projects only known template fields;
       // restore this engine-derived ancestry marker after that projection so a
       // finite child cannot silently escape an unlimited ancestor's gate.
@@ -621,7 +630,7 @@ export class AosEngine {
         runId: run.id,
         taskId: task.id,
         name: planned.title,
-        role: planned.kind,
+        role: task.roleRuntime?.role || planned.kind,
         provider: planned.worker || 'local',
         status: 'queued',
         workspace: null,
@@ -1569,15 +1578,16 @@ export class AosEngine {
   // Run the mounted Codex adapter's public preflight and keep readiness truthful
   // for callers that inspect providers before a run is started. The result is
   // intentionally returned only to the caller; readiness remains in memory.
-  async preflightCodex({ worker = null } = {}) {
+  async preflightCodex({ worker = null, config = null } = {}) {
     if (!this.execution.codex) throw new AosError('codex_preflight_unavailable', 'Codex preflight requires a configured Codex adapter', { statusCode: 409 });
     try {
+      const expected = config ? resolveCodexConfig(config) : this.execution.codex;
       const adapter = worker || this.workers.get('codex');
       if (!adapter || typeof adapter.preflight !== 'function') {
         throw new AosError('codex_preflight_unavailable', 'The mounted Codex worker does not expose preflight', { statusCode: 409 });
       }
-      const result = await adapter.preflight();
-      this.#validateCodexPreflight(result);
+      const result = await adapter.preflight(expected);
+      this.#validateCodexPreflight(result, expected);
       const checkedAt = result.checkedAt || new Date(this.clock()).toISOString();
       this.providerReadiness.codex = {
         status: 'available',
@@ -1595,8 +1605,7 @@ export class AosEngine {
     }
   }
 
-  #validateCodexPreflight(result) {
-    const config = this.execution.codex;
+  #validateCodexPreflight(result, config = this.execution.codex) {
     const validObject = result && typeof result === 'object' && !Array.isArray(result);
     if (!validObject) {
       throw new AosError('codex_preflight_invalid', 'Codex preflight did not return a result object', { statusCode: 409 });
@@ -2046,6 +2055,87 @@ export class AosEngine {
     return executionAdapterConfig(this.execution, providerId);
   }
 
+  // Public to the immutable plan service and lead-planning seam. A plan never
+  // gets to name a model for a role; it may only resolve a preset role that has
+  // this engine-owned binding.
+  roleRuntimeForPlanTask(task) {
+    return this.#roleRuntimeForTask(task);
+  }
+
+  assertManagerRoleTaskLimit(run, plannedTasks = []) {
+    const managerCount = (tasks) => tasks.reduce((total, task) => {
+      const binding = this.#roleRuntimeForTask(task);
+      return total + (binding?.class === 'manager' ? 1 : 0);
+    }, 0);
+    const existing = run ? managerCount(this.#tasks(run.id)) : 0;
+    const proposed = managerCount(plannedTasks);
+    if (existing + proposed > MANAGER_ROLE_TASK_LIMIT) {
+      throw new AosError('manager_role_limit', `Run ${run?.id || '(new)'} would contain ${existing + proposed} manager-role tasks; the role policy permits at most ${MANAGER_ROLE_TASK_LIMIT}`, {
+        statusCode: 409,
+        details: { runId: run?.id || null, existing, proposed, limit: MANAGER_ROLE_TASK_LIMIT },
+      });
+    }
+    return { existing, proposed, limit: MANAGER_ROLE_TASK_LIMIT };
+  }
+
+  #roleRuntimeForTask(task) {
+    let source = task && typeof task === 'object' ? task : {};
+    if (source.templateId && !source.presetId) {
+      source = applyTemplateToTask(
+        { ...source, config: null },
+        source,
+        this.templates.get(source.templateId, source.templateVersion ?? null),
+      );
+    }
+    const presetId = source.presetId || PRESET_FOR_KIND[source.kind] || null;
+    if (!presetId) return null;
+    const preset = this.presets.effective(presetId, source.presetVersion ?? null);
+    const binding = roleRuntimeFor(preset.role);
+    return binding ? { ...binding, presetId: preset.id, presetVersion: preset.version } : null;
+  }
+
+  #assertCodexRoleRuntime(task) {
+    const binding = this.#roleRuntimeForTask(task);
+    if (!binding) {
+      throw new AosError('role_runtime_unbound', `Codex task ${task?.key || task?.id || '(unknown)'} has no resolved preset role`, {
+        statusCode: 409,
+        details: { taskId: task?.id || null, presetId: task?.presetId || null, kind: task?.kind || null },
+      });
+    }
+    const effective = task?.config?.effective?.harness || {};
+    const model = task?.model ?? effective.model ?? null;
+    const effort = task?.effort ?? effective.effort ?? null;
+    if ((model != null && model !== binding.model) || (effort != null && effort !== binding.effort)) {
+      throw new AosError('role_runtime_violation', `Codex role ${binding.role} must use ${binding.model}/${binding.effort}`, {
+        statusCode: 409,
+        details: { taskId: task?.id || null, role: binding.role, requested: { model, effort }, expected: { model: binding.model, effort: binding.effort } },
+      });
+    }
+    return binding;
+  }
+
+  #bindCodexRoleRuntime(task) {
+    const binding = this.#assertCodexRoleRuntime(task);
+    task.model = binding.model;
+    task.effort = binding.effort;
+    task.roleRuntime = {
+      version: roleRuntimePolicyView().version,
+      role: binding.role,
+      class: binding.class,
+      presetId: binding.presetId,
+      presetVersion: binding.presetVersion,
+      requested: { model: binding.model, effort: binding.effort },
+    };
+    if (task.config?.effective?.harness) {
+      task.config.effective.harness = {
+        ...task.config.effective.harness,
+        model: binding.model,
+        effort: binding.effort,
+      };
+    }
+    return binding;
+  }
+
   #renderPoolPrompt(run, task) {
     if (!task.presetId) return null;
     const rendered = this.presets.render(task.presetId, {
@@ -2060,7 +2150,9 @@ export class AosEngine {
     if (task.mayDelegate === true || task.delegation || task.capabilityExecution) return false;
     const writePaths = task.config?.effective?.filesystem?.writePaths || [];
     if (Array.isArray(writePaths) && writePaths.length) return false;
-    const profile = providerProfile(this.execution, task.worker);
+    const profile = providerProfile(this.execution, task.worker, task);
+    const runnerProfile = providerProfile(this.execution, task.worker);
+    if (profile.fingerprint !== runnerProfile.fingerprint) return false;
     const sandbox = task.sandbox || task.config?.effective?.filesystem?.sandbox || profile.sandbox;
     if (sandbox !== profile.sandbox) return false;
     try {
@@ -2116,7 +2208,7 @@ export class AosEngine {
     this.#assertPoolCapacity(run, task, worker);
 
     const attempt = task.attempts + 1;
-    const profile = providerProfile(this.execution, worker.id);
+    const profile = providerProfile(this.execution, worker.id, task);
     const claimId = newId('claim');
     task.status = TASK_STATUS.running;
     task.attempts = attempt;
@@ -2378,7 +2470,7 @@ export class AosEngine {
     const lease = task.lease || {};
     const goal = this.#require('goals', run.goalId, 'goal');
     const agent = this.state.agents.find((item) => item.id === task.agentId);
-    const profile = lease.profile || task.providerProfile || providerProfile(this.execution, task.worker || 'local');
+    const profile = lease.profile || task.providerProfile || providerProfile(this.execution, task.worker || 'local', task);
     const dependencies = this.#dependencyOutputs(task).map((dependency) => ({
       id: dependency.id,
       key: dependency.key,
@@ -2497,7 +2589,7 @@ export class AosEngine {
         taskId: task.id,
         attempt,
         worker: worker.id,
-        profileFingerprint: providerProfile(this.execution, worker.id).fingerprint,
+        profileFingerprint: providerProfile(this.execution, worker.id, task).fingerprint,
       },
     };
   }
@@ -2846,10 +2938,13 @@ export class AosEngine {
         }
         const config = this.#providerConfig(providerId);
         if (['codex', 'claude', 'ollama', 'command'].includes(providerId)) {
-          const requestedModel = effectiveTask.model ?? effectiveTask.config?.effective?.harness?.model ?? effectiveTask.config?.model ?? (providerId === 'ollama' ? null : config?.model);
-          const requestedEffort = effectiveTask.effort ?? effectiveTask.config?.effective?.harness?.effort ?? effectiveTask.config?.effort ?? config?.effort;
-          if (requestedModel !== config?.model || (!['ollama', 'command'].includes(providerId) && requestedEffort !== config?.effort) || (providerId === 'command' && requestedEffort != null)) {
-            throw new Error(`Mixed execution task "${task.title}" must use configured ${providerId} runtime ${config?.model}${providerId === 'ollama' ? '' : `/${config?.effort}`}; there is no substitution`);
+          const codexRoleBinding = providerId === 'codex' ? this.#assertCodexRoleRuntime(effectiveTask) : null;
+          const requestedModel = effectiveTask.model ?? effectiveTask.config?.effective?.harness?.model ?? effectiveTask.config?.model ?? (providerId === 'codex' ? codexRoleBinding.model : providerId === 'ollama' ? null : config?.model);
+          const requestedEffort = effectiveTask.effort ?? effectiveTask.config?.effective?.harness?.effort ?? effectiveTask.config?.effort ?? (providerId === 'codex' ? codexRoleBinding.effort : config?.effort);
+          if ((providerId !== 'codex' && (requestedModel !== config?.model || (!['ollama', 'command'].includes(providerId) && requestedEffort !== config?.effort) || (providerId === 'command' && requestedEffort != null)))
+            || (providerId === 'codex' && (requestedModel !== codexRoleBinding.model || requestedEffort !== codexRoleBinding.effort))) {
+            const expected = providerId === 'codex' ? codexRoleBinding : config;
+            throw new Error(`Mixed execution task "${task.title}" must use configured ${providerId} runtime ${expected?.model}${providerId === 'ollama' ? '' : `/${expected?.effort}`}; there is no substitution`);
           }
           if (providerId === 'ollama') this.#validateOllamaTask(task, effectiveTask);
           if (providerId === 'command') this.#validateExternalHarnessTask(task, effectiveTask);
@@ -2857,12 +2952,15 @@ export class AosEngine {
       }
       return;
     }
-    const { model, effort } = this.execution.codex;
     for (const task of plan.tasks) {
-      const allowed = task.worker === 'codex' || (task.worker === 'engine' && task.kind === 'adopt');
+      const effectiveTask = task.templateId
+        ? applyTemplateToTask({ ...task, config: null }, task, this.templates.get(task.templateId, task.templateVersion ?? null))
+        : task;
+      const allowed = effectiveTask.worker === 'codex' || (effectiveTask.worker === 'engine' && effectiveTask.kind === 'adopt');
       if (!allowed) {
-        throw new Error(`Live Codex mode refuses task "${task.title}" on worker "${task.worker}": worker tasks must run on codex ${model}/${effort}; there is no fallback`);
+        throw new Error(`Live Codex mode refuses task "${task.title}" on worker "${effectiveTask.worker}": worker tasks must run on codex with their exact role-bound runtime; there is no fallback`);
       }
+      if (effectiveTask.worker === 'codex') this.#assertCodexRoleRuntime(effectiveTask);
     }
   }
 
@@ -3071,7 +3169,7 @@ export class AosEngine {
             attempt,
             reservationId: reservation.id,
             provider: worker.id,
-            profileFingerprint: providerProfile(this.execution, worker.id).fingerprint,
+            profileFingerprint: providerProfile(this.execution, worker.id, task).fingerprint,
             reserved: reservation.reserved,
           },
         });
@@ -3135,7 +3233,7 @@ export class AosEngine {
 
       const controller = new AbortController();
       this.inflight.set(task.id, { controller, runId: run.id, worker: worker.id });
-      const profile = providerProfile(this.execution, worker.id);
+      const profile = providerProfile(this.execution, worker.id, task);
       task.lease = this.#newLease(task, attempt, worker);
       const running = this.#tasks(run.id).filter((item) => item.status === TASK_STATUS.running).length;
       emitNow('worker.dispatched', { worker: worker.id, running, cap: run.maxConcurrency ?? null, profile });
@@ -3740,6 +3838,7 @@ export class AosEngine {
     const error = fault.error || `Injected retryable failure on attempt ${task.attempts}`;
     emit('fault.injected', { holdMs, error });
     await abortableDelay(holdMs, signal);
+    const profile = providerProfile(this.execution, task.worker, task);
     const runtime = {
       runId: run.id,
       taskId: task.id,
@@ -3748,10 +3847,10 @@ export class AosEngine {
       spawned: false,
       injected: true,
       provider: task.worker,
-      requested: this.#providerConfig(task.worker)
-        ? { model: this.#providerConfig(task.worker).model || null, effort: this.#providerConfig(task.worker).effort || null, sandbox: providerProfile(this.execution, task.worker).sandbox }
+      requested: profile.model || profile.effort
+        ? { model: profile.model || null, effort: profile.effort || null, sandbox: profile.sandbox }
         : null,
-      profile: providerProfile(this.execution, task.worker),
+      profile,
       startedAt,
       endedAt: this.now(),
       cancelled: signal.aborted,
@@ -3847,15 +3946,19 @@ export class AosEngine {
         scratch.presetVersion = planned.presetVersion ?? null;
       }
       const harness = scratch.worker || 'local';
+      if (harness === 'codex') this.#assertCodexRoleRuntime(scratch);
       if (this.execution.mode === 'mixed' && ['codex', 'claude', 'ollama', 'command'].includes(harness)) {
         const configured = this.#providerConfig(harness);
         if (!configured) {
           throw new AosError('plan_provider_unconfigured', `Plan task ${planned.id} selects ${harness}, but that provider is not configured for this engine`, { statusCode: 409, details: { taskId: planned.id, harness } });
         }
-        const requestedModel = scratch.model ?? scratch.config?.effective?.harness?.model ?? scratch.config?.model ?? (harness === 'ollama' ? null : configured.model);
-        const requestedEffort = scratch.effort ?? scratch.config?.effective?.harness?.effort ?? scratch.config?.effort ?? configured.effort;
-        if (requestedModel !== configured.model || (!['ollama', 'command'].includes(harness) && requestedEffort !== configured.effort) || (harness === 'command' && requestedEffort != null)) {
-          throw new AosError('plan_provider_config_invalid', `Plan task ${planned.id} must use the configured ${harness} runtime ${configured.model}${['ollama', 'command'].includes(harness) ? '' : `/${configured.effort}`}`, { statusCode: 409, details: { taskId: planned.id, harness, requested: { model: requestedModel, ...(['ollama', 'command'].includes(harness) ? {} : { effort: requestedEffort }) }, expected: { model: configured.model, ...(['ollama', 'command'].includes(harness) ? {} : { effort: configured.effort }) } } });
+        const codexRoleBinding = harness === 'codex' ? this.#assertCodexRoleRuntime(scratch) : null;
+        const requestedModel = scratch.model ?? scratch.config?.effective?.harness?.model ?? scratch.config?.model ?? (harness === 'codex' ? codexRoleBinding.model : harness === 'ollama' ? null : configured.model);
+        const requestedEffort = scratch.effort ?? scratch.config?.effective?.harness?.effort ?? scratch.config?.effort ?? (harness === 'codex' ? codexRoleBinding.effort : configured.effort);
+        if ((harness !== 'codex' && (requestedModel !== configured.model || (!['ollama', 'command'].includes(harness) && requestedEffort !== configured.effort) || (harness === 'command' && requestedEffort != null)))
+          || (harness === 'codex' && (requestedModel != null && requestedModel !== codexRoleBinding.model || requestedEffort != null && requestedEffort !== codexRoleBinding.effort))) {
+          const expected = harness === 'codex' ? codexRoleBinding : configured;
+          throw new AosError('plan_provider_config_invalid', `Plan task ${planned.id} must use the configured ${harness} runtime ${expected.model}${['ollama', 'command'].includes(harness) ? '' : `/${expected.effort}`}`, { statusCode: 409, details: { taskId: planned.id, harness, requested: { model: requestedModel, ...(['ollama', 'command'].includes(harness) ? {} : { effort: requestedEffort }) }, expected: { model: expected.model, ...(['ollama', 'command'].includes(harness) ? {} : { effort: expected.effort }) } } });
         }
         if (harness === 'ollama') this.#validateOllamaTask(planned, scratch);
         if (harness === 'command') this.#validateExternalHarnessTask(planned, scratch);

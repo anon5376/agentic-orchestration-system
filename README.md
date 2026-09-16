@@ -72,7 +72,7 @@ node bin/aos.mjs live preflight
 AOS_EXECUTION=codex npm run dev:all
 ```
 
-The current live policy accepts only `gpt-5.6-luna` at reasoning effort `max`, with at most four concurrent workers. Runtime evidence is checked after every worker attempt. Model substitution, missing session evidence, or another worker type stops the run.
+The current live role policy binds lead, coordinator, planner, manager, supervisor, and branch-manager roles to `gpt-5.6-terra` at reasoning effort `max`. All other worker roles bind to `gpt-5.6-luna` at `max`. A run may contain at most seven logical manager-role tasks; worker fan-out has no role-policy ceiling, while provider, project, run, budget, and the four-process Codex cap still bound physical execution. Runtime evidence is checked after every worker attempt. Model substitution, missing session evidence, or another worker type stops the run.
 
 AOS can also use the Claude Code account session without reading or copying its credential:
 

@@ -227,6 +227,7 @@ export class PlanService {
         throw new AosError('plan_template_invalid', error.message, { statusCode: 409, details: error.details || null });
       }
       this.#validateAssignments(run, additions);
+      this.engine.assertManagerRoleTaskLimit(run, additions);
       this.#validateCeilings(run, mergedTasks, additions);
 
       const version = currentPointer.version + 1;
@@ -307,10 +308,13 @@ export class PlanService {
         if (!configured) {
           throw new AosError('plan_provider_unconfigured', `Plan task ${planned.id} selects ${harness}, but that provider is not configured for this engine`, { statusCode: 409, details: { taskId: planned.id, harness } });
         }
-        const requestedModel = model ?? configured.model;
-        const requestedEffort = effective.effort ?? configured.effort;
-        if (requestedModel !== configured.model || (harness !== 'ollama' && requestedEffort !== configured.effort)) {
-          throw new AosError('plan_provider_config_invalid', `Plan task ${planned.id} must use the configured ${harness} runtime ${configured.model}${harness === 'ollama' ? '' : `/${configured.effort}`}`, { statusCode: 409, details: { taskId: planned.id, harness, requested: { model: requestedModel, ...(harness === 'ollama' ? {} : { effort: requestedEffort }) }, expected: { model: configured.model, ...(harness === 'ollama' ? {} : { effort: configured.effort }) } } });
+        const codexRoleBinding = harness === 'codex' ? this.engine.roleRuntimeForPlanTask(effective) : null;
+        const requestedModel = model ?? (harness === 'codex' ? codexRoleBinding?.model : configured.model);
+        const requestedEffort = effective.effort ?? (harness === 'codex' ? codexRoleBinding?.effort : configured.effort);
+        if ((harness !== 'codex' && (requestedModel !== configured.model || (harness !== 'ollama' && requestedEffort !== configured.effort)))
+          || (harness === 'codex' && (!codexRoleBinding || requestedModel !== codexRoleBinding.model || requestedEffort !== codexRoleBinding.effort))) {
+          const expected = harness === 'codex' ? codexRoleBinding : configured;
+          throw new AosError('plan_provider_config_invalid', `Plan task ${planned.id} must use the configured ${harness} runtime ${expected.model}${harness === 'ollama' ? '' : `/${expected.effort}`}`, { statusCode: 409, details: { taskId: planned.id, harness, requested: { model: requestedModel, ...(harness === 'ollama' ? {} : { effort: requestedEffort }) }, expected: { model: expected.model, ...(harness === 'ollama' ? {} : { effort: expected.effort }) } } });
         }
         if (harness === 'ollama') {
           const presetRole = effective.presetId
@@ -326,10 +330,11 @@ export class PlanService {
             throw new AosError('plan_live_codex_invalid', `Live Codex runs refuse plan task ${planned.id} on harness ${harness}; there is no fallback`, { statusCode: 409, details: { taskId: planned.id, harness, expected: 'codex' } });
           }
           if (harness === 'codex') {
-            const requestedModel = model ?? live.model;
-            const requestedEffort = effective.effort ?? live.effort;
-            if (requestedModel !== live.model || requestedEffort !== live.effort) {
-              throw new AosError('plan_live_codex_invalid', `Live Codex plan task ${planned.id} must use ${live.model}/${live.effort}`, { statusCode: 409, details: { taskId: planned.id, requested: { model: requestedModel, effort: requestedEffort }, expected: { model: live.model, effort: live.effort } } });
+            const roleRuntime = this.engine.roleRuntimeForPlanTask(effective);
+            const requestedModel = model ?? roleRuntime?.model;
+            const requestedEffort = effective.effort ?? roleRuntime?.effort;
+            if (!roleRuntime || requestedModel !== roleRuntime.model || requestedEffort !== roleRuntime.effort) {
+              throw new AosError('plan_live_codex_invalid', `Live Codex plan task ${planned.id} must use ${roleRuntime?.model || 'its role-bound model'}/${roleRuntime?.effort || 'its role-bound effort'}`, { statusCode: 409, details: { taskId: planned.id, requested: { model: requestedModel, effort: requestedEffort }, expected: roleRuntime ? { model: roleRuntime.model, effort: roleRuntime.effort } : null } });
             }
             const provider = this.engine.listProviders().find((item) => item.id === 'codex');
             if (provider?.readiness?.status === 'unavailable') {

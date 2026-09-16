@@ -34,7 +34,10 @@ if (args[0] === 'login') {
   process.exit(0);
 }
 if (args[0] === 'debug') {
-  console.log(JSON.stringify({ models: [{ slug: 'gpt-5.6-luna', supported_reasoning_levels: [{ effort: 'medium' }, { effort: 'max' }], upgrade: null }] }));
+  console.log(JSON.stringify({ models: [
+    { slug: 'gpt-5.6-terra', supported_reasoning_levels: [{ effort: 'medium' }, { effort: 'max' }], upgrade: null },
+    { slug: 'gpt-5.6-luna', supported_reasoning_levels: [{ effort: 'medium' }, { effort: 'max' }], upgrade: null },
+  ] }));
   process.exit(0);
 }
 const opt = (flag) => args[args.indexOf(flag) + 1];
@@ -149,10 +152,14 @@ function alive(pid) {
   }
 }
 
-test('live config only accepts gpt-5.6-luna at effort max and at most four workers', () => {
+test('live config accepts only role-bound models at effort max and at most four workers', () => {
   assert.deepEqual(
     { model: resolveCodexConfig({}).model, effort: resolveCodexConfig({}).effort, cap: resolveCodexConfig({}).maxConcurrency },
     { model: 'gpt-5.6-luna', effort: 'max', cap: 4 },
+  );
+  assert.deepEqual(
+    { model: resolveCodexConfig({ model: 'gpt-5.6-terra' }).model, effort: resolveCodexConfig({ model: 'gpt-5.6-terra' }).effort },
+    { model: 'gpt-5.6-terra', effort: 'max' },
   );
   assert.throws(() => resolveCodexConfig({ model: 'gpt-5.6-sol' }), /not allowlisted/);
   assert.throws(() => resolveCodexConfig({ effort: 'xhigh' }), /not allowlisted/);
@@ -305,6 +312,46 @@ test('live run executes codex workers with verified runtime evidence and no viol
   } finally {
     delete process.env.OPENAI_API_KEY;
   }
+});
+
+test('template-only manager tasks execute Terra/max and reject a substituted worker model', async () => {
+  const fake = fakeCodex();
+  const aos = liveEngine(fake);
+  const template = aos.templates.create({
+    id: 'live-template-manager',
+    name: 'Live template manager',
+    description: 'A template-only manager used to prove engine-owned role binding.',
+    config: { preset: { id: 'branch-manager' }, harness: { id: 'codex' } },
+  });
+  const plan = (brief) => ({
+    title: 'Template manager runtime proof',
+    tasks: [{
+      id: 'M', key: 'M', title: 'Manager', kind: 'research',
+      templateId: template.id, templateVersion: template.version,
+      brief,
+    }],
+    dependencies: [],
+  });
+
+  const accepted = aos.createGoal({ prompt: 'Prove exact manager runtime with a bounded scope.', plan: plan('Run the bounded manager task.') });
+  const run = aos.startRun({ goalId: accepted.id });
+  await aos.advanceRun(run.id, { untilIdle: true });
+  const manager = byKey(aos, run.id, 'M');
+  const runtime = JSON.parse(readFileSync(join(manager.workspace, 'attempt-1', 'runtime.json'), 'utf8'));
+  assert.equal(manager.status, 'succeeded');
+  assert.deepEqual(manager.roleRuntime.requested, { model: 'gpt-5.6-terra', effort: 'max' });
+  assert.deepEqual(runtime.requested, { model: 'gpt-5.6-terra', effort: 'max', sandbox: 'read-only' });
+  assert.equal(runtime.effective.model, 'gpt-5.6-terra');
+  assert.equal(runtime.effective.effort, 'max');
+  assert.ok(fake.invocations().some((item) => item.args.includes('gpt-5.6-terra')));
+
+  const substituted = aos.createGoal({ prompt: 'Prove substitution rejection with a bounded scope.', plan: plan('[[fake:model=gpt-5.6-luna]]') });
+  const rejected = aos.startRun({ goalId: substituted.id });
+  await aos.advanceRun(rejected.id, { untilIdle: true });
+  const rejectedTask = byKey(aos, rejected.id, 'M');
+  assert.equal(rejectedTask.status, 'failed');
+  assert.equal(rejectedTask.attempts, 1);
+  assert.match(rejectedTask.error, /session model gpt-5.6-luna != requested gpt-5.6-terra/);
 });
 
 test('verified Codex failure without usage reaches the typed lead-planner failure', async () => {

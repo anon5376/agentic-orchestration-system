@@ -35,6 +35,8 @@ export const ROLE_KINDS = Object.freeze([
   'coordinator',
   'planner',
   'branch-manager',
+  'manager',
+  'supervisor',
   'worker',
   'researcher',
   'analyst',

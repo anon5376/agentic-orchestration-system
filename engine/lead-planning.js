@@ -1,6 +1,7 @@
 import { fingerprint, newId } from './ids.js';
 import { claimWorkspace } from './workers.js';
-import { CODEX_AUTH_PATH, redactText } from './codex.js';
+import { CODEX_AUTH_PATH, redactText, resolveCodexConfig } from './codex.js';
+import { ROLE_RUNTIME_PROFILES } from './role-runtime.js';
 import { AosError, notFound } from './schema.js';
 import {
   LEAD_PLANNING_OUTPUT_SCHEMA,
@@ -11,8 +12,8 @@ import {
   normalizeLeadPlanOutput,
 } from './lead-planning-schema.js';
 
-const MODEL = 'gpt-5.6-luna';
-const EFFORT = 'max';
+const MODEL = ROLE_RUNTIME_PROFILES.manager.model;
+const EFFORT = ROLE_RUNTIME_PROFILES.manager.effort;
 const SANDBOX = 'read-only';
 
 export const LEAD_PLAN_STATUS = Object.freeze({
@@ -519,7 +520,7 @@ export class LeadPlanningService {
     let preflight;
     try {
       if (typeof planner?.preflight !== 'function') throw leadError('lead_planner_preflight_invalid', 'Lead planning requires a Codex preflight result', 409);
-      preflight = await this.engine.preflightCodex({ worker: planner });
+      preflight = await this.engine.preflightCodex({ worker: planner, config });
       this.#assertPreflight(preflight, config);
     } catch (error) {
       const code = {
@@ -730,10 +731,7 @@ export class LeadPlanningService {
     if (this.engine.execution?.mode !== 'codex' || !this.engine.execution.codex) {
       throw leadError('lead_planner_requires_codex', 'Lead planning requires live Codex execution; local workers are not a fallback', 409, { mode: this.engine.execution?.mode || null });
     }
-    const config = this.engine.execution.codex;
-    if (config.model !== MODEL || config.effort !== EFFORT) {
-      throw leadError('lead_planner_config_invalid', `Lead planning requires ${MODEL}/${EFFORT}`, 409, { requested: { model: config.model, effort: config.effort }, expected: { model: MODEL, effort: EFFORT } });
-    }
+    const config = resolveCodexConfig({ ...this.engine.execution.codex, model: MODEL, effort: EFFORT });
     const planner = this.#planner();
     if (!planner || (typeof planner !== 'function' && typeof planner.plan !== 'function' && typeof planner.execute !== 'function')) {
       throw leadError('lead_planner_unavailable', 'The existing Codex harness is not available', 409);
@@ -775,7 +773,7 @@ export class LeadPlanningService {
       && runtime.threadId.trim()
       && (hasUsage || usageUnavailable)
       && validTiming;
-    if (!valid) throw leadError('lead_planner_unverified', 'Lead planner runtime receipt is incomplete or does not match verified Codex ChatGPT login at gpt-5.6-luna/max/read-only', 409, { provider: runtime?.provider || null, authPath: runtime?.authPath || null, verified: runtime?.verified ?? null, hasHarnessReference: Boolean(runtime?.threadId) });
+    if (!valid) throw leadError('lead_planner_unverified', `Lead planner runtime receipt is incomplete or does not match verified Codex ChatGPT login at ${MODEL}/${EFFORT}/${SANDBOX}`, 409, { provider: runtime?.provider || null, authPath: runtime?.authPath || null, verified: runtime?.verified ?? null, hasHarnessReference: Boolean(runtime?.threadId) });
   }
 
   #validateAssignments(goal, plan, config) {
@@ -789,14 +787,15 @@ export class LeadPlanningService {
       const harness = task.worker || task.harness || 'codex';
       const isEngineAdopt = harness === 'engine' && task.kind === 'adopt';
       if (!isEngineAdopt && harness !== 'codex') throw leadError('lead_plan_policy', `Lead plan task ${task.id} must use the codex harness`, 409, { taskId: task.id, harness });
-      const model = task.model || config.model;
-      const effort = task.effort || config.effort;
+      const roleRuntime = isEngineAdopt ? null : this.engine.roleRuntimeForPlanTask(task);
+      const model = task.model || roleRuntime?.model;
+      const effort = task.effort || roleRuntime?.effort;
       const sandbox = task.sandbox || task.sandboxTier || SANDBOX;
       if (isEngineAdopt && task.requiresApproval !== true) {
         throw leadError('lead_plan_policy', `Lead plan task ${task.id} must require operator approval`, 409, { taskId: task.id, requiresApproval: task.requiresApproval });
       }
-      if (!isEngineAdopt && (model !== config.model || effort !== config.effort || sandbox !== SANDBOX)) {
-        throw leadError('lead_plan_policy', `Lead plan task ${task.id} must use ${config.model}/${config.effort}/${SANDBOX}`, 409, { taskId: task.id, requested: { model, effort, sandbox }, expected: { model: config.model, effort: config.effort, sandbox: SANDBOX } });
+      if (!isEngineAdopt && (!roleRuntime || model !== roleRuntime.model || effort !== roleRuntime.effort || sandbox !== SANDBOX)) {
+        throw leadError('lead_plan_policy', `Lead plan task ${task.id} must use its bound ${roleRuntime?.class || 'role'} runtime`, 409, { taskId: task.id, requested: { model, effort, sandbox }, expected: roleRuntime ? { model: roleRuntime.model, effort: roleRuntime.effort, sandbox: SANDBOX } : null });
       }
       task.worker = harness;
       task.harness = harness;
