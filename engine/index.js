@@ -1,4 +1,15 @@
 export { AosEngine, TASK_STATUS, RUN_STATUS, IsolationError } from './engine.js';
+export { ClaudeCliWorker, ClaudeConfigError, ClaudePreflightError, CLAUDE_AUTH_PATH, CLAUDE_SANDBOX, CLAUDE_MODEL_ALLOWLIST, CLAUDE_EFFORT_ALLOWLIST, resolveClaudeConfig, buildClaudeArgs, preflightClaude, sanitizedClaudeEnv, redactClaudeText } from './claude.js';
 export { createAosServer, bootEngine } from './http.js';
+export { PoolHttpClient, PoolRunner, PoolRunnerError, POOL_PROTOCOL, assertLoopbackPoolUrl } from './pool-runner.js';
 export { interpretGoal, identifyAmbiguities } from './intake.js';
 export { loadEngineFromEnv, executeCommand, dispatch, HELP } from './cli.js';
+export { ModelControlService, MODEL_CONTROL_SCHEMA_VERSION } from './model-control.js';
+export { PlanService, PLAN_SCHEMA_VERSION } from './plans.js';
+export { LeadPlanningService, LEAD_PLAN_STATUS, LEAD_PLANNING_SCHEMA_VERSION, LEAD_PLANNING_OUTPUT_SCHEMA, LEAD_PLANNING_LIMITS, normalizeLeadPlan, normalizeLeadPlanOutput, validateLeadQuestions } from './lead-planning.js';
+export { PROVIDER_CONTRACT_SCHEMA_VERSION, PROVIDER_FAILURES, createProviderContract, assertExternalHarnessTaskAdmission, assertProviderDispatchable, isProviderMounted } from './provider-contracts.js';
+export { EXTERNAL_HARNESS_PROTOCOL, EXTERNAL_HARNESS_SANDBOX, EXTERNAL_HARNESS_ATTESTATION, ExternalHarnessConfigError, ExternalHarnessPreflightError, ExternalHarnessWorker, resolveExternalHarnessConfig, sanitizedExternalHarnessEnv, preflightExternalHarness } from './external-harness.js';
+export { CapabilityRegistry, CAPABILITY_SCHEMA_VERSION, CAPABILITY_KINDS, CAPABILITY_PERMISSIONS, CAPABILITY_SCOPES, parseCapabilityRef } from './capabilities.js';
+export { EffectClaimService, EFFECT_CLAIM_STATUSES } from './effect-claims.js';
+export { HarnessSessionRegistry, HARNESS_SESSION_SCHEMA_VERSION, HARNESS_SESSION_STATUSES } from './sessions.js';
+export { ImprovementService, IMPROVEMENT_SCHEMA_VERSION, IMPROVEMENT_EVALUATION_INPUT_SCHEMA, IMPROVABLE_POLICY_KEYS, proposalFingerprint } from './improvements.js';

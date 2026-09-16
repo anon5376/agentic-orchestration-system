@@ -6,6 +6,7 @@ export const routeDefinitions = [
   { key: 'synthesis', path: '/synthesis', label: 'Synthesis', shortLabel: 'Y', group: 'decision' },
   { key: 'evolution', path: '/evolution', label: 'Evolution', shortLabel: 'V', group: 'decision' },
   { key: 'capabilities', path: '/capabilities', label: 'Capabilities', shortLabel: 'C', group: 'system' },
+  { key: 'models', path: '/models', label: 'Models', shortLabel: 'O', group: 'system' },
   { key: 'memory', path: '/memory', label: 'Memory', shortLabel: 'M', group: 'system' },
   { key: 'system', path: '/system', label: 'System studio', shortLabel: 'S', group: 'system' },
 ];

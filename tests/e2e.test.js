@@ -10,6 +10,16 @@ import { createAosServer } from '../engine/http.js';
 
 const PROMPT = 'Determine whether delayed feedback destabilises bidirectional nerve-interface coupling, and propose the next experiment. Success is a bounded claim with an explicit uncertainty. Scope excludes clinical deployment.';
 
+function passImprovement(aos, proposalId, requestId) {
+  return aos.improvements.evaluate(proposalId, {
+    requestId,
+    benchmark: { id: 'e2e-reasoning', version: '1', datasetFingerprint: 'a1b2c3d4e5f60708', sampleSize: 20 },
+    baseline: { quality: 0.7, costUsd: 1, latencyMs: 1000, verifiedRuntimeRate: 1, operatorInterventions: 1 },
+    candidate: { quality: 0.75, costUsd: 0.9, latencyMs: 900, verifiedRuntimeRate: 1, operatorInterventions: 1 },
+    artifactRefs: ['bench/e2e-result.json'],
+  });
+}
+
 test('end-to-end: goal, plan, deterministic workers, persist, synthesize, retrospective, approval, reload', async () => {
   const dataDir = mkdtempSync(join(tmpdir(), 'aos-e2e-'));
   const aos = new AosEngine({ dataDir, concurrency: 2 });
@@ -41,6 +51,7 @@ test('end-to-end: goal, plan, deterministic workers, persist, synthesize, retros
   assert.equal(reloaded.getProposal(proposal.id).status, 'proposed');
   assert.equal(reloaded.store.readEventLog().length, aos.store.readEventLog().length);
 
+  passImprovement(reloaded, proposal.id, 'e2e-direct-evaluation');
   reloaded.approveProposal(proposal.id);
   const finished = await reloaded.advanceRun(run.id, { untilIdle: true });
   assert.equal(finished.run.status, 'completed');
@@ -69,12 +80,13 @@ test('CLI and HTTP operate on the same store', async () => {
   assert.ok(decision.lines.some((line) => line.startsWith('decision ')));
   const improvements = await executeCommand(aos, `improvements ${runId}`);
   const proposalId = improvements.lines[0].split(' ')[0];
+  passImprovement(aos, proposalId, 'e2e-cli-evaluation');
   const approved = await executeCommand(aos, `approve ${proposalId}`);
   assert.equal(approved.ok, true);
 
   const httpEngine = new AosEngine({ dataDir });
   httpEngine.load();
-  const { listen, close, server } = createAosServer({ engine: httpEngine, port: 0, host: '127.0.0.1' });
+  const { listen, close, server } = createAosServer({ engine: httpEngine, port: 0, host: '127.0.0.1', operatorToken: false });
   await listen();
   const addr = server.address();
   const snapshot = await fetch(`http://127.0.0.1:${addr.port}/api/v1/snapshot`).then((res) => res.json());
@@ -113,7 +125,7 @@ test('CLI and HTTP expose the persisted clarification gate', async () => {
   }
   assert.equal(aos.getGoal(goalId).status, 'planned');
 
-  const { listen, close, server } = createAosServer({ engine: aos, port: 0, host: '127.0.0.1' });
+  const { listen, close, server } = createAosServer({ engine: aos, port: 0, host: '127.0.0.1', operatorToken: false });
   await listen();
   const addr = server.address();
   const base = `http://127.0.0.1:${addr.port}`;
@@ -154,6 +166,49 @@ test('CLI and HTTP expose the persisted clarification gate', async () => {
   }).then(async (res) => ({ status: res.status, body: await res.json() }));
   assert.equal(started.status, 201);
   assert.equal(started.body.status, 'running');
+  await close();
+});
+
+test('task question answers have CLI and HTTP parity', async () => {
+  const dataDir = mkdtempSync(join(tmpdir(), 'aos-task-answers-'));
+  const aos = loadEngineFromEnv({ dataDir });
+  aos.workers.set('local', {
+    id: 'local',
+    async execute(task) {
+      return task.attempts === 1
+        ? { status: 'awaiting_user', questions: [{ prompt: 'Choose the evidence boundary.' }, { prompt: 'Name the uncertainty to retain.' }] }
+        : { status: 'succeeded', summary: 'resumed' };
+    },
+  });
+  const goal = aos.createGoal({
+    prompt: 'A bounded task objective with explicit success criteria and literature-only scope.',
+    plan: { tasks: [{ id: 'ask', key: 'ask', title: 'Ask operator', kind: 'research', worker: 'local' }], dependencies: [] },
+  });
+  const run = aos.startRun({ goalId: goal.id });
+  await aos.advanceRun(run.id, { untilIdle: true });
+  const waiting = aos.state.tasks.find((task) => task.runId === run.id);
+  const inspected = await executeCommand(aos, `inspect ${waiting.id}`);
+  assert.ok(inspected.lines.some((line) => line.includes(`${waiting.questions[0].id}  open`)));
+
+  const cli = await executeCommand(aos, `task answer ${waiting.id} ${waiting.questions[0].id} "Use published interface studies"`);
+  assert.equal(cli.ok, true);
+  assert.ok(cli.lines.includes('status  awaiting_user'));
+
+  const { listen, close, server } = createAosServer({ engine: aos, port: 0, host: '127.0.0.1', operatorToken: false });
+  await listen();
+  const base = `http://127.0.0.1:${server.address().port}`;
+  const response = await fetch(`${base}/api/v1/tasks/${waiting.id}/answers`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ answers: [{ id: waiting.questions[1].id, answer: 'Keep uncertainty explicit' }] }),
+  });
+  assert.equal(response.status, 200);
+  const answered = await response.json();
+  assert.equal(answered.status, 'ready');
+  assert.equal(aos.getRun(run.id).status, 'running');
+  await aos.advanceRun(run.id, { untilIdle: true });
+  assert.equal(aos.getTask(waiting.id).status, 'succeeded');
+  assert.equal(aos.getTask(waiting.id).attempts, 2);
   await close();
 });
 

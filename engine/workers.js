@@ -1,8 +1,10 @@
-import { spawn } from 'node:child_process';
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { dirname, join, resolve, sep } from 'node:path';
 import { fingerprint } from './ids.js';
 import { CodexCliWorker } from './codex.js';
+import { ClaudeCliWorker } from './claude.js';
+import { OllamaWorker } from './ollama.js';
+import { ExternalHarnessWorker } from './external-harness.js';
 
 export class IsolationError extends Error {
   constructor(message) {
@@ -168,29 +170,6 @@ export class DisabledLiveWorker {
   }
 }
 
-export class CommandWorker {
-  id = 'command';
-  label = 'Generic command worker';
-
-  async execute(task, ctx) {
-    const command = task.command || ctx.taskCommand;
-    if (!command) {
-      return {
-        status: 'failed',
-        skipped: true,
-        error: 'No command configured for this task. Command worker is a typed boundary only until a command is set.',
-        summary: 'Command worker not configured',
-      };
-    }
-    const result = await runCommand(command, ctx.workspace.dir, task.timeoutMs || 30_000);
-    ctx.workspace.write('command.json', { command, ...result });
-    if (result.exitCode !== 0) {
-      return { status: 'failed', summary: result.stderr || `exit ${result.exitCode}`, artifacts: ['command.json'] };
-    }
-    return { status: 'succeeded', summary: result.stdout.slice(0, 240) || 'Command completed', artifacts: ['command.json'] };
-  }
-}
-
 export class ApiWorker {
   id = 'api';
   label = 'Generic HTTP worker';
@@ -199,54 +178,59 @@ export class ApiWorker {
     return {
       status: 'failed',
       skipped: true,
-      error: 'Generic HTTP API worker is a typed boundary. Live OAuth for arbitrary APIs is unsupported in this MVP. Configure a local or command worker instead.',
+      error: 'Generic HTTP API worker is a typed boundary. Live OAuth for arbitrary APIs is unsupported in this MVP. Configure local work or a fixed external-harness adapter instead.',
       summary: 'Unsupported live API execution',
     };
   }
 }
 
-function runCommand(command, cwd, timeoutMs) {
-  return new Promise((resolve) => {
-    const child = spawn(command, { cwd, shell: true });
-    let stdout = '';
-    let stderr = '';
-    const timer = setTimeout(() => {
-      child.kill('SIGTERM');
-    }, timeoutMs);
-    child.stdout?.on('data', (chunk) => {
-      stdout += chunk.toString('utf8');
-    });
-    child.stderr?.on('data', (chunk) => {
-      stderr += chunk.toString('utf8');
-    });
-    child.on('close', (exitCode) => {
-      clearTimeout(timer);
-      resolve({ exitCode: exitCode ?? 1, stdout, stderr });
-    });
-    child.on('error', (error) => {
-      clearTimeout(timer);
-      resolve({ exitCode: 1, stdout, stderr: error.message });
-    });
-  });
-}
-
-export function createWorkerRegistry({ codex: codexConfig = null } = {}) {
+export function createWorkerRegistry({
+  codex: codexConfig = null,
+  claude: claudeConfig = null,
+  ollama: ollamaConfig = null,
+  command: commandConfig = null,
+  adapters = null,
+} = {}) {
   const local = new LocalDeterministicWorker();
-  const command = new CommandWorker();
   const api = new ApiWorker();
   const engine = new EngineActionWorker();
-  const codex = codexConfig
-    ? new CodexCliWorker(codexConfig)
+  const configured = (id, legacy) => {
+    const value = adapters && Object.prototype.hasOwnProperty.call(adapters, id) ? adapters[id] : legacy;
+    if (!value || value === false || value.enabled === false) return null;
+    return value.config && typeof value.config === 'object' ? value.config : value;
+  };
+  const codex = configured('codex', codexConfig)
+    ? new CodexCliWorker(configured('codex', codexConfig))
     : new DisabledLiveWorker({
       id: 'codex',
       label: 'Codex',
       reason: 'Live Codex execution is not enabled. Start the engine with AOS_EXECUTION=codex to run workers through the Codex CLI ChatGPT login.',
     });
-  const claude = new DisabledLiveWorker({
-    id: 'claude',
-    label: 'Claude Code',
-    reason: 'Live Claude Code execution is not enabled. This MVP does not spawn Claude Code and did not use credentials.',
-  });
+  const claude = configured('claude', claudeConfig)
+    ? new ClaudeCliWorker(configured('claude', claudeConfig))
+    : new DisabledLiveWorker({
+      id: 'claude',
+      label: 'Claude Code',
+      reason: 'Live Claude Code execution is not enabled. Configure a Claude account-session adapter and pass preflight before dispatch.',
+    });
+  const ollamaEntry = adapters && Object.prototype.hasOwnProperty.call(adapters, 'ollama') ? adapters.ollama : ollamaConfig;
+  const ollamaExplicit = Boolean(ollamaEntry && ollamaEntry !== false && ollamaEntry.enabled === true);
+  const ollama = ollamaExplicit && configured('ollama', ollamaConfig)
+    ? new OllamaWorker(configured('ollama', ollamaConfig))
+    : new DisabledLiveWorker({
+      id: 'ollama',
+      label: 'Ollama',
+      reason: 'Local Ollama execution is not enabled. Use AOS_EXECUTION=mixed with AOS_OLLAMA_ENABLED=1 and an explicit AOS_OLLAMA_MODEL; there is no fallback.',
+    });
+  const commandEntry = adapters && Object.prototype.hasOwnProperty.call(adapters, 'command') ? adapters.command : commandConfig;
+  const commandExplicit = Boolean(commandEntry && commandEntry !== false && commandEntry.enabled === true);
+  const command = commandExplicit && configured('command', commandConfig)
+    ? new ExternalHarnessWorker(configured('command', commandConfig))
+    : new DisabledLiveWorker({
+      id: 'command',
+      label: 'External harness (protocol)',
+      reason: 'External harness execution is disabled. Configure the fixed external-harness JSON protocol; task-provided commands are unsupported.',
+    });
   const grok = new DisabledLiveWorker({
     id: 'grok',
     label: 'Grok',
@@ -259,6 +243,7 @@ export function createWorkerRegistry({ codex: codexConfig = null } = {}) {
     [engine.id, engine],
     [codex.id, codex],
     [claude.id, claude],
+    [ollama.id, ollama],
     [grok.id, grok],
   ]);
 }

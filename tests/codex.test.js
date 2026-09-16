@@ -4,9 +4,13 @@ import { join } from 'node:path';
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { AosEngine } from '../engine/engine.js';
+import { executeCommand } from '../engine/cli.js';
 import {
+  CODEX_OUTPUT_SCHEMA,
   CODEX_DISABLED_FEATURES,
+  LEAD_PLANNING_OUTPUT_SCHEMA,
   buildCodexArgs,
+  buildWorkerPrompt,
   redactText,
   resolveCodexConfig,
   sanitizedChildEnv,
@@ -63,8 +67,11 @@ process.stdin.on('end', () => {
       console.log(JSON.stringify({ type: 'turn.failed', error: { message: directive('fail') } }));
       process.exit(1);
     }
+    const awaitUser = Boolean(directive('await-user')) && attempt === 1;
     const body = {
       task_nonce: directive('wrong-nonce') ? 'aos-another-task' : nonce,
+      status: awaitUser ? 'awaiting_user' : 'succeeded',
+      ...(awaitUser ? { questions: [{ prompt: 'Which source boundary should be used?', reason: 'Two scopes remain plausible.' }] } : {}),
       summary: 'fake summary for attempt ' + attempt,
       findings: [{ kind: 'supported', claim: 'fake claim', evidence: ['engine/engine.js:1'], confidence: 0.7 }],
       risks: [],
@@ -170,9 +177,50 @@ test('codex exec arguments pin model, effort, read-only sandbox and disable othe
   assert.equal(args.at(-1), '-');
 });
 
+test('codex output schema and prompt carry bounded operator-question support', () => {
+  assert.deepEqual(CODEX_OUTPUT_SCHEMA.properties.status.enum, ['succeeded', 'awaiting_user']);
+  assert.equal(CODEX_OUTPUT_SCHEMA.properties.questions.minItems, 1);
+  assert.equal(CODEX_OUTPUT_SCHEMA.properties.questions.maxItems, 3);
+  assert.equal(CODEX_OUTPUT_SCHEMA.properties.questions.items.properties.prompt.maxLength, 500);
+  assert.equal(CODEX_OUTPUT_SCHEMA.properties.questions.items.properties.reason.maxLength, 300);
+  const task = { id: 'tsk_1', key: 'A', title: 'Ask', kind: 'research', branch: 'root', attempts: 2, nonce: 'aos-nonce', brief: 'Original brief', questions: [{ id: 'q_1', prompt: 'Boundary?', answer: 'Published studies only' }] };
+  const prompt = buildWorkerPrompt(task, { run: { id: 'run_1' }, goal: { prompt: 'Objective' }, dependencies: [] });
+  assert.match(prompt, /## Operator answers \(from an earlier wait\)/);
+  assert.match(prompt, /Published studies only/);
+  assert.match(prompt, /status must be "succeeded".*"awaiting_user"/);
+  assert.match(prompt, /1–3 objects/);
+  assert.match(prompt, /Do not include answers/);
+  assert.match(prompt, /Original brief/);
+});
+
+test('lead planning structured output schema is strict and bounded at every object', () => {
+  const visit = (schema) => {
+    if (!schema || typeof schema !== 'object') return;
+    if (schema.type === 'object') {
+      assert.equal(schema.additionalProperties, false);
+      assert.ok(Array.isArray(schema.required));
+      assert.deepEqual([...schema.required].sort(), Object.keys(schema.properties || {}).sort());
+    }
+    for (const child of Object.values(schema.properties || {})) visit(child);
+    if (schema.items) visit(schema.items);
+    for (const child of schema.anyOf || []) visit(child);
+  };
+
+  visit(LEAD_PLANNING_OUTPUT_SCHEMA);
+  const plan = LEAD_PLANNING_OUTPUT_SCHEMA.properties.plan.anyOf.find((branch) => branch.type === 'object');
+  assert.ok(plan, 'plan must have a bounded object branch');
+  assert.equal(plan.properties.tasks.maxItems, 24);
+  assert.equal(plan.properties.dependencies.maxItems, 48);
+  assert.equal(plan.properties.tasks.items.properties.parentId.anyOf.at(-1).type, 'null');
+  assert.deepEqual(
+    [...LEAD_PLANNING_OUTPUT_SCHEMA.properties.questions.items.required].sort(),
+    ['prompt', 'reason', 'required'],
+  );
+});
+
 test('child environment drops API keys and redaction masks credentials', () => {
-  const { env, stripped } = sanitizedChildEnv({ PATH: '/bin', HOME: '/h', OPENAI_API_KEY: 'x', CODEX_API_KEY: 'y', OPENAI_BASE_URL: 'z', GITHUB_ACCESS_TOKEN: 't' }, {});
-  assert.deepEqual(stripped, ['CODEX_API_KEY', 'GITHUB_ACCESS_TOKEN', 'OPENAI_API_KEY', 'OPENAI_BASE_URL']);
+  const { env, stripped } = sanitizedChildEnv({ PATH: '/bin', HOME: '/h', OPENAI_API_KEY: 'x', CODEX_API_KEY: 'y', OPENAI_BASE_URL: 'z', GITHUB_ACCESS_TOKEN: 't', AOS_OPERATOR_TOKEN: 'operator-secret' }, {});
+  assert.deepEqual(stripped, ['AOS_OPERATOR_TOKEN', 'CODEX_API_KEY', 'GITHUB_ACCESS_TOKEN', 'OPENAI_API_KEY', 'OPENAI_BASE_URL']);
   assert.equal(env.PATH, '/bin');
   assert.equal(env.OPENAI_API_KEY, undefined);
   const jwt = ['eyJ', 'abcdefghij', '.', 'klmnopqrst', '.', 'uvwxyz0123'].join('');
@@ -206,7 +254,7 @@ test('live run executes codex workers with verified runtime evidence and no viol
       assert.equal(task.status, 'succeeded', key);
       const runtime = JSON.parse(readFileSync(join(task.workspace, 'attempt-1', 'runtime.json'), 'utf8'));
       assert.equal(runtime.verified, true);
-      assert.deepEqual(runtime.requested, { model: 'gpt-5.6-luna', effort: 'max' });
+      assert.deepEqual(runtime.requested, { model: 'gpt-5.6-luna', effort: 'max', sandbox: 'read-only' });
       assert.equal(runtime.effective.model, 'gpt-5.6-luna');
       assert.equal(runtime.effective.effort, 'max');
       assert.equal(runtime.effective.planType, 'pro');
@@ -257,6 +305,78 @@ test('live run executes codex workers with verified runtime evidence and no viol
   } finally {
     delete process.env.OPENAI_API_KEY;
   }
+});
+
+test('verified Codex failure without usage reaches the typed lead-planner failure', async () => {
+  const fake = fakeCodex();
+  const aos = liveEngine(fake);
+  await assert.rejects(
+    aos.createLeadGoalProposal({
+      prompt: 'Bounded lead objective [[fake:fail=upstream failure]]',
+      requestId: 'lead-failure-without-usage',
+    }),
+    (error) => error.code === 'lead_planner_failed' && error.statusCode === 409,
+  );
+  assert.equal(aos.state.leadPlans.length, 1);
+  assert.equal(aos.state.leadPlans[0].status, 'failed');
+  assert.equal(aos.state.leadPlans[0].errorCode, 'lead_planner_failed');
+});
+
+test('explicit Codex preflight updates provider readiness and the live CLI uses it', async () => {
+  const fake = fakeCodex();
+  const aos = liveEngine(fake);
+  assert.equal(aos.listProviders().find((item) => item.id === 'codex').readiness.status, 'unverified');
+  const preflight = await aos.preflightCodex();
+  assert.equal(preflight.login, 'Logged in using ChatGPT');
+  assert.equal(aos.listProviders().find((item) => item.id === 'codex').readiness.status, 'available');
+  const cli = await executeCommand(aos, 'live preflight');
+  assert.equal(cli.ok, true);
+  assert.ok(cli.lines.some((line) => line.startsWith('login     Logged in using ChatGPT')));
+  assert.equal(aos.listProviders().find((item) => item.id === 'codex').readiness.status, 'available');
+});
+
+test('failed Codex preflight marks provider unavailable without persisting details', async () => {
+  const fake = fakeCodex();
+  process.env.FAKE_CODEX_LOGIN = 'apikey';
+  try {
+    const aos = liveEngine(fake);
+    await assert.rejects(aos.preflightCodex(), /not logged in with a ChatGPT account/);
+    const provider = aos.listProviders().find((item) => item.id === 'codex');
+    assert.equal(provider.readiness.status, 'unavailable');
+    assert.ok(provider.readiness.checkedAt);
+    assert.equal(Object.hasOwn(provider.readiness, 'output'), false);
+    const cli = await executeCommand(aos, 'live preflight');
+    assert.equal(cli.ok, false);
+    assert.equal(aos.listProviders().find((item) => item.id === 'codex').readiness.status, 'unavailable');
+  } finally {
+    delete process.env.FAKE_CODEX_LOGIN;
+  }
+});
+
+test('verified codex questions pause a run and resume on attempt two', async () => {
+  const fake = fakeCodex();
+  const aos = liveEngine(fake);
+  const goal = aos.createGoal({
+    prompt: 'Fake live objective with success criteria and a bounded scope.',
+    plan: { tasks: [{ id: 'A', key: 'A', title: 'Ask live operator', kind: 'research', worker: 'codex', brief: 'Live question [[fake:await-user]]' }], dependencies: [] },
+  });
+  const run = aos.startRun({ goalId: goal.id });
+  await aos.advanceRun(run.id, { untilIdle: true });
+  const waiting = byKey(aos, run.id, 'A');
+  assert.equal(waiting.status, 'awaiting_user');
+  assert.equal(aos.getRun(run.id).status, 'awaiting_user');
+  assert.equal(waiting.questions.length, 1);
+  assert.equal(waiting.questions[0].askedBy.worker, 'codex');
+  assert.equal(waiting.questions[0].attempt, 1);
+  assert.equal(waiting.wait.code, 'operator_question');
+  aos.answerTaskQuestions(waiting.id, [{ id: waiting.questions[0].id, answer: 'Use the published boundary.' }]);
+  await aos.advanceRun(run.id, { untilIdle: true });
+  assert.equal(aos.getTask(waiting.id).status, 'succeeded');
+  assert.equal(aos.getTask(waiting.id).attempts, 2);
+  assert.equal(aos.getRun(run.id).status, 'completed');
+  const prompt = readFileSync(join(waiting.workspace, 'attempt-2', 'prompt.md'), 'utf8');
+  assert.match(prompt, /Operator answers/);
+  assert.match(prompt, /Use the published boundary/);
 });
 
 test('live run fails closed before spawning workers when the login is not ChatGPT', async () => {
@@ -333,7 +453,7 @@ test('cancelling a live run stops the codex process and discards its result', as
   const active = aos.snapshot();
   assert.equal(active.telemetry.active, 1);
   assert.equal(active.telemetry.workers.find((worker) => worker.taskId === byKey(aos, run.id, 'A').id).model, 'gpt-5.6-luna');
-  assert.ok(active.telemetry.workers.find((worker) => worker.taskId === byKey(aos, run.id, 'A').id).threadId);
+  assert.match(active.telemetry.workers.find((worker) => worker.taskId === byKey(aos, run.id, 'A').id).sessionId, /^hss_/);
   aos.cancelRun(run.id);
   await driving;
   assert.equal(byKey(aos, run.id, 'A').status, 'cancelled');

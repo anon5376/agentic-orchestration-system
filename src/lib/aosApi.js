@@ -43,7 +43,26 @@ export const aosApi = {
   }),
   snapshot: () => request('/snapshot'),
   createGoal: (prompt, contextPaths = []) => request('/goals', { method: 'POST', body: { prompt, contextPaths } }),
+  createLeadGoal: (prompt, contextPaths = [], requestId) => request('/goals', {
+    method: 'POST',
+    body: { prompt, contextPaths, planningMode: 'lead', requestId },
+  }),
   answerQuestions: (goalId, answers) => request(`/goals/${goalId}/answers`, { method: 'POST', body: { answers } }),
+  listLeadPlans: (goalId, status = null) => request(`/goals/${encode(goalId)}/lead-plans${queryString({ status })}`),
+  reviseLeadPlan: (goalId, { requestId, derivedFromProposalId } = {}) => request(`/goals/${encode(goalId)}/lead-plans`, {
+    method: 'POST',
+    body: { requestId, derivedFromProposalId },
+  }),
+  getLeadPlan: (id) => request(`/lead-plans/${encode(id)}`),
+  acceptLeadPlan: (id, actor = 'operator') => request(`/lead-plans/${encode(id)}/accept`, {
+    method: 'POST',
+    body: { actor },
+  }),
+  rejectLeadPlan: (id, reason = 'Rejected from dashboard', actor = 'operator') => request(`/lead-plans/${encode(id)}/reject`, {
+    method: 'POST',
+    body: { actor, reason },
+  }),
+  answerTaskQuestions: (taskId, answers) => request(`/tasks/${encode(taskId)}/answers`, { method: 'POST', body: { answers } }),
   startRun: (goalId, { blueprintId = null, blueprintVersion = null, maxConcurrency = null } = {}) => request('/runs', {
     method: 'POST',
     body: { goalId, blueprintId, blueprintVersion, maxConcurrency },
@@ -54,6 +73,13 @@ export const aosApi = {
   resume: (runId) => request(`/runs/${runId}/resume`, { method: 'POST', body: {} }),
   approveProposal: (id) => request(`/proposals/${id}/approve`, { method: 'POST', body: {} }),
   rejectProposal: (id) => request(`/proposals/${id}/reject`, { method: 'POST', body: { reason: 'Rejected from dashboard' } }),
+  providers: () => request('/providers').then((data) => data.providers || []),
+  modelControl: (projectId = null) => request(`/models${queryString({ projectId })}`),
+  assignModel: (input) => request('/models/assign', { method: 'POST', body: input }),
+  runPlan: (runId, version = null) => request(`/runs/${encode(runId)}/plan${queryString({ version })}`),
+  patchRunPlan: (runId, input) => request(`/runs/${encode(runId)}/plan/patches`, { method: 'POST', body: input }),
+  eventsReplay: ({ after = null, limit = 200 } = {}) => request(`/events/replay${queryString({ after, limit })}`),
+  eventsStreamUrl: (after = null) => `/api/v1/events/stream${queryString({ after })}`,
   cli: (command) => request('/cli', { method: 'POST', body: { command } }),
 
   systemManifest: () => request('/settings/manifest'),

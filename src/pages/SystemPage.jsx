@@ -1,6 +1,7 @@
-import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useWorkspace } from '../app/WorkspaceContext';
 import { aosApi } from '../lib/aosApi';
+import { initialSetupDraft, interpretSetupMessage } from '../lib/setupAssistant';
 
 const INSTRUMENTS = [
   { key: 'setup', label: 'Build swarm', count: '→', note: 'Start here' },
@@ -104,58 +105,125 @@ function InstrumentNav({ active, onChange, bundle }) {
   );
 }
 
-function SetupView({ bundle, onOpen, onLaunch }) {
-  const defaultSwarm = bundle.blueprints?.find((item) => item.id === 'default-research-swarm') || bundle.blueprints?.[0];
+function SetupView({ bundle, selectedBlueprintId, onApplyBlueprint, onOpen, onModels, onLaunch }) {
   const mode = bundle.snapshot?.execution?.mode || 'unknown';
   const runnable = bundle.executionAllowedHarnesses?.value || [];
-  const runtimeCopy = mode === 'local'
-    ? 'Runs use the deterministic local worker. No external model is called in this mode.'
-    : mode === 'codex'
-      ? 'Runs may dispatch to the mounted Codex worker when the selected worker allows it.'
-      : `The engine reports ${mode} execution. Check the worker and policy before launching.`;
-  const steps = [
-    { key: 'presets', number: '1', title: 'Write the instructions', text: 'Define one role clearly: its job, evidence standard, boundaries and required output.', action: 'Edit instructions' },
-    { key: 'templates', number: '2', title: 'Configure the workers', text: 'Choose the instructions, model or harness, tools, memory, autonomy and budget for each worker.', action: 'Configure workers' },
-    { key: 'blueprints', number: '3', title: 'Assemble the swarm', text: 'Pick the lead, the workers it may create, hierarchy depth, parallelism, gates and run limits.', action: 'Assemble swarm' },
-    { key: 'launch', number: '4', title: 'Give it a research goal', text: 'Attach your objective and context. AOS turns the selected swarm into a live run.', action: 'Create research goal' },
-  ];
+  const [draft, setDraft] = useState(() => initialSetupDraft(bundle.blueprints, selectedBlueprintId));
+  const [messages, setMessages] = useState(() => [{
+    id: 'welcome',
+    role: 'assistant',
+    title: 'What are you trying to build or investigate?',
+    body: 'Tell me the outcome in plain language. Add limits only if they matter. I’ll recommend a swarm and show every assumption before anything changes.',
+    question: 'For example: “Audit this repository with six workers, prioritize evidence, and use Codex.”',
+    unresolved: [],
+  }]);
+  const [input, setInput] = useState('');
+  const [appliedBlueprintId, setAppliedBlueprintId] = useState(selectedBlueprintId);
+  const transcriptRef = useRef(null);
+  const blueprint = bundle.blueprints?.find((item) => item.id === draft.blueprintId) || null;
+  const memoryEnabled = bundle.memoryPolicy?.effective?.enabled !== false;
+  const requestedHarnessSupported = draft.requestedHarness === 'inherit current runtime'
+    || (draft.requestedHarness.startsWith('Codex') && mode === 'codex');
+  const isApplied = Boolean(draft.blueprintId && appliedBlueprintId === draft.blueprintId);
+
+  useEffect(() => {
+    const node = transcriptRef.current;
+    if (node) node.scrollTop = node.scrollHeight;
+  }, [messages]);
+
+  const send = (text = input) => {
+    const value = String(text || '').trim();
+    if (!value) return;
+    const result = interpretSetupMessage(value, bundle.blueprints, draft);
+    setDraft(result.draft);
+    setAppliedBlueprintId((current) => current === result.draft.blueprintId ? current : null);
+    setMessages((current) => [
+      ...current,
+      { id: `user-${Date.now()}`, role: 'user', body: value },
+      { id: `assistant-${Date.now()}`, role: 'assistant', ...result.reply },
+    ]);
+    setInput('');
+  };
+
+  const reset = () => {
+    setDraft(initialSetupDraft(bundle.blueprints, selectedBlueprintId));
+    setAppliedBlueprintId(selectedBlueprintId);
+    setMessages([{ id: 'welcome', role: 'assistant', title: 'Start again.', body: 'Describe the result you want. I’ll keep the setup bounded and make each assumption visible.', question: 'Nothing from the previous draft was applied.', unresolved: [] }]);
+    setInput('');
+  };
+
+  const applyRecommendation = () => {
+    if (!draft.blueprintId) return;
+    onApplyBlueprint(draft.blueprintId);
+    setAppliedBlueprintId(draft.blueprintId);
+    setMessages((current) => [...current, {
+      id: `applied-${Date.now()}`,
+      role: 'assistant',
+      title: `${blueprint?.name || 'Swarm'} is now selected.`,
+      body: 'Only the swarm selection changed. Provider and memory requests remain notes until you configure and save them in their own editors.',
+      question: 'You can review the swarm or continue to Goal Intake.',
+      unresolved: [],
+    }]);
+  };
+
   return (
-    <div className="setup-stage">
-      <main className="setup-path">
-        <header className="setup-path__header">
-          <div><p>Start here</p><h2>Build one working swarm.</h2></div>
-          <p>Instructions shape a worker. Workers form a swarm. The swarm executes a goal.</p>
+    <div className="setup-assistant">
+      <main className="setup-chat">
+        <header className="setup-chat__header">
+          <div><Signal tone="verified">SETUP ASSISTANT</Signal><span>local configuration guide</span></div>
+          <button type="button" onClick={reset}>Clear conversation</button>
         </header>
-        <ol className="setup-steps">
-          {steps.map((step) => (
-            <li key={step.key}>
-              <span className="setup-steps__number">{step.number}</span>
-              <div><h3>{step.title}</h3><p>{step.text}</p></div>
-              <button type="button" onClick={() => step.key === 'launch' ? onLaunch() : onOpen(step.key)}>{step.action}<span aria-hidden="true"> →</span></button>
-            </li>
+        <div className="setup-chat__transcript" ref={transcriptRef} aria-live="polite">
+          {messages.map((message) => (
+            <article key={message.id} className={`setup-message setup-message--${message.role}`}>
+              <span className="setup-message__mark" aria-hidden="true">{message.role === 'user' ? '›' : 'AOS'}</span>
+              <div>
+                {message.title ? <h2>{message.title}</h2> : null}
+                <p>{message.body}</p>
+                {message.reason ? <p className="setup-message__reason"><span>Why</span>{message.reason}</p> : null}
+                {message.unresolved?.length ? <ul>{message.unresolved.map((item) => <li key={item}>{item}</li>)}</ul> : null}
+                {message.question ? <p className="setup-message__question">{message.question}</p> : null}
+              </div>
+            </article>
           ))}
-        </ol>
-        <footer className="setup-path__footer">
-          <p>Need full control? Every field remains available.</p>
-          <button type="button" onClick={() => onOpen('settings')}>Open advanced settings</button>
-        </footer>
+        </div>
+        <div className="setup-chat__suggestions" aria-label="Example requests">
+          <button type="button" onClick={() => send('Set up a rigorous research swarm that prioritizes evidence quality.')}>Research</button>
+          <button type="button" onClick={() => send('Use 6 workers to audit an existing result and verify every claim.')}>Audit</button>
+          <button type="button" onClick={() => send('Run an exhaustive unbounded investigation with persistent memory.')}>Unbounded</button>
+        </div>
+        <form className="setup-chat__composer" onSubmit={(event) => { event.preventDefault(); send(); }}>
+          <span aria-hidden="true">›</span>
+          <textarea value={input} onChange={(event) => setInput(event.target.value)} onKeyDown={(event) => { if (event.key === 'Enter' && !event.shiftKey) { event.preventDefault(); send(); } }} placeholder="Describe the swarm you need…" aria-label="Message the setup assistant" rows="2" />
+          <button type="submit" disabled={!input.trim()}>Send</button>
+        </form>
       </main>
-      <aside className="setup-runtime">
-        <section>
-          <p>Quick start</p>
-          <h2>{defaultSwarm?.name || 'Default research swarm'}</h2>
-          <p>Open the installed default, inspect its team and limits, then use it as the basis for your first run.</p>
-          <button type="button" className="system-button system-button--primary" onClick={() => onOpen('blueprints', defaultSwarm?.id)}>Review this swarm</button>
+      <aside className="setup-draft">
+        <header><p>Working draft</p><Signal tone={isApplied ? 'verified' : 'transition'}>{isApplied ? 'SELECTED' : 'NOT APPLIED'}</Signal></header>
+        <section className="setup-draft__primary">
+          <span>Recommended swarm</span>
+          <h2>{blueprint?.name || 'Waiting for a goal'}</h2>
+          <p>{blueprint?.description || 'The assistant needs a short objective before it can recommend a configuration.'}</p>
         </section>
-        <section>
-          <div className="setup-runtime__status"><Signal tone={mode === 'local' ? 'quiet' : 'verified'}>{mode.toUpperCase()}</Signal><span>current execution</span></div>
-          <p>{runtimeCopy}</p>
+        <section className="setup-draft__facts">
           <dl>
-            <div><dt>Runnable adapters</dt><dd>{runnable.length ? runnable.join(' / ') : 'none reported'}</dd></div>
-            <div><dt>Saved workers</dt><dd>{bundle.templates?.length || 0}</dd></div>
-            <div><dt>Saved swarms</dt><dd>{bundle.blueprints?.length || 0}</dd></div>
+            <div><dt>Priority</dt><dd>{draft.priority}</dd></div>
+            <div><dt>Requested scale</dt><dd>{draft.requestedWorkers ? `${draft.requestedWorkers} workers` : blueprint?.unlimited ? 'unbounded' : 'blueprint default'}</dd></div>
+            <div><dt>Current runtime</dt><dd>{mode}</dd></div>
+            <div><dt>Provider request</dt><dd className={requestedHarnessSupported ? '' : 'is-warning'}>{draft.requestedHarness}</dd></div>
+            <div><dt>Memory</dt><dd>{draft.memory === 'inherit current policy' ? (memoryEnabled ? 'on · current policy' : 'off · current policy') : draft.memory}</dd></div>
+            <div><dt>Allowed by policy</dt><dd>{runnable.length ? runnable.join(' / ') : 'none reported'}</dd></div>
           </dl>
         </section>
+        <section className="setup-draft__actions">
+          <button type="button" className="system-button system-button--primary" disabled={!draft.blueprintId || isApplied} onClick={applyRecommendation}>{isApplied ? 'Recommendation selected' : 'Use this recommendation'}</button>
+          <button type="button" className="system-button" disabled={!draft.blueprintId} onClick={() => onOpen('blueprints', draft.blueprintId)}>Review swarm details</button>
+          <button type="button" className="system-button" onClick={onModels}>Choose models</button>
+          <button type="button" className="system-button" onClick={() => onOpen('templates')}>Configure workers</button>
+          <button type="button" className="system-button" onClick={() => onOpen('memory')}>Configure memory</button>
+          <button type="button" className="system-button system-button--next" disabled={!isApplied} onClick={onLaunch}>Continue to goal intake →</button>
+        </section>
+        <footer><span>Guide only</span><p>This chat does not call a model or silently rewrite configuration. Live Codex remains inside verified swarm runs.</p></footer>
       </aside>
     </div>
   );
@@ -676,6 +744,11 @@ export function SystemPage({ onNavigate }) {
     try { if (selected.blueprints) window.localStorage.setItem(SELECTED_BLUEPRINT_KEY, selected.blueprints); } catch { /* ignore */ }
     onNavigate('/intake');
   };
+  const applySelectedSwarm = (id) => {
+    setSelected((value) => ({ ...value, blueprints: id }));
+    try { window.localStorage.setItem(SELECTED_BLUEPRINT_KEY, id); } catch { /* ignore */ }
+    setNotice('Swarm recommendation selected · no run started');
+  };
 
   return (
     <div className="system-page">
@@ -686,7 +759,7 @@ export function SystemPage({ onNavigate }) {
         : loading && !bundle ? <div className="system-loading system-loading--page">Reading the live engine manifest…</div>
           : bundle ? (
             <>
-              {active === 'setup' ? <SetupView bundle={bundle} onOpen={openInstrument} onLaunch={launchSelectedSwarm} /> : null}
+              {active === 'setup' ? <SetupView bundle={bundle} selectedBlueprintId={selected.blueprints} onApplyBlueprint={applySelectedSwarm} onOpen={openInstrument} onModels={() => onNavigate('/models')} onLaunch={launchSelectedSwarm} /> : null}
               {active === 'presets' ? <PresetView items={bundle.presets} selectedId={selected.presets} onSelect={(id) => setSelected((value) => ({ ...value, presets: id }))} detail={detail} loading={detailLoading} editor={editor} setEditor={setEditor} onSave={savePreset} onNext={() => openInstrument('templates')} /> : null}
               {active === 'templates' ? <TemplateView items={bundle.templates} presets={bundle.presets} manifest={bundle.manifest} executionAllowedHarnesses={bundle.executionAllowedHarnesses} selectedId={selected.templates} onSelect={(id) => setSelected((value) => ({ ...value, templates: id }))} detail={detail} loading={detailLoading} editor={editor} setEditor={setEditor} onSave={saveTemplate} onNext={() => openInstrument('blueprints')} /> : null}
               {active === 'blueprints' ? <BlueprintView items={bundle.blueprints} templates={bundle.templates} selectedId={selected.blueprints} onSelect={(id) => { setSelected((value) => ({ ...value, blueprints: id })); try { window.localStorage.setItem(SELECTED_BLUEPRINT_KEY, id); } catch { /* ignore */ } }} detail={detail} estimate={estimate} loading={detailLoading} editor={editor} setEditor={setEditor} onSave={saveBlueprint} onNext={launchSelectedSwarm} /> : null}

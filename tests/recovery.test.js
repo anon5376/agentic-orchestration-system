@@ -1,7 +1,8 @@
-import { mkdtempSync } from 'node:fs';
+import { existsSync, mkdtempSync, readdirSync, writeFileSync } from 'node:fs';
 import { hostname, tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { spawn } from 'node:child_process';
+import { pathToFileURL } from 'node:url';
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { AosEngine } from '../engine/engine.js';
@@ -27,8 +28,8 @@ function newEngine(dataDir = mkdtempSync(join(tmpdir(), 'aos-recovery-'))) {
 }
 
 function slowWorker(aos, { delayMs = 150, onExecute = null } = {}) {
-  aos.workers.set('slow', {
-    id: 'slow',
+  aos.workers.set('local', {
+    id: 'local',
     async execute(task, ctx) {
       if (onExecute) await onExecute(task, ctx);
       await sleep(delayMs);
@@ -39,7 +40,7 @@ function slowWorker(aos, { delayMs = 150, onExecute = null } = {}) {
 
 function planOf(keys, deps = [], extra = {}) {
   return {
-    tasks: keys.map((key) => ({ id: key, key, title: `Task ${key}`, kind: 'research', worker: 'slow', ...extra })),
+    tasks: keys.map((key) => ({ id: key, key, title: `Task ${key}`, kind: 'research', worker: 'local', ...extra })),
     dependencies: deps.map(([taskId, dependsOnTaskId]) => ({ taskId, dependsOnTaskId })),
   };
 }
@@ -154,8 +155,8 @@ test('restart reaps a recorded live worker process group and requeues the task',
 test('an attempt records the worker process, keeps its lease fresh, and clears it on settlement', async () => {
   const a = newEngine();
   let seen = null;
-  a.workers.set('slow', {
-    id: 'slow',
+  a.workers.set('local', {
+    id: 'local',
     async execute(task, ctx) {
       ctx.recordWorkerProcess({ pid: process.pid, pgid: process.pid });
       ctx.heartbeat();
@@ -203,8 +204,8 @@ test('two engines driving the same run do not double-dispatch a task', async () 
   const b = newEngine(a.store.dataDir);
   const calls = [];
   for (const engine of [a, b]) {
-    engine.workers.set('slow', {
-      id: 'slow',
+    engine.workers.set('local', {
+      id: 'local',
       async execute(task) {
         calls.push(task.key);
         await sleep(150);
@@ -225,3 +226,105 @@ test('two engines driving the same run do not double-dispatch a task', async () 
   const dispatched = c.store.readEventLog().filter((event) => event.type === 'worker.dispatched' && event.runId === run.id);
   assert.equal(dispatched.length, 3);
 });
+
+test('a waiting task survives restart and concurrent engines answer it once', async () => {
+  const a = newEngine();
+  a.workers.set('local', {
+    id: 'local',
+    async execute(task) {
+      return task.attempts === 1
+        ? { status: 'awaiting_user', questions: [{ prompt: 'Choose the bounded source set.' }] }
+        : { status: 'succeeded', summary: 'resumed' };
+    },
+  });
+  const goal = a.createGoal({
+    prompt: PROMPT,
+    plan: { tasks: [{ id: 'ask', key: 'ask', title: 'Ask operator', kind: 'research', worker: 'local' }], dependencies: [] },
+  });
+  const run = a.startRun({ goalId: goal.id });
+  await a.advanceRun(run.id, { untilIdle: true });
+  const waiting = a.state.tasks.find((task) => task.runId === run.id);
+  const questionId = waiting.questions[0].id;
+  const beforeRestart = a.store.readEventLog();
+  const preWaitCursor = beforeRestart.find((event) => event.type === 'task.started' && event.taskId === waiting.id)?.cursor;
+  assert.equal(typeof preWaitCursor, 'number');
+
+  const reloaded = newEngine(a.store.dataDir);
+  assert.equal(reloaded.getRun(run.id).status, 'awaiting_user');
+  assert.equal(reloaded.getTask(waiting.id).status, 'awaiting_user');
+  assert.deepEqual(reloaded.getTask(waiting.id).wait, waiting.wait);
+  assert.equal(reloaded.store.readEventLog().length, beforeRestart.length);
+
+  const barrier = join(a.store.dataDir, 'answer-barrier');
+  const readyDir = join(barrier, 'ready');
+  const release = join(barrier, 'release');
+  writeFileSync(join(a.store.dataDir, 'answer-child.mjs'), `
+    import { existsSync, mkdirSync, writeFileSync } from 'node:fs';
+    import { join } from 'node:path';
+    import { AosEngine } from ${JSON.stringify(pathToFileURL(join(process.cwd(), 'engine/engine.js')).href)};
+    const dataDir = process.argv[2];
+    const taskId = process.argv[3];
+    const questionId = process.argv[4];
+    const barrier = process.argv[5];
+    const readyDir = join(barrier, 'ready');
+    mkdirSync(readyDir, { recursive: true });
+    writeFileSync(join(readyDir, String(process.pid)), 'ready');
+    while (!existsSync(join(barrier, 'release'))) Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, 10);
+    const engine = new AosEngine({ dataDir });
+    engine.load();
+    try {
+      engine.answerTaskQuestions(taskId, [{ id: questionId, answer: 'Published bounded sources.' }]);
+      process.stdout.write('ok\\n');
+    } catch (error) {
+      process.stdout.write(JSON.stringify({ code: error.code, message: error.message }) + '\\n');
+      process.exitCode = 1;
+    }
+  `);
+  const childPath = join(a.store.dataDir, 'answer-child.mjs');
+  const launch = () => new Promise((resolve) => {
+    const child = spawn(process.execPath, [childPath, a.store.dataDir, waiting.id, questionId, barrier], { stdio: ['ignore', 'pipe', 'pipe'] });
+    let stdout = '';
+    let stderr = '';
+    child.stdout.on('data', (chunk) => { stdout += chunk; });
+    child.stderr.on('data', (chunk) => { stderr += chunk; });
+    child.on('close', (code) => resolve({ code, stdout, stderr }));
+  });
+  const children = [launch(), launch()];
+  for (let i = 0; i < 200 && (!existsSync(readyDir) || readdirCount(readyDir) < 2); i += 1) await sleep(5);
+  assert.equal(readdirCount(readyDir), 2, 'both answer engines reached the barrier');
+  writeFileSync(release, 'go');
+  const results = await Promise.all(children);
+  assert.deepEqual(results.map((result) => result.code), [0, 0]);
+  assert.ok(results.every((result) => result.stdout.includes('ok')));
+
+  const after = newEngine(a.store.dataDir);
+  const answered = after.getTask(waiting.id);
+  assert.equal(answered.questions[0].answer, 'Published bounded sources.');
+  assert.equal(answered.status, 'ready');
+  assert.equal(after.getRun(run.id).status, 'running');
+  const events = after.store.readEventLog().filter((event) => event.taskId === waiting.id);
+  assert.equal(events.filter((event) => event.type === 'task.questions_answered').length, 1);
+  assert.equal(events.filter((event) => event.type === 'task.resumed').length, 1);
+  const replay = after.store.replay({ after: preWaitCursor, limit: 500 });
+  assert.equal(replay.resyncRequired, false);
+  const replayTypes = replay.events.filter((event) => event.taskId === waiting.id).map((event) => event.type);
+  assert.ok(replayTypes.includes('task.awaiting_user'));
+  assert.ok(replayTypes.includes('task.questions_answered'));
+  assert.ok(replayTypes.includes('task.resumed'));
+  after.workers.set('local', {
+    id: 'local',
+    async execute() { return { status: 'succeeded', summary: 'resumed' }; },
+  });
+  await after.advanceRun(run.id, { untilIdle: true });
+  assert.equal(after.getTask(waiting.id).status, 'succeeded');
+  assert.equal(after.getTask(waiting.id).attempts, 2);
+  assert.equal(after.getRun(run.id).status, 'completed');
+});
+
+function readdirCount(path) {
+  try {
+    return readdirSync(path).length;
+  } catch {
+    return 0;
+  }
+}

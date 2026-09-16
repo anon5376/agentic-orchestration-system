@@ -165,7 +165,7 @@ test('CLI and HTTP accept a blueprint when starting a run', async () => {
   const started = await executeCommand(aos, `run start ${goalId} --blueprint small-audit-swarm`);
   assert.equal(started.ok, true);
   assert.match(started.lines[0], /blueprint small-audit-swarm@1/);
-  const { listen, close, server } = createAosServer({ engine: aos, port: 0, host: '127.0.0.1' });
+  const { listen, close, server } = createAosServer({ engine: aos, port: 0, host: '127.0.0.1', operatorToken: false });
   await listen();
   const port = server.address().port;
   const response = await fetch(`http://127.0.0.1:${port}/api/v1/runs`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ goalId, blueprintId: 'default-research-swarm' }) });

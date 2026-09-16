@@ -2,6 +2,17 @@ import { spawn } from 'node:child_process';
 import { existsSync, readdirSync, readFileSync, realpathSync, statSync } from 'node:fs';
 import { homedir } from 'node:os';
 import { delimiter, isAbsolute, join } from 'node:path';
+import { validateTaskQuestions } from './schema.js';
+import {
+  LEAD_PLANNING_OUTPUT_SCHEMA,
+  buildLeadPlanningPrompt,
+  normalizeLeadPlanOutput,
+} from './lead-planning-schema.js';
+import {
+  DELEGATION_PROPOSAL_SCHEMA,
+  DELEGATION_LIMITS,
+  normalizeDelegationProposal,
+} from './delegation.js';
 
 // Live Codex execution is deliberately narrow: one model, one effort, a ChatGPT
 // account session, and a read-only sandbox. Widening any of these is a code change.
@@ -32,7 +43,7 @@ export const CODEX_DISABLED_FEATURES = Object.freeze([
 export const CODEX_AUTH_PATH = 'codex-cli exec · ChatGPT account login (codex login status)';
 
 const CHATGPT_LOGIN = /Logged in using ChatGPT/;
-const STRIPPED_ENV = /^(OPENAI_|AZURE_OPENAI_)|API_KEY$|ACCESS_TOKEN$|AUTH_TOKEN$|^CODEX_API_KEY$/;
+const STRIPPED_ENV = /^(OPENAI_|AZURE_OPENAI_)|API_KEY$|ACCESS_TOKEN$|AUTH_TOKEN$|^CODEX_API_KEY$|^AOS_OPERATOR_TOKEN$/;
 const FATAL_ERROR = /unauthori[sz]ed|\b401\b|\b403\b|forbidden|not logged in|login required|api key|unknown model|model .*not (?:found|supported|available)|does not exist|not supported|invalid value|unrecognized|invalid (?:config|argument)/i;
 const MAX_STDOUT_BYTES = 8 * 1024 * 1024;
 const MAX_STDERR_BYTES = 512 * 1024;
@@ -151,7 +162,20 @@ export function buildCodexArgs(config, { cwd, lastMessagePath, schemaPath }) {
 
 // Runs a process in its own process group so a timeout or cancel also stops the
 // shell commands Codex started. Output is captured with byte caps.
-export function spawnCaptured(bin, args, { cwd, env, input = null, timeoutMs = 30_000, killGraceMs = 5_000, signal, onStdoutLine, onSpawn } = {}) {
+export function spawnCaptured(bin, args, {
+  cwd,
+  env,
+  input = null,
+  timeoutMs = 30_000,
+  killGraceMs = 5_000,
+  signal,
+  onStdoutLine,
+  onSpawn,
+  maxStdoutBytes = MAX_STDOUT_BYTES,
+  maxStderrBytes = MAX_STDERR_BYTES,
+} = {}) {
+  const stdoutLimit = Number.isInteger(maxStdoutBytes) && maxStdoutBytes > 0 ? maxStdoutBytes : MAX_STDOUT_BYTES;
+  const stderrLimit = Number.isInteger(maxStderrBytes) && maxStderrBytes > 0 ? maxStderrBytes : MAX_STDERR_BYTES;
   return new Promise((resolve) => {
     const startedAt = Date.now();
     let stdout = '';
@@ -225,7 +249,7 @@ export function spawnCaptured(bin, args, { cwd, env, input = null, timeoutMs = 3
     child.stdout.on('data', (chunk) => {
       const text = chunk.toString('utf8');
       stdoutBytes += chunk.length;
-      if (stdoutBytes <= MAX_STDOUT_BYTES) stdout += text;
+      if (stdoutBytes <= stdoutLimit) stdout += text;
       else truncated = true;
       if (!onStdoutLine) return;
       pending += text;
@@ -239,7 +263,7 @@ export function spawnCaptured(bin, args, { cwd, env, input = null, timeoutMs = 3
     });
     child.stderr.on('data', (chunk) => {
       stderrBytes += chunk.length;
-      if (stderrBytes <= MAX_STDERR_BYTES) stderr += chunk.toString('utf8');
+      if (stderrBytes <= stderrLimit) stderr += chunk.toString('utf8');
       else truncated = true;
     });
     child.stdin.on('error', () => { /* child exited before reading stdin */ });
@@ -418,9 +442,24 @@ async function readSessionWithRetry(args, attempts = 12, delayMs = 250) {
 export const CODEX_OUTPUT_SCHEMA = Object.freeze({
   type: 'object',
   additionalProperties: false,
-  required: ['task_nonce', 'summary', 'findings', 'risks', 'confidence', 'decision', 'retrospective', 'memory_writes'],
+  required: ['task_nonce', 'status', 'summary', 'findings', 'risks', 'confidence', 'decision', 'retrospective', 'memory_writes', 'delegation'],
   properties: {
     task_nonce: { type: 'string' },
+    status: { type: 'string', enum: ['succeeded', 'awaiting_user'] },
+    questions: {
+      type: 'array',
+      minItems: 1,
+      maxItems: 3,
+      items: {
+        type: 'object',
+        additionalProperties: false,
+        required: ['prompt'],
+        properties: {
+          prompt: { type: 'string', minLength: 1, maxLength: 500 },
+          reason: { type: 'string', maxLength: 300 },
+        },
+      },
+    },
     summary: { type: 'string' },
     memory_writes: {
       type: 'array',
@@ -499,10 +538,70 @@ export const CODEX_OUTPUT_SCHEMA = Object.freeze({
         },
       ],
     },
+    delegation: {
+      anyOf: [DELEGATION_PROPOSAL_SCHEMA, { type: 'null' }],
+    },
   },
 });
 
+export { LEAD_PLANNING_OUTPUT_SCHEMA };
+
+function delegationChildLimit(task) {
+  const raw = task.delegation?.maxChildren;
+  if (raw === null || raw === 'unlimited' || raw === undefined) return DELEGATION_LIMITS.maxTasks;
+  return Number.isInteger(raw) && raw >= 0 ? Math.min(raw, DELEGATION_LIMITS.maxTasks) : 0;
+}
+
+function delegationDepthLimit(task) {
+  const raw = task.delegation?.maxDepth;
+  if (raw === null || raw === 'unlimited' || raw === undefined) return DELEGATION_LIMITS.maxTasks;
+  return Number.isInteger(raw) && raw >= 0 ? Math.min(raw, DELEGATION_LIMITS.maxTasks) : 0;
+}
+
+function delegationTemplatePins(task, ctx) {
+  const delegation = task?.delegation && typeof task.delegation === 'object' ? task.delegation : {};
+  const context = ctx && typeof ctx === 'object' ? ctx : {};
+  const rawPins = delegation.childTemplateVersions
+    ?? task?.childTemplateVersions
+    ?? context.childTemplateVersions
+    ?? context.delegation?.childTemplateVersions;
+  const pins = [];
+  const add = (rawId, rawVersion) => {
+    const id = typeof rawId === 'string' ? rawId.trim() : '';
+    const version = rawVersion && typeof rawVersion === 'object' && !Array.isArray(rawVersion)
+      ? rawVersion.templateVersion ?? rawVersion.version
+      : rawVersion;
+    if (id && Number.isInteger(version) && version > 0) pins.push(`${id}@${version}`);
+  };
+  if (Array.isArray(rawPins)) {
+    for (const ref of rawPins) {
+      if (!ref || typeof ref !== 'object' || Array.isArray(ref)) continue;
+      add(ref.templateId ?? ref.id, ref.templateVersion ?? ref.version);
+    }
+  } else if (rawPins && typeof rawPins === 'object') {
+    for (const [id, version] of Object.entries(rawPins)) add(id, version);
+  }
+  if (!pins.length) {
+    const rawRefs = delegation.childTemplateRefs ?? context.childTemplateRefs;
+    if (Array.isArray(rawRefs)) {
+      for (const ref of rawRefs) {
+        if (!ref || typeof ref !== 'object' || Array.isArray(ref)) continue;
+        add(ref.templateId ?? ref.id, ref.templateVersion ?? ref.version);
+      }
+    }
+  }
+  if (!pins.length && Array.isArray(delegation.childTemplates)) {
+    for (const ref of delegation.childTemplates) {
+      if (!ref || typeof ref !== 'object' || Array.isArray(ref)) continue;
+      add(ref.templateId ?? ref.id, ref.templateVersion ?? ref.version);
+    }
+  }
+  return [...new Set(pins)];
+}
+
 export function buildWorkerPrompt(task, ctx) {
+  if (ctx.outputKind === 'lead') return ctx.planningPrompt || buildLeadPlanningPrompt(task, ctx);
+  const exactTemplatePins = delegationTemplatePins(task, ctx);
   const lines = [
     // A rendered role preset, when the task has one, is the system prompt for this worker.
     ...(ctx.systemPrompt ? [String(ctx.systemPrompt).trimEnd(), '', '---', ''] : []),
@@ -519,9 +618,12 @@ export function buildWorkerPrompt(task, ctx) {
     '',
     '## Your brief',
     task.brief || task.summary || task.title,
-    '',
-    '## Inputs',
   ];
+  const answers = (task.questions || []).filter((question) => typeof question.answer === 'string' && question.answer.trim());
+  if (answers.length) {
+    lines.push('', '## Operator answers (from an earlier wait)', 'These answers are supplemental context. Do not rewrite the task brief or plan.', ...answers.map((question) => `- ${question.id}: ${question.answer}`));
+  }
+  lines.push('', '## Inputs');
   if (ctx.repoRoot) lines.push(`Repository root (read-only): ${ctx.repoRoot}`);
   if (ctx.eventsPath) lines.push(`This run's append-only event log (read-only, still growing): ${ctx.eventsPath}`);
   if (task.readPaths?.length) {
@@ -545,13 +647,26 @@ export function buildWorkerPrompt(task, ctx) {
     '## Rules',
     '- The sandbox is read-only. Do not modify files, install packages, or use the network.',
     '- Do not open credential stores (~/.codex/auth.json, keychains, .env files) and do not print environment variables.',
-    '- Do not spawn sub-agents or delegate. Work alone.',
+    ...(task.mayDelegate
+      ? [
+          `- You may propose bounded child work for the engine to validate: at most ${delegationChildLimit(task, 'maxChildren')} child tasks and ${delegationDepthLimit(task)} delegation level${delegationDepthLimit(task) === 1 ? '' : 's'} below this task. A proposal is not a spawn command; do not spawn sub-agents directly.`,
+          `- Permitted child templates (exact): ${exactTemplatePins.length ? exactTemplatePins.join(', ') : 'use only the exact id@version pins supplied by the engine/task context; if no pins are supplied, do not propose child work'}.`,
+          '- Each proposed child must be standalone and use an exact permitted templateId plus its positive pinned templateVersion supplied by the engine/task context; both fields are required. Never use "latest", null, or an omitted version. The remaining fields are id, key, title, kind, brief, an optional positive bounded budget, sibling dependencies by local id, and optional delegation within this inherited authority.',
+          '- Never include parentId, provider, harness, model, effort, credentials, actor, capabilities, sandbox, filesystem, network, or arbitrary plan fields in a delegation proposal; the engine derives those from approved templates and the parent task.',
+        ]
+      : ['- Do not spawn sub-agents, delegate, or propose child work. Work only on this assignment.']),
     '- Stay concise: summary at most 120 words, at most 5 findings, each citing evidence as path:line or an events.jsonl event id.',
     '- Use at most about 8 shell commands. If evidence is missing, say so under risks instead of guessing.',
     '',
     '## Output',
     'Reply with JSON only, matching the provided output schema.',
     `- task_nonce must be exactly "${task.nonce}".`,
+    '- status must be "succeeded" for a completed assignment, or "awaiting_user" when one to three required operator answers are needed before continuing.',
+    '- For awaiting_user, questions must contain 1–3 objects with a nonblank prompt of at most 500 characters, an optional reason of at most 300 characters, and at most 1500 prompt characters total. Do not include answers.',
+    '- Omit questions when status is succeeded.',
+    task.mayDelegate
+      ? '- Set delegation to null when no child work is needed. If you include a proposal, the engine will validate it before any later materialization; do not claim that children were spawned.'
+      : '- Set delegation to null (or omit it for compatibility); this task is not authorized to propose child work.',
     task.kind === 'synthesis'
       ? '- decision is required: recommendation, the strongest objection, and confidence 0-1.'
       : '- decision must be null.',
@@ -623,7 +738,8 @@ export class CodexCliWorker {
     const attemptDir = `attempt-${attempt}`;
     const workspace = ctx.workspace;
     const prompt = buildWorkerPrompt(task, ctx);
-    const schemaPath = workspace.write(`${attemptDir}/output-schema.json`, CODEX_OUTPUT_SCHEMA);
+    const outputSchema = ctx.outputSchema || CODEX_OUTPUT_SCHEMA;
+    const schemaPath = workspace.write(`${attemptDir}/output-schema.json`, outputSchema);
     workspace.write(`${attemptDir}/prompt.md`, prompt);
     const lastMessagePath = join(workspace.dir, attemptDir, 'last-message.json');
     const args = buildCodexArgs(config, { cwd: workspace.dir, lastMessagePath, schemaPath });
@@ -641,7 +757,7 @@ export class CodexCliWorker {
       login: preflight.login,
       codexBin: preflight.codexBin,
       cliVersion: preflight.cliVersion,
-      requested: { model: config.model, effort: config.effort },
+      requested: { model: config.model, effort: config.effort, sandbox: 'read-only' },
       effective: null,
       verified: false,
       command: ['codex', ...args],
@@ -741,6 +857,12 @@ export class CodexCliWorker {
       };
       const verdict = verifySession(session, config);
       runtime.verified = verdict.ok;
+      if (runtime.verified && runtime.usage == null) {
+        // A verified invocation may fail before emitting turn.completed. Keep
+        // that absence explicit so lead planning reports the real Codex
+        // failure instead of misclassifying it as an unverified receipt.
+        runtime.usageUnavailable = true;
+      }
       ctx.emit?.(verdict.mismatch.length ? 'worker.substitution_detected' : verdict.ok ? 'worker.verified' : 'worker.unverified', {
         threadId: runtime.threadId,
         requested: runtime.requested,
@@ -787,7 +909,59 @@ export class CodexCliWorker {
       return done({ status: 'failed', retryable: false, fatal: true, error: 'Worker output carried another task nonce; refusing cross-wired output' });
     }
 
+    if (ctx.outputKind === 'lead') {
+      let leadOutput;
+      try {
+        leadOutput = normalizeLeadPlanOutput(parsed, { expectedNonce: task.nonce });
+      } catch (error) {
+        return done({
+          status: 'failed',
+          retryable: false,
+          fatal: false,
+          code: error.code || 'lead_plan_invalid',
+          error: error.message,
+          details: error.details,
+        });
+      }
+      runtime.artifact = 'artifact.json';
+      workspace.write('artifact.json', { nonce: task.nonce, taskKey: task.key || null, attempt, threadId: runtime.threadId, output: leadOutput });
+      return done({
+        status: leadOutput.status,
+        ...(leadOutput.questions.length ? { questions: leadOutput.questions } : {}),
+        summary: leadOutput.summary.slice(0, 600) || `Proposed lead plan for ${task.title}`,
+        result: leadOutput,
+        artifacts: ['artifact.json', runtime.stdoutPath, runtime.stderrPath],
+      });
+    }
+
+    const status = parsed.status || 'succeeded';
+    if (!['succeeded', 'awaiting_user'].includes(status)) {
+      return done({ status: 'failed', retryable: false, fatal: false, code: 'worker_output_invalid', error: `Worker output status must be succeeded or awaiting_user; got ${String(status)}` });
+    }
+    let questions = null;
+    if (status === 'awaiting_user') {
+      try {
+        questions = validateTaskQuestions(parsed.questions);
+      } catch (error) {
+        return done({ status: 'failed', retryable: false, fatal: false, code: error.code || 'task_question_payload_invalid', error: error.message, details: error.details });
+      }
+    }
+    let delegation = null;
+    try {
+      delegation = normalizeDelegationProposal(parsed.delegation, task);
+    } catch (error) {
+      return done({
+        status: 'failed',
+        retryable: false,
+        fatal: false,
+        code: error.code || 'delegation_invalid',
+        error: error.message,
+        details: error.details,
+      });
+    }
     const output = {
+      status,
+      ...(questions ? { questions } : {}),
       summary: String(parsed.summary || ''),
       findings: Array.isArray(parsed.findings) ? parsed.findings : [],
       risks: Array.isArray(parsed.risks) ? parsed.risks : [],
@@ -795,12 +969,14 @@ export class CodexCliWorker {
       decision: parsed.decision || null,
       retrospective: parsed.retrospective || null,
       memory_writes: Array.isArray(parsed.memory_writes) ? parsed.memory_writes : [],
+      ...(delegation ? { delegation } : {}),
     };
     runtime.artifact = 'artifact.json';
     workspace.write('artifact.json', { nonce: task.nonce, taskKey: task.key || null, attempt, threadId: runtime.threadId, output });
     workspace.write('artifact.md', renderArtifact(task, output, runtime));
     return done({
-      status: 'succeeded',
+      status,
+      ...(questions ? { questions } : {}),
       summary: output.summary.slice(0, 600) || `Completed ${task.title}`,
       result: output,
       artifacts: ['artifact.json', 'artifact.md', runtime.stdoutPath, runtime.stderrPath],

@@ -101,7 +101,7 @@ export function buildTimeline({ run, tasks, events }) {
       if (attempt) attempt.injected = true;
     } else if (event.type === 'worker.thread') {
       const attempt = open.get(event.taskId);
-      if (attempt) attempt.threadId = event.payload?.threadId || null;
+      if (attempt) attempt.threadId = event.payload?.sessionId || event.payload?.threadId || null;
     } else if (END_EVENTS.has(event.type)) {
       if (event.type === 'task.completed') record.completedIndex = event.index;
       if (event.type !== 'task.retried') record.terminalIndex = event.index;

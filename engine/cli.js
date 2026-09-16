@@ -1,19 +1,28 @@
 import { AosEngine } from './engine.js';
 import { preflightCodex, resolveCodexConfig } from './codex.js';
+import { preflightClaude, resolveClaudeConfig } from './claude.js';
+import { resolveOllamaConfig } from './ollama.js';
 import { readFileSync } from 'node:fs';
 import { apiActions } from './api.js';
+import { AosError } from './schema.js';
 
 export const HELP = `AOS — local agentic coordination
 
 Usage:
   aos serve [--port 7740] [--data DIR]
+  aos pool run --worker codex [--run RUN_ID] [--once] [--owner ID]
   aos status
   aos providers
-  aos live preflight
+  aos live preflight [codex|claude|ollama|command]
   aos project create <name>
-  aos goal create "<prompt>" [--context PATH]
+  aos goal create "<prompt>" [--context PATH] [--planning-mode lead --request-id ID]
+  aos goal plan <goalId> --request-id ID [--derived-from ID]
+  aos goal plans <goalId>
   aos goal show <id>
   aos goal answer <goalId> <questionId> "<answer>"
+  aos lead-plan show <id> | accept <id> [--actor A] | reject <id> [--reason R] [--actor A]
+  aos task answer <taskId> <questionId> "<answer>"
+  aos delegation list <runId> | approve <receiptId> --request-id ID | reject <receiptId> --request-id ID
   aos goals
   aos run start <goalId> [--concurrency N] [--blueprint ID]
   aos runs
@@ -43,6 +52,13 @@ System access (every command below is also an HTTP route under /api/v1; same val
   aos template validate --json J | from-task <taskId> <newId> [--name N] | export | import --file F
   aos blueprint list | show <id> | history <id> | effective <id> | estimate <id> [--depth N] | create --json J | edit <id> --json J
   aos blueprint fork <id> <newId> | archive <id> | restore <id> | validate --json J | export | import --file F
+  aos capability list [--kind skill|mcp|plugin|tool] | show <id> [--version N] | history <id>
+  aos capability create --json J | edit <id> --json J | test <id> --version N --json J
+  aos capability enable <id> --version N | revoke <id> --version N [--reason R]
+  aos capability permissions <id> --version N | grant <id> --version N --json J | revoke-permission <id> --version N --json J
+  aos session list [--project ID] [--run ID] [--task ID] [--provider ID] [--status active|reset|expired]
+  aos session show <id> | reset <id> [--reason R] | retention
+  aos improvement evaluate <proposalId> --json J | evaluations [--proposal ID] | genome [--project ID] | rollback <genomeVersionId> [--reason R]
   aos memory stats | policy [--scope S --scope-id ID] | policy set --json J [--scope S --scope-id ID]
   aos memory search [--scope S --namespace NS --query Q --tags a,b --limit N] | show <id> | add <scope> <namespace> --json J
   aos memory correct <id> --json J | commit <id> | pin <id> | unpin <id> | forget <id> [--reason R] | promote <id> <toScope>
@@ -52,9 +68,16 @@ System access (every command below is also an HTTP route under /api/v1; same val
 
 Live execution (off by default):
   AOS_EXECUTION=codex runs worker tasks through \`codex exec\` on the ChatGPT
-  account login. Only gpt-5.6-luna at effort max is accepted, at most 4 workers
-  run at once, and nothing falls back to another worker or model.
-  AOS_CODEX_TIMEOUT_MS  per-attempt timeout   AOS_REPO_ROOT  read-only repo for workers
+  account login. AOS_EXECUTION=mixed enables the explicitly configured provider
+  adapters independently; selected tasks fail closed when their adapter is not ready.
+  AOS_CODEX_TIMEOUT_MS / AOS_CLAUDE_TIMEOUT_MS  per-attempt timeout
+  AOS_OLLAMA_ENABLED=1 with AOS_EXECUTION=mixed enables the loopback-only
+  Ollama adapter; AOS_OLLAMA_MODEL is required, base URL is optional, and
+  concurrency/timeout are bounded. Ollama has no auth or token environment.
+  AOS_ADAPTERS may explicitly configure the disabled-by-default command adapter
+  as a fixed external-harness JSON protocol wrapper. It never accepts a task
+  command, provider token, or generic OAuth configuration.
+  AOS_REPO_ROOT  read-only repo for workers
 
 Dashboard and CLI share the same .aos store. Secrets are never printed.
 `;
@@ -102,8 +125,51 @@ export async function dispatch(engine, argv) {
     );
   }
   if (cmd === 'live' && sub === 'preflight') {
+    const provider = rest[0] || (engine.execution.mode === 'mixed' && engine.execution.ollama ? 'ollama' : engine.execution.mode === 'mixed' && engine.execution.claude ? 'claude' : engine.execution.mode === 'mixed' && engine.execution.command ? 'command' : 'codex');
+    if (provider === 'claude') {
+      const config = engine.execution.claude || resolveClaudeConfig({});
+      const result = engine.execution.claude ? await engine.preflightClaude() : await preflightClaude(config);
+      return [
+        `claude    ${result.claudeBin}`,
+        `version   ${result.cliVersion}`,
+        `login     ${result.auth.loggedIn ? 'logged in' : 'not logged in'}  method=${result.auth.authMethod || 'unknown'}`,
+        `auth      ${result.authPath}`,
+        `requested ${result.requested.model} / ${result.requested.effort}`,
+        `posture   restricted=${result.posture.restricted} safe=${result.posture.safeMode} mcp=${result.posture.strictMcpConfig} permission=${result.posture.permissionMode}/${result.posture.permissionPrompts} tools=${result.posture.tools.join(',')} chrome=${result.posture.chrome}`,
+        `env       stripped ${result.strippedEnv.length ? result.strippedEnv.join(', ') : 'nothing (no unrelated API-key variables present)'}`,
+      ];
+    }
+    if (provider === 'ollama') {
+      if (!engine.execution.ollama) throw new AosError('ollama_preflight_unavailable', 'Ollama preflight requires AOS_EXECUTION=mixed, AOS_OLLAMA_ENABLED=1, and AOS_OLLAMA_MODEL', { statusCode: 409 });
+      const result = await engine.preflightOllama();
+      const models = Array.isArray(result.models)
+        ? result.models.map((item) => typeof item === 'string' ? item : item?.name || item?.model).filter(Boolean)
+        : [];
+      return [
+        `ollama    ${result.baseUrl || engine.execution.ollama.baseUrl}`,
+        `transport loopback-local  redirects=disabled`,
+        `model     ${engine.execution.ollama.model}`,
+        `models    ${models.length ? models.join(',') : engine.execution.ollama.model}`,
+        `observed  ${result.checkedAt || 'now'}  attestation=local-response-observed  external-identity=none`,
+        `limits    concurrency=${engine.execution.ollama.maxConcurrency} timeoutMs=${engine.execution.ollama.timeoutMs}`,
+        `execution ${engine.execution.mode === 'mixed' ? 'mixed Ollama' : 'disabled'}`,
+      ];
+    }
+    if (provider === 'command') {
+      if (!engine.execution.command) throw new AosError('command_preflight_unavailable', 'External harness preflight requires explicit AOS_EXECUTION=mixed command adapter configuration', { statusCode: 409 });
+      const result = await engine.preflightCommand();
+      return [
+        `harness   ${result.provider}${result.model ? ` / ${result.model}` : ''}`,
+        `protocol  ${result.protocol}  shell=false`,
+        `auth      ${result.authType}  session=${result.sessionMode}`,
+        `sandbox   ${result.sandbox}  isolation=not-claimed`,
+        `limits    concurrency=${engine.execution.command.maxConcurrency} timeoutMs=${engine.execution.command.timeoutMs}`,
+        `receipt   self-reported protocol attestation; external identity=not-verified`,
+        `execution mixed external-harness wrapper`,
+      ];
+    }
     const config = engine.execution.codex || resolveCodexConfig({});
-    const result = await preflightCodex(config);
+    const result = engine.execution.codex ? await engine.preflightCodex() : await preflightCodex(config);
     return [
       `codex     ${result.codexBin}`,
       `version   ${result.cliVersion}`,
@@ -112,7 +178,7 @@ export async function dispatch(engine, argv) {
       `model     ${result.model.slug}  efforts=${result.model.efforts.join(',')}  upgrade=${result.model.upgrade ?? 'none'}`,
       `requested ${result.requested.model} / ${result.requested.effort}`,
       `env       stripped ${result.strippedEnv.length ? result.strippedEnv.join(', ') : 'nothing (no API-key variables present)'}`,
-      `execution ${engine.live ? 'live codex' : 'local (set AOS_EXECUTION=codex to enable live workers)'}`,
+      `execution ${engine.execution.mode === 'codex' ? 'live codex' : 'provider preflight only'}`,
     ];
   }
   if (cmd === 'events') return eventLines(engine, sub || rest[0], Number(flags.limit) || 60);
@@ -123,6 +189,19 @@ export async function dispatch(engine, argv) {
   if (cmd === 'goal' && sub === 'create') {
     const prompt = rest.join(' ') || flags.prompt;
     if (!prompt) throw new Error('goal create requires a prompt');
+    const planningMode = flags['planning-mode'];
+    if (planningMode === 'lead') {
+      const result = await engine.createLeadGoalProposal({
+        projectId: flags.project,
+        prompt,
+        contextPaths: flags.context ? [].concat(flags.context) : [],
+        requestId: flags['request-id'],
+      });
+      return leadPlanCreateLines(result);
+    }
+    if (planningMode != null && planningMode !== '') {
+      throw new AosError('lead_planning_mode_invalid', 'planning-mode must be "lead" when supplied', { statusCode: 400, details: { field: 'planning-mode', expected: 'lead' } });
+    }
     const contextPaths = flags.context ? [flags.context] : [];
     const goal = engine.createGoal({ prompt, contextPaths });
     return [
@@ -135,6 +214,37 @@ export async function dispatch(engine, argv) {
       ...goal.plan.tasks.map((task) => `  - ${task.kind.padEnd(14)} ${task.title}`),
     ];
   }
+  if (cmd === 'goal' && sub === 'plan') {
+    const goalId = rest[0];
+    if (!goalId) throw new Error('goal plan requires a goal id');
+    const result = await engine.planGoal({
+      goalId,
+      requestId: flags['request-id'],
+      derivedFromProposalId: flags['derived-from'],
+    });
+    return leadPlanCreateLines(result);
+  }
+  if (cmd === 'goal' && sub === 'plans') {
+    const goalId = rest[0];
+    if (!goalId) throw new Error('goal plans requires a goal id');
+    const plans = engine.listLeadPlans(goalId, { status: flags.status || null });
+    if (!plans.length) return ['no lead plans'];
+    return plans.map((proposal) => leadPlanSummaryLine(proposal));
+  }
+  if (cmd === 'lead-plan' && sub === 'show') {
+    const proposal = engine.getLeadPlan(subArg(sub, rest, 'lead plan id'));
+    return leadPlanShowLines(proposal);
+  }
+  if (cmd === 'lead-plan' && sub === 'accept') {
+    const proposalId = rest[0];
+    if (!proposalId) throw new Error('lead-plan accept requires a proposal id');
+    return leadPlanDecisionLines(engine.acceptLeadPlan(proposalId, { actor: flags.actor }));
+  }
+  if (cmd === 'lead-plan' && sub === 'reject') {
+    const proposalId = rest[0];
+    if (!proposalId) throw new Error('lead-plan reject requires a proposal id');
+    return leadPlanDecisionLines(engine.rejectLeadPlan(proposalId, { actor: flags.actor, reason: flags.reason }));
+  }
   if (cmd === 'goal' && sub === 'answer') {
     const [goalId, questionId, ...answerParts] = rest;
     if (!goalId || !questionId || !answerParts.length) {
@@ -144,6 +254,16 @@ export async function dispatch(engine, argv) {
     const remaining = goal.questions.filter((question) => question.required && !String(question.answer || '').trim()).length;
     return [`goal ${goal.id}`, `status  ${goal.status}`, `remaining required  ${remaining}`];
   }
+  if (cmd === 'task' && sub === 'answer') {
+    const [taskId, questionId, ...answerParts] = rest;
+    if (!taskId || !questionId || !answerParts.length) {
+      throw new Error('task answer requires a task id, question id, and answer');
+    }
+    const task = engine.answerTaskQuestions(taskId, [{ id: questionId, answer: answerParts.join(' ') }]);
+    const remaining = (task.questions || []).filter((question) => question.required !== false && !String(question.answer || '').trim()).length;
+    return [`task ${task.id}`, `status  ${task.status}`, `remaining required  ${remaining}`];
+  }
+  if (cmd === 'delegation') return delegationCommand(engine, sub, rest, flags);
   if (cmd === 'goal' && sub === 'show') return goalLines(engine.getGoal(subArg(sub, rest, 'goal id')));
   if (cmd === 'goals') {
     return engine.state.goals.map((goal) => `${goal.id}  ${goal.status}  ${truncate(goal.prompt, 72)}`);
@@ -188,7 +308,21 @@ export async function dispatch(engine, argv) {
   throw new Error(`unknown command: ${argv.join(' ')}`);
 }
 
-const RESOURCE_BY_COMMAND = { settings: 'settings', preset: 'presets', template: 'templates', blueprint: 'blueprints', memory: 'memory' };
+const RESOURCE_BY_COMMAND = { settings: 'settings', preset: 'presets', template: 'templates', blueprint: 'blueprints', memory: 'memory', capability: 'capabilities', session: 'sessions', improvement: 'improvements' };
+
+async function delegationCommand(engine, action, rest, flags) {
+  const actions = apiActions(engine).delegations;
+  const id = rest[0];
+  if (action === 'list') return compactJson(await actions.list({ runId: id }));
+  if (action === 'approve' || action === 'reject') {
+    return compactJson(await actions[action]({ receiptId: id, requestId: flags['request-id'] }));
+  }
+  throw new Error(`unknown delegation action: ${action || '(none)'}`);
+}
+
+function compactJson(value) {
+  return [JSON.stringify(value === undefined ? { ok: true } : value)];
+}
 
 function jsonValue(text) {
   if (text === undefined) return undefined;
@@ -230,6 +364,21 @@ async function resourceCommand(engine, cmd, action, rest, flags) {
       validate: () => ({ key: first, value: jsonValue(second) }), preview: () => ({ ...common, key: first, value: jsonValue(second) }),
       export: () => ({ scope: flags.scope ?? null }), import: () => ({ payload: inputFrom(flags), actor: flags.actor }),
     }[action]?.();
+  } else if (resource === 'improvements') {
+    params = {
+      evaluate: () => ({ proposalId: first, input: inputFrom(flags) }),
+      evaluations: () => ({ proposalId: flags.proposal ?? null, projectId: flags.project ?? null }),
+      genome: () => ({ projectId: flags.project ?? null }),
+      rollback: () => ({ versionId: first, actor: flags.actor, reason: flags.reason }),
+    }[action]?.();
+  } else if (resource === 'sessions') {
+    params = {
+      list: () => ({ projectId: flags.project ?? null, runId: flags.run ?? null, taskId: flags.task ?? null, provider: flags.provider ?? null, status: flags.status ?? null }),
+      show: () => ({ id: first }),
+      reset: () => ({ id: first, actor: flags.actor, reason: flags.reason }),
+      retention: () => ({}),
+    }[action]?.();
+    if (action === 'show') action = 'get';
   } else if (resource === 'memory') {
     if (action === 'policy' && first === 'set') params = { ...common, value: inputFrom(flags) };
     else params = {
@@ -241,6 +390,22 @@ async function resourceCommand(engine, cmd, action, rest, flags) {
       export: () => ({ scope: first, namespace: second, includeInactive: Boolean(flags.inactive) }), import: () => ({ payload: inputFrom(flags), scope: flags.scope ?? null, namespace: flags.namespace ?? null, actor: flags.actor }),
     }[action]?.();
     if (action === 'policy' && first === 'set') action = 'setPolicy';
+  } else if (resource === 'capabilities') {
+    params = {
+      list: () => ({ includeRevoked: Boolean(flags.revoked), kind: flags.kind ?? null }),
+      show: () => ({ id: first, version: flags.version }),
+      history: () => ({ id: first }),
+      create: () => ({ input: inputFrom(flags) }),
+      edit: () => ({ id: first, input: inputFrom(flags) }),
+      test: () => ({ id: first, version: flags.version, input: inputFrom(flags) }),
+      enable: () => ({ ...common, id: first, version: flags.version }),
+      revoke: () => ({ ...common, id: first, version: flags.version }),
+      permissions: () => ({ id: first, version: flags.version }),
+      grant: () => ({ id: first, version: flags.version, input: inputFrom(flags) }),
+      'revoke-permission': () => ({ id: first, version: flags.version, input: inputFrom(flags) }),
+    }[action]?.();
+    if (action === 'show') action = 'get';
+    if (action === 'revoke-permission') action = 'revokePermission';
   } else {
     const variables = {};
     for (const pair of [].concat(flags.var || [])) { const [key, ...valueParts] = String(pair).split('='); variables[key] = jsonValue(valueParts.join('=')); }
@@ -275,17 +440,62 @@ export function loadEngineFromEnv({ dataDir, concurrency, execution } = {}) {
 export function executionFromEnv(env = process.env) {
   const mode = env.AOS_EXECUTION || 'local';
   if (mode === 'local') return { mode: 'local' };
-  if (mode !== 'codex') throw new Error(`AOS_EXECUTION must be "local" or "codex"; got "${mode}"`);
-  return {
-    mode: 'codex',
-    codex: {
-      model: env.AOS_CODEX_MODEL || undefined,
-      effort: env.AOS_CODEX_EFFORT || undefined,
-      maxConcurrency: env.AOS_CODEX_MAX_CONCURRENCY ? Number(env.AOS_CODEX_MAX_CONCURRENCY) : undefined,
-      timeoutMs: env.AOS_CODEX_TIMEOUT_MS ? Number(env.AOS_CODEX_TIMEOUT_MS) : undefined,
-      repoRoot: env.AOS_REPO_ROOT || process.cwd(),
-    },
+  const codex = {
+    model: env.AOS_CODEX_MODEL || undefined,
+    effort: env.AOS_CODEX_EFFORT || undefined,
+    maxConcurrency: env.AOS_CODEX_MAX_CONCURRENCY ? Number(env.AOS_CODEX_MAX_CONCURRENCY) : undefined,
+    timeoutMs: env.AOS_CODEX_TIMEOUT_MS ? Number(env.AOS_CODEX_TIMEOUT_MS) : undefined,
+    codexBin: env.AOS_CODEX_BIN || undefined,
+    repoRoot: env.AOS_REPO_ROOT || process.cwd(),
   };
+  const claude = {
+    model: env.AOS_CLAUDE_MODEL || undefined,
+    effort: env.AOS_CLAUDE_EFFORT || undefined,
+    maxConcurrency: env.AOS_CLAUDE_MAX_CONCURRENCY ? Number(env.AOS_CLAUDE_MAX_CONCURRENCY) : undefined,
+    timeoutMs: env.AOS_CLAUDE_TIMEOUT_MS ? Number(env.AOS_CLAUDE_TIMEOUT_MS) : undefined,
+    killGraceMs: env.AOS_CLAUDE_KILL_GRACE_MS ? Number(env.AOS_CLAUDE_KILL_GRACE_MS) : undefined,
+    claudeBin: env.AOS_CLAUDE_BIN || undefined,
+    repoRoot: env.AOS_REPO_ROOT || process.cwd(),
+  };
+  const ollamaEnabled = (mode === 'mixed' || mode === 'providers') && env.AOS_OLLAMA_ENABLED === '1';
+  if (ollamaEnabled) {
+    const authEnv = Object.keys(env).filter((name) => /^AOS_OLLAMA_(?:AUTH|API[_-]?KEY|ACCESS[_-]?KEY|PRIVATE[_-]?KEY|CLIENT[_-]?SECRET|SECRET|TOKEN|PASSWORD|AUTHORIZATION|CREDENTIAL|COOKIE)/i.test(name));
+    if (authEnv.length) throw new Error('Ollama authentication and token environment is unsupported');
+  }
+  const ollama = ollamaEnabled
+    ? resolveOllamaConfig({
+      model: env.AOS_OLLAMA_MODEL || undefined,
+      baseUrl: env.AOS_OLLAMA_BASE_URL || undefined,
+      maxConcurrency: env.AOS_OLLAMA_MAX_CONCURRENCY ? Number(env.AOS_OLLAMA_MAX_CONCURRENCY) : undefined,
+      timeoutMs: env.AOS_OLLAMA_TIMEOUT_MS ? Number(env.AOS_OLLAMA_TIMEOUT_MS) : undefined,
+    })
+    : null;
+  if (mode === 'codex') return { mode: 'codex', codex };
+  if (mode === 'claude') return { mode: 'claude', claude };
+  if (mode === 'mixed' || mode === 'providers') {
+    let adapters = null;
+    const encoded = env.AOS_ADAPTERS || env.AOS_PROVIDERS;
+    if (encoded) {
+      try { adapters = JSON.parse(encoded); } catch { throw new Error('AOS_ADAPTERS must be valid JSON'); }
+    }
+    if (ollamaEnabled) {
+      if (adapters) adapters.ollama = { enabled: true, ...ollama };
+    } else if (adapters?.ollama) {
+      // The generic adapter envelope cannot opt Ollama in. Keep the provider
+      // disabled unless the dedicated mixed-mode flag is explicit.
+      adapters.ollama = { enabled: false };
+    }
+    return adapters ? { mode: 'mixed', adapters } : {
+      mode: 'mixed',
+      adapters: {
+        local: { enabled: env.AOS_LOCAL_ENABLED !== '0' },
+        codex: { enabled: env.AOS_CODEX_ENABLED === '1', ...codex },
+        claude: { enabled: env.AOS_CLAUDE_ENABLED === '1', ...claude },
+        ollama: ollamaEnabled ? { enabled: true, ...ollama } : { enabled: false },
+      },
+    };
+  }
+  throw new Error(`AOS_EXECUTION must be "local", "codex", "claude", or "mixed"; got "${mode}"`);
 }
 
 function statusLines(engine) {
@@ -302,6 +512,7 @@ function statusLines(engine) {
 }
 
 function goalLines(goal) {
+  const tasks = goal.plan?.tasks || [];
   return [
     `goal ${goal.id}`,
     `status  ${goal.status}`,
@@ -311,7 +522,46 @@ function goalLines(goal) {
     `questions`,
     ...goal.questions.map((item) => `  - ${item.id}  ${item.required ? '[required]  ' : ''}${item.prompt}${item.answer ? `  → ${item.answer}` : ''}`),
     `plan`,
-    ...goal.plan.tasks.map((task) => `  - ${task.id}  ${task.kind}  ${task.title}`),
+    ...(tasks.length ? tasks.map((task) => `  - ${task.id}  ${task.kind}  ${task.title}`) : ['  — none']),
+  ];
+}
+
+function leadPlanCreateLines(result) {
+  const goal = result.goal;
+  const proposal = result.proposal;
+  return [
+    `goal ${goal.id}`,
+    `status  ${goal.status}`,
+    `proposal ${proposal.id}  ${proposal.status}${result.idempotent ? '  idempotent' : ''}`,
+    `plan tasks  ${proposal.plan?.tasks?.length || 0}`,
+    `questions  ${proposal.questions?.length || 0}`,
+  ];
+}
+
+function leadPlanSummaryLine(proposal) {
+  return `proposal ${proposal.id}  ${proposal.status}  goal ${proposal.goalId}  tasks=${proposal.plan?.tasks?.length || 0}  questions=${proposal.questions?.length || 0}`;
+}
+
+function leadPlanShowLines(proposal) {
+  return [
+    `proposal ${proposal.id}`,
+    `status    ${proposal.status}`,
+    `goal      ${proposal.goalId}`,
+    `request   ${proposal.requestId}`,
+    `derived   ${proposal.derivedFromProposalId || 'none'}`,
+    `tasks     ${proposal.plan?.tasks?.length || 0}`,
+    `questions ${proposal.questions?.length || 0}`,
+  ];
+}
+
+function leadPlanDecisionLines(result) {
+  const proposal = result.proposal;
+  const goal = result.goal;
+  return [
+    `proposal ${proposal.id}`,
+    `status    ${proposal.status}`,
+    `goal      ${goal.id}  ${goal.status}`,
+    `plan tasks  ${goal.plan?.tasks?.length || 0}`,
   ];
 }
 
@@ -355,11 +605,13 @@ function inspectLines(engine, taskId) {
     `agent     ${agent ? `${agent.id}  ${agent.status}` : 'none'}`,
     `output    ${task.output?.summary || '—'}`,
     `error     ${task.error || '—'}`,
+    `blockedBy ${task.blockedBy ? `${task.blockedBy.code}  dependency=${task.blockedBy.dependencyTaskId || 'unknown'}  plan=${task.blockedBy.dependencyPlanTaskId || 'unknown'}  status=${task.blockedBy.dependencyStatus || 'unknown'}` : '—'}`,
+    ...(task.questions || []).filter((question) => !String(question.answer || '').trim()).map((question) => `question  ${question.id}  open  ${question.prompt}`),
     `evidence  ${evidence.length}`,
     ...(task.runtime || []).map((item) => {
       if (item.injected) return `attempt ${item.attempt}  injected fault, no process spawned  ${item.error || ''}`;
       const effective = item.effective ? `${item.effective.model}/${item.effective.effort} plan=${item.effective.planType ?? '?'}` : 'unverified';
-      return `attempt ${item.attempt}  ${item.provider} requested=${item.requested?.model}/${item.requested?.effort} effective=${effective} verified=${item.verified} thread=${item.threadId || '—'} exit=${item.exitCode} ${item.durationMs ?? '?'}ms`;
+      return `attempt ${item.attempt}  ${item.provider} requested=${item.requested?.model}/${item.requested?.effort} effective=${effective} verified=${item.verified} session=${item.sessionId || item.threadId || '—'} exit=${item.exitCode} ${item.durationMs ?? '?'}ms`;
     }),
   ];
 }
@@ -371,7 +623,7 @@ function eventLines(engine, runId, limit) {
     .filter((item) => item.runId === runId)
     .slice(-limit)
     .map((item) => {
-      const detail = item.payload?.error || item.payload?.threadId || item.payload?.reason || '';
+      const detail = item.payload?.error || item.payload?.sessionId || item.payload?.threadId || item.payload?.reason || '';
       const attempt = item.payload?.attempt ? ` #${item.payload.attempt}` : '';
       return `${item.ts}  ${item.type.padEnd(28)} ${(keys.get(item.taskId) || '').padEnd(10)}${attempt}  ${truncate(detail, 80)}`;
     });

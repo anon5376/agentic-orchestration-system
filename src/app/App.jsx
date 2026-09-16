@@ -28,6 +28,7 @@ import {
   LiveMemoryPage,
 } from '../pages/LivePages';
 import { SystemPage } from '../pages/SystemPage';
+import { ModelsPage } from '../pages/ModelsPage';
 
 const illustrativePages = {
   missions: MissionsPage,
@@ -37,6 +38,7 @@ const illustrativePages = {
   synthesis: SynthesisPage,
   evolution: EvolutionPage,
   capabilities: CapabilitiesPage,
+  models: ModelsPage,
   memory: MemoryPage,
   system: SystemPage,
 };
@@ -49,6 +51,7 @@ const livePages = {
   synthesis: LiveSynthesisPage,
   evolution: LiveEvolutionPage,
   capabilities: LiveCapabilitiesPage,
+  models: ModelsPage,
   memory: LiveMemoryPage,
   system: SystemPage,
 };

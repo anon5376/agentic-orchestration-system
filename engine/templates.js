@@ -10,7 +10,9 @@ import { AosError, check, identifier, invalid, notFound, t } from './schema.js';
 export const TEMPLATE_SCHEMA_VERSION = 1;
 export const TEMPLATE_EXPORT_FORMAT = 'aos-templates/1';
 export const KNOWN_HARNESSES = Object.freeze(['local', 'codex', 'claude', 'api', 'ollama', 'command']);
-export const SANDBOX_TIERS = Object.freeze(['read_only', 'workspace_write', 'network']);
+// host_process is intentionally a disclosure tier, not a filesystem or network
+// sandbox. Only the fixed external-harness adapter may admit such a task.
+export const SANDBOX_TIERS = Object.freeze(['read_only', 'workspace_write', 'network', 'host_process']);
 export const MEMORY_SCOPES = Object.freeze(['agent', 'role', 'run', 'swarm', 'project', 'global']);
 // List-size sanity limits only. Delegation fan-out and depth have no product-level cap:
 // null (or the literal 'unlimited' at the boundary) means unlimited.
@@ -18,6 +20,12 @@ export const TEMPLATE_LIMITS = Object.freeze({ maxCapabilities: 200, maxPaths: 5
 export const UNLIMITED = null;
 
 const idList = (max) => t.array(t.string({ minLength: 1, maxLength: 200 }), { maxItems: max, unique: true });
+const CAPABILITY_REFERENCE = /^[A-Za-z][A-Za-z0-9_.-]{0,127}@[1-9][0-9]*$/;
+const CAPABILITY_EXECUTION_SCHEMA = t.object({
+  selector: t.literal('first_declared_read_path'),
+  reference: t.string({ minLength: 3, maxLength: 300, pattern: CAPABILITY_REFERENCE, patternName: 'a versioned capability reference' }),
+  timeoutMs: t.integer({ min: 1, max: 10_000 }),
+});
 
 export const TEMPLATE_CONFIG_SCHEMA = t.object({
   preset: t.object({ id: identifier(), version: t.optional(t.nullable(t.integer({ min: 1 }))) }),
@@ -33,6 +41,7 @@ export const TEMPLATE_CONFIG_SCHEMA = t.object({
     plugins: t.optional(idList(TEMPLATE_LIMITS.maxCapabilities)),
     tools: t.optional(idList(TEMPLATE_LIMITS.maxCapabilities)),
   })),
+  capabilityExecution: t.optional(CAPABILITY_EXECUTION_SCHEMA),
   filesystem: t.optional(t.object({
     sandbox: t.enumOf(SANDBOX_TIERS),
     readPaths: t.optional(idList(TEMPLATE_LIMITS.maxPaths)),
@@ -132,6 +141,7 @@ export function normalizeConfig(config) {
   }
   merged.preset = { id: config.preset.id, version: config.preset.version ?? null };
   merged.harness = { id: config.harness.id, model: config.harness.model ?? null, effort: config.harness.effort ?? null, fallback: config.harness.fallback ?? [] };
+  if (config.capabilityExecution !== undefined) merged.capabilityExecution = structuredClone(config.capabilityExecution);
   // Canonical internal form for unlimited fan-out or depth is null.
   if (merged.delegation.maxChildren === 'unlimited') merged.delegation.maxChildren = UNLIMITED;
   if (merged.delegation.maxDepth === 'unlimited') merged.delegation.maxDepth = UNLIMITED;
@@ -426,6 +436,7 @@ function configFromLegacyTask(task, run, engine) {
     filesystem: { sandbox: task.sandbox || (run.execution?.sandbox === 'read-only' ? 'read_only' : 'read_only'), readPaths: task.readPaths || [] },
     retry: { maxRetries: task.maxRetries ?? 1 },
     timeoutMs: task.timeoutMs ?? null,
+    capabilityExecution: task.capabilityExecution ?? undefined,
     budget: task.budget || {},
     delegation: task.delegation ? { mayDelegate: Boolean(task.mayDelegate), ...task.delegation } : { mayDelegate: Boolean(task.mayDelegate) },
     escalation: task.escalation || {},
@@ -472,6 +483,7 @@ export function applyTemplateToTask(task, planned, template) {
   take('sandbox', planned.sandbox, (value) => { config.filesystem.sandbox = value; });
   take('readPaths', planned.readPaths, (value) => { config.filesystem.readPaths = [...new Set([...config.filesystem.readPaths, ...value])]; });
   take('capabilities', planned.capabilities, (value) => { config.capabilities = { ...config.capabilities, ...value }; });
+  take('capabilityExecution', planned.capabilityExecution, (value) => { config.capabilityExecution = structuredClone(value); });
   take('mayDelegate', planned.mayDelegate, (value) => { config.delegation.mayDelegate = value; });
   take('delegation', planned.delegation, (value) => { config.delegation = { ...config.delegation, ...value }; });
   take('model', planned.model, (value) => { config.harness.model = value; });
@@ -489,6 +501,7 @@ export function applyTemplateToTask(task, planned, template) {
   task.sandbox = config.filesystem.sandbox;
   task.readPaths = config.filesystem.readPaths;
   task.capabilities = config.capabilities;
+  if (config.capabilityExecution !== undefined && config.capabilityExecution !== null) task.capabilityExecution = structuredClone(config.capabilityExecution);
   task.mayDelegate = config.delegation.mayDelegate;
   task.delegation = { maxChildren: config.delegation.maxChildren, maxDepth: config.delegation.maxDepth, childTemplates: config.delegation.childTemplates, unlimited: config.delegation.unlimited };
   task.model = config.harness.model;

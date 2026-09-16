@@ -8,15 +8,17 @@ The dashboard and CLI use the same on-disk state in `.aos/`.
 
 - Goal intake with clarification questions and a reviewable task plan
 - Versioned worker instructions, worker configurations, and swarm configurations
-- Hierarchical delegation with dependency-aware scheduling and bounded concurrency
+- Agent-originated hierarchical delegation with immutable plan versions, exact child-template pins, and operator gates
 - Deterministic local execution for development and testing
-- Live Codex execution through an existing ChatGPT login
+- Live Codex and Claude Code execution through existing account logins
+- Disabled-by-default fixed-argv external-harness protocol for operator-owned CLI wrappers
 - Per-worker budgets, sandbox access, capabilities, memory, and delegation limits
+- One engine-owned, read-only MCP capability for bounded staged-text reads
 - Optional scoped memory across agents, roles, runs, swarms, projects, and the global system
 - Run telemetry, token accounting, artifacts, evidence, approval gates, and retrospectives
 - Proposal-only self-improvement with explicit approval and rollback boundaries
 
-Mounted worker adapters currently cover deterministic local execution and Codex. Claude, generic API-key providers, Ollama, and arbitrary OAuth providers remain configuration-only. An unavailable adapter stops dispatch instead of silently substituting another worker.
+Mounted worker adapters cover deterministic local execution, Codex, Claude Code, an explicit loopback-only Ollama worker, and a disabled-by-default external-harness protocol wrapper. The wrapper is not a native OpenCode/OpenClaw integration and does not implement provider OAuth. Generic API-key providers and arbitrary OAuth providers remain configuration-only. An unavailable adapter stops its assigned task instead of silently substituting another worker.
 
 ## Start locally
 
@@ -60,7 +62,7 @@ The run records the resolved swarm version. Later edits create a new version and
 - **Goal** is the research objective and its source context.
 - **Run** is one execution of a goal by a resolved swarm version.
 
-## Live Codex workers
+## Live account-session workers
 
 AOS can use the Codex CLI session already authenticated with ChatGPT. The OAuth credential stays inside the Codex CLI session.
 
@@ -71,6 +73,70 @@ AOS_EXECUTION=codex npm run dev:all
 ```
 
 The current live policy accepts only `gpt-5.6-luna` at reasoning effort `max`, with at most four concurrent workers. Runtime evidence is checked after every worker attempt. Model substitution, missing session evidence, or another worker type stops the run.
+
+AOS can also use the Claude Code account session without reading or copying its credential:
+
+```bash
+claude auth status
+node bin/aos.mjs live preflight claude
+AOS_EXECUTION=claude npm run dev:all
+```
+
+Mixed mode keeps assignments explicit and applies a separate concurrency limit to each provider:
+
+```bash
+AOS_EXECUTION=mixed \
+  AOS_LOCAL_ENABLED=1 \
+  AOS_CODEX_ENABLED=1 \
+  AOS_CLAUDE_ENABLED=1 \
+  npm run dev:all
+```
+
+To execute ready provider tasks from separate same-host processes, start one or more fenced pool runners with the same `AOS_HOME` and provider environment as the engine:
+
+```bash
+node bin/aos.mjs pool run --worker codex
+```
+
+Each runner handles one Codex task at a time and exits when its queue is idle. It uses the engine's loopback bearer-authenticated claim protocol; it is not a public or cross-host worker service. Claude and Ollama still run inside the engine process because their pool completion path does not yet have independent receipt verification.
+
+Claude Code runs with restricted mode, safe mode, no custom MCP configuration, no browser integration, no permission prompts, and only read-oriented tools. AOS accepts the result only when Claude reports the requested model family and complete usage data.
+
+Ollama can handle cheap, non-delegating bulk roles through its local HTTP service. It is available only in mixed mode, uses one exact configured model, and stays unavailable until preflight confirms that model is installed:
+
+```bash
+AOS_EXECUTION=mixed \
+  AOS_LOCAL_ENABLED=1 \
+  AOS_OLLAMA_ENABLED=1 \
+  AOS_OLLAMA_MODEL=<exact-installed-model> \
+  npm run dev:all
+
+node bin/aos.mjs live preflight ollama
+```
+
+The Ollama endpoint must be a literal `http://127.0.0.1` or `http://[::1]` origin. AOS refuses credentials, redirects, remote hosts, model substitution, delegation, and tool execution on this adapter. Ollama usage is locally observed, not an externally verified provider receipt.
+
+### External CLI harness wrapper
+
+`command` is retained only as a compatibility ID. It is no longer a shell-command worker and is disabled in local mode. To enable it, provide an operator-owned executable and fixed argument array through `AOS_ADAPTERS`; the executable reads one JSON request from stdin and emits one JSON response using `aos-external-harness-v1`.
+
+```bash
+AOS_EXECUTION=mixed \
+  AOS_ADAPTERS='{"local":{"enabled":true},"command":{"enabled":true,"bin":"aos-opencode-wrapper","argv":[],"provider":"opencode","model":"provider/model","authType":"external_cli_session","sessionMode":"ephemeral","timeoutMs":900000}}' \
+  npm run dev:all
+
+node bin/aos.mjs live preflight command
+```
+
+The wrapper receives a sanitized environment, never receives an AOS/provider token, runs with `shell=false`, has bounded redacted output, and is stopped through its own process group on timeout or cancellation. AOS verifies only protocol/config/nonce binding; provider identity, usage, and session evidence remain self-reported by the wrapper. It is therefore not a claim of native OpenCode, OpenClaw, dsh, or OAuth support.
+
+This is a `host_process` disclosure tier, not filesystem or network isolation. A command task must explicitly use that tier and cannot contain a task command, a resume session, a fallback, delegation, or capability mounts. Existing task-provided command plans fail closed and must be migrated to a configured wrapper.
+
+## MCP execution boundary
+
+AOS ships one executable MCP capability: `aos.staged-text-reader@1`. It reads exactly the first declared relative project path through an engine-staged file and records fingerprints instead of raw content in state and events. The task must be read-only, offline, explicitly permissioned, tested, enabled, and bound to that exact version.
+
+Arbitrary task-provided local commands, package-provided MCP servers, remote MCP transports, writable tools, and effectful MCP actions are not executable. The only generic CLI path is the explicit fixed-argv external-harness wrapper above. AOS now has a durable task-workspace effect-claim kernel: an operator approval is bound to the exact capability, task attempt, input, isolation, and rollback fingerprints before a cross-engine fenced lease can be acquired; terminal and rollback receipts survive restart. No writable adapter is connected to it yet, so this is a safety boundary, not a claim that arbitrary effects can run.
 
 To return to deterministic local execution:
 
@@ -89,7 +155,12 @@ node bin/aos.mjs goal create "State the objective, success criteria, and scope."
 node bin/aos.mjs run start <goalId> --blueprint <blueprintId>
 node bin/aos.mjs tree <runId>
 node bin/aos.mjs advance <runId> --until-idle
+node bin/aos.mjs delegation list <runId>
+node bin/aos.mjs delegation approve <receiptId> --request-id <uniqueId>
+node bin/aos.mjs delegation reject <receiptId> --request-id <uniqueId>
 ```
+
+Workers with explicit delegation authority may propose child tasks only through exact, version-pinned templates. AOS derives the provider, model, tools, sandbox, parent edge, and budget boundary; the worker cannot set them. Finite proposals can apply automatically unless the swarm requires an expansion gate. Unlimited branches remain possible, but every generation stays operator-paced.
 
 Set `AOS_LOCAL_ONLY=1` to force file-only CLI access. Set `AOS_HOME` to place the state directory somewhere other than `./.aos`.
 

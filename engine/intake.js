@@ -108,7 +108,7 @@ function planTask(partial, defaultWorker = 'local') {
   };
   // maxRetries stays absent unless the plan sets it, so a template can supply it; the engine defaults to 1.
   if (partial.maxRetries != null) task.maxRetries = partial.maxRetries;
-  for (const field of ['key', 'brief', 'readPaths', 'injectFault', 'timeoutMs', 'templateId', 'templateVersion', 'presetId', 'presetVersion', 'budget', 'sandbox', 'capabilities', 'mayDelegate', 'delegation', 'model', 'effort', 'variables', 'escalation', 'memory']) {
+  for (const field of ['key', 'brief', 'readPaths', 'injectFault', 'timeoutMs', 'templateId', 'templateVersion', 'presetId', 'presetVersion', 'budget', 'sandbox', 'capabilities', 'capabilityExecution', 'mayDelegate', 'delegation', 'model', 'effort', 'variables', 'escalation', 'memory']) {
     if (partial[field] != null) task[field] = partial[field];
   }
   return task;
@@ -177,10 +177,10 @@ export function buildHierarchicalPlan(prompt, ambiguities = [], { execution = 'l
   const branches = inferBranches(prompt);
   const tasks = [];
   const dependencies = [];
-  const live = execution === 'codex';
+  const defaultWorker = ['codex', 'claude'].includes(execution) ? execution : 'local';
 
   const add = (partial) => {
-    const worker = partial.kind === 'adopt' ? (live ? 'engine' : 'local') : (live ? 'codex' : 'local');
+    const worker = partial.kind === 'adopt' ? (defaultWorker === 'codex' ? 'engine' : 'local') : defaultWorker;
     const task = planTask(partial, worker);
     tasks.push(task);
     return task;

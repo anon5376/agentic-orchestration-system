@@ -5,7 +5,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { AosEngine } from '../engine/engine.js';
 import { JsonStore, STORE_VERSION } from '../engine/store.js';
-import { COLLECTIONS_V2, CURRENT_STORE_VERSION, migrateState } from '../engine/migrate.js';
+import { COLLECTIONS_V2, COLLECTIONS_V3, COLLECTIONS_V5, COLLECTIONS_V6, COLLECTIONS_V7, COLLECTIONS_V8, COLLECTIONS_V9, COLLECTIONS_V10, CURRENT_STORE_VERSION, migrateState } from '../engine/migrate.js';
 import { AosError, check, notFound, t, validate } from '../engine/schema.js';
 
 const FIXTURE = new URL('./fixtures/state-v1.json', import.meta.url);
@@ -14,7 +14,7 @@ function tempStore(prefix = 'aos-migrate-') {
   return mkdtempSync(join(tmpdir(), prefix));
 }
 
-test('a version 1 store from the real project migrates to version 2 with every record preserved', () => {
+test('a version 1 store from the real project migrates to the current version with every record preserved', () => {
   const dataDir = tempStore();
   copyFileSync(FIXTURE, join(dataDir, 'state.json'));
   const before = JSON.parse(readFileSync(FIXTURE, 'utf8'));
@@ -25,25 +25,29 @@ test('a version 1 store from the real project migrates to version 2 with every r
 
   assert.equal(aos.state.version, CURRENT_STORE_VERSION);
   assert.equal(STORE_VERSION, CURRENT_STORE_VERSION);
-  for (const name of ['projects', 'goals', 'runs', 'tasks', 'agents', 'dependencies', 'evidence', 'decisions', 'policies', 'retrospectives', 'proposals', 'providers']) {
+  for (const name of ['projects', 'goals', 'runs', 'tasks', 'agents', 'dependencies', 'evidence', 'decisions', 'policies', 'retrospectives', 'proposals']) {
     assert.equal(aos.state[name].length, before[name].length, `${name} count preserved`);
     assert.deepEqual(aos.state[name].map((item) => item.id), before[name].map((item) => item.id), `${name} ids preserved in order`);
   }
-  for (const name of COLLECTIONS_V2) assert.deepEqual(aos.state[name], [], `${name} added empty`);
+  assert.deepEqual(aos.state.providers.slice(0, before.providers.length), before.providers, 'historical provider records preserved in order');
+  assert.deepEqual(aos.state.providers.slice(before.providers.length).map((item) => item.id), ['ollama'], 'new catalog providers append without rewriting history');
+  for (const name of [...COLLECTIONS_V2, ...COLLECTIONS_V3, ...COLLECTIONS_V5, ...COLLECTIONS_V6, ...COLLECTIONS_V7, ...COLLECTIONS_V8, ...COLLECTIONS_V9, ...COLLECTIONS_V10]) assert.deepEqual(aos.state[name], [], `${name} added empty`);
+  assert.equal(aos.state.eventCursor, aos.state.events.length, 'legacy in-state event tail seeds the cursor when no durable log exists');
   assert.ok(aos.state.tasks.every((task) => task.lease === null), 'old tasks gain lease: null');
-  assert.equal(aos.state.migrations.length, 1);
-  assert.deepEqual([aos.state.migrations[0].from, aos.state.migrations[0].to], [1, 2]);
+  assert.ok(aos.state.tasks.every((task) => Array.isArray(task.questions) && task.wait === null && task.blockedBy === null));
+  assert.equal(aos.state.migrations.length, CURRENT_STORE_VERSION - 1);
+  assert.deepEqual(aos.state.migrations.map((item) => [item.from, item.to]), Array.from({ length: CURRENT_STORE_VERSION - 1 }, (_, index) => [index + 1, index + 2]));
 
   const backup = join(dataDir, 'state.json.v1.bak');
   assert.ok(existsSync(backup), 'pre-migration file kept');
   assert.equal(JSON.parse(readFileSync(backup, 'utf8')).version, 1);
   const onDisk = JSON.parse(readFileSync(join(dataDir, 'state.json'), 'utf8'));
-  assert.equal(onDisk.version, 2);
+  assert.equal(onDisk.version, CURRENT_STORE_VERSION);
   assert.equal(onDisk.runs.length, before.runs.length);
 
   const again = new AosEngine({ dataDir });
   again.load();
-  assert.equal(again.state.migrations.length, 1, 'a second load does not migrate again');
+  assert.equal(again.state.migrations.length, CURRENT_STORE_VERSION - 1, 'a second load does not migrate again');
   assert.equal(again.getRun(before.runs[0].id).status, before.runs[0].status);
 });
 
@@ -54,8 +58,26 @@ test('migration preserves unknown top-level fields and record fields it does not
   const { state, applied } = migrateState(raw);
   assert.deepEqual(state.experimental, { keep: true });
   assert.equal(state.tasks[0].customNote, 'kept');
-  assert.equal(applied.length, 1);
+  assert.equal(applied.length, CURRENT_STORE_VERSION - 1);
   assert.equal(JSON.parse(readFileSync(FIXTURE, 'utf8')).version, 1, 'fixture untouched');
+});
+
+test('v4 to current migration preserves unknown fields and current task wait records', () => {
+  const raw = {
+    version: 4,
+    tasks: [{ id: 'task_current', questions: [{ id: 'q1', prompt: 'Already here' }], wait: { status: 'awaiting_user' }, blockedBy: { code: 'dependency_failed' }, custom: 'keep' }],
+    experimental: { keep: true },
+  };
+  const { state, applied } = migrateState(raw);
+  assert.equal(applied.length, CURRENT_STORE_VERSION - 4);
+  assert.deepEqual(state.tasks[0], raw.tasks[0]);
+  assert.deepEqual(state.experimental, raw.experimental);
+  assert.deepEqual(state.leadPlans, []);
+  for (const name of COLLECTIONS_V6) assert.deepEqual(state[name], []);
+  for (const name of COLLECTIONS_V7) assert.deepEqual(state[name], []);
+  for (const name of COLLECTIONS_V8) assert.deepEqual(state[name], []);
+  for (const name of COLLECTIONS_V9) assert.deepEqual(state[name], []);
+  for (const name of COLLECTIONS_V10) assert.deepEqual(state[name], []);
 });
 
 test('a store from a newer engine is refused with a stable error code', () => {

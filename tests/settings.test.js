@@ -8,6 +8,7 @@ import { executeCommand } from '../engine/cli.js';
 import { createAosServer } from '../engine/http.js';
 import { SETTING_DEFINITIONS, SETTING_GROUPS, SETTINGS_EXPORT_FORMAT } from '../engine/settings.js';
 import { RESOURCE_ROUTES } from '../engine/api.js';
+import { CURRENT_STORE_VERSION } from '../engine/migrate.js';
 
 const PROMPT = 'Settings objective with success criteria and a bounded scope.';
 
@@ -18,7 +19,7 @@ function engine(dataDir = mkdtempSync(join(tmpdir(), 'aos-settings-'))) {
 }
 
 async function withServer(aos, fn) {
-  const { listen, close, server } = createAosServer({ engine: aos, port: 0, host: '127.0.0.1' });
+  const { listen, close, server } = createAosServer({ engine: aos, port: 0, host: '127.0.0.1', operatorToken: false });
   await listen();
   const base = `http://127.0.0.1:${server.address().port}`;
   const http = async (method, path, body) => {
@@ -48,9 +49,11 @@ test('the manifest describes every setting group, definition and registry for a 
   for (const setting of described) {
     assert.ok(setting.key && setting.description && setting.schema && Array.isArray(setting.scopes), `${setting.key} fully described`);
   }
-  assert.deepEqual(Object.keys(manifest.registries), ['presets', 'templates', 'blueprints', 'memory', 'runs']);
-  assert.equal(manifest.diagnostics.store.version, 2);
+  assert.deepEqual(Object.keys(manifest.registries), ['presets', 'templates', 'blueprints', 'memory', 'capabilities', 'sessions', 'improvements', 'runs']);
+  assert.equal(manifest.diagnostics.store.version, CURRENT_STORE_VERSION);
   assert.ok(manifest.inputSchemas.preset.fields.role.values.includes('lead'), 'registry input schemas are described');
+  assert.ok(manifest.inputSchemas.capability.fields.kind.values.includes('skill'), 'capability input schema is described');
+  assert.ok(manifest.inputSchemas.improvementEvaluation.fields.baseline.fields.quality, 'improvement evaluation schema is described');
   assert.ok(manifest.routes.some((route) => route.method === 'POST' && route.path === '/api/v1/memory/clear' && route.destructive.gate === 'approval'), 'destructive gates are declared');
   assert.ok(manifest.routes.some((route) => route.path === '/api/v1/presets/:id/preview'), 'route params are named');
   assert.deepEqual(manifest.enumerations.harnesses, ['local', 'codex', 'claude', 'api', 'ollama', 'command']);

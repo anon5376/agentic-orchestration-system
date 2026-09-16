@@ -20,7 +20,28 @@ export function apiActions(engine) {
   const blueprints = engine.blueprints;
   const memory = engine.memory;
   const settings = engine.settings;
+  const capabilities = engine.capabilities;
+  const sessions = engine.sessions;
+  const improvements = engine.improvements;
   return {
+    delegations: {
+      list: (p) => engine.listDelegationExpansions(need(p, 'runId')),
+      decide: (p) => decideDelegationExpansion(engine, p),
+      approve: (p) => decideDelegationExpansion(engine, p, 'approve'),
+      reject: (p) => decideDelegationExpansion(engine, p, 'reject'),
+    },
+    improvements: {
+      evaluations: (p = {}) => improvements.listEvaluations({ proposalId: p.proposalId ?? null, projectId: p.projectId ?? null }),
+      evaluate: (p) => improvements.evaluate(need(p, 'proposalId'), need(p, 'input')),
+      genome: (p = {}) => improvements.listGenome({ projectId: p.projectId ?? engine.defaultProject()?.id }),
+      rollback: (p) => improvements.rollback(need(p, 'versionId'), { actor: p.actor ?? 'operator', reason: p.reason ?? 'operator rollback' }),
+    },
+    sessions: {
+      list: (p = {}) => sessions.list({ projectId: p.projectId ?? null, runId: p.runId ?? null, taskId: p.taskId ?? null, provider: p.provider ?? null, status: p.status ?? null }),
+      get: (p) => sessions.get(need(p, 'id')),
+      reset: (p) => sessions.reset(need(p, 'id'), { actor: p.actor ?? 'operator', reason: p.reason ?? 'operator reset' }),
+      retention: () => sessions.runRetention(),
+    },
     settings: {
       manifest: () => settings.manifest(),
       diagnostics: () => settings.diagnostics(),
@@ -33,6 +54,19 @@ export function apiActions(engine) {
       preview: (p) => settings.preview(need(p, 'key'), need(p, 'value'), { scope: need(p, 'scope'), scopeId: p.scopeId ?? null, context: p.context ?? { projectId: engine.defaultProject()?.id ?? null } }),
       export: (p = {}) => settings.exportSettings({ scope: p.scope ?? null }),
       import: (p) => settings.importSettings(need(p, 'payload'), { actor: p.actor ?? 'import' }),
+    },
+    capabilities: {
+      list: (p = {}) => capabilities.list({ includeRevoked: Boolean(p.includeRevoked), kind: p.kind ?? null }),
+      get: (p) => capabilities.get(need(p, 'id'), optionalInt(p.version, 'version')),
+      history: (p) => capabilities.history(need(p, 'id')),
+      create: (p) => capabilities.create(need(p, 'input')),
+      edit: (p) => capabilities.edit(need(p, 'id'), need(p, 'input')),
+      test: (p) => capabilities.recordTest(need(p, 'id'), optionalInt(need(p, 'version'), 'version'), need(p, 'input')),
+      enable: (p) => capabilities.setState(need(p, 'id'), optionalInt(need(p, 'version'), 'version'), 'active', { actor: p.actor, reason: p.reason }),
+      revoke: (p) => capabilities.setState(need(p, 'id'), optionalInt(need(p, 'version'), 'version'), 'revoked', { actor: p.actor, reason: p.reason }),
+      permissions: (p) => capabilities.permissions(need(p, 'id'), optionalInt(need(p, 'version'), 'version')),
+      grant: (p) => capabilities.setPermission(need(p, 'id'), optionalInt(need(p, 'version'), 'version'), 'grant', need(p, 'input')),
+      revokePermission: (p) => capabilities.setPermission(need(p, 'id'), optionalInt(need(p, 'version'), 'version'), 'revoke', need(p, 'input')),
     },
     presets: {
       list: (p = {}) => presets.list({ includeArchived: Boolean(p.includeArchived), role: p.role ?? null }),
@@ -99,6 +133,8 @@ export function apiActions(engine) {
     runs: {
       patch: (p) => settings.patchRun(need(p, 'runId'), { key: need(p, 'key'), value: need(p, 'value'), reason: p.reason ?? null, actor: p.actor ?? 'operator' }),
       patches: (p) => settings.runPatches(need(p, 'runId')),
+      planPatch: (p) => engine.plans.patch(need(p, 'runId'), p),
+      plan: (p) => engine.plans.get(need(p, 'runId'), p.version == null ? null : optionalInt(p.version, 'version')),
     },
   };
 }
@@ -106,6 +142,14 @@ export function apiActions(engine) {
 // Resource routes shared by HTTP and CLI: [method, path pattern, resource, action, param names, status].
 // Literal paths come before parameterised ones so "export" is never read as an id.
 export const RESOURCE_ROUTES = Object.freeze([
+  ['GET', /^\/api\/v1\/improvements\/evaluations$/, 'improvements', 'evaluations', []],
+  ['POST', /^\/api\/v1\/proposals\/([^/]+)\/evaluations$/, 'improvements', 'evaluate', ['proposalId'], 201],
+  ['GET', /^\/api\/v1\/improvements\/genome$/, 'improvements', 'genome', []],
+  ['POST', /^\/api\/v1\/improvements\/genome\/([^/]+)\/rollback$/, 'improvements', 'rollback', ['versionId'], 201],
+  ['GET', /^\/api\/v1\/sessions$/, 'sessions', 'list', []],
+  ['POST', /^\/api\/v1\/sessions\/retention$/, 'sessions', 'retention', []],
+  ['POST', /^\/api\/v1\/sessions\/([^/]+)\/reset$/, 'sessions', 'reset', ['id']],
+  ['GET', /^\/api\/v1\/sessions\/([^/]+)$/, 'sessions', 'get', ['id']],
   ['GET', /^\/api\/v1\/settings\/manifest$/, 'settings', 'manifest', []],
   ['GET', /^\/api\/v1\/settings\/diagnostics$/, 'settings', 'diagnostics', []],
   ['GET', /^\/api\/v1\/settings\/export$/, 'settings', 'export', []],
@@ -117,6 +161,17 @@ export const RESOURCE_ROUTES = Object.freeze([
   ['GET', /^\/api\/v1\/settings\/([^/]+)$/, 'settings', 'get', ['key']],
   ['PUT', /^\/api\/v1\/settings\/([^/]+)$/, 'settings', 'set', ['key']],
   ['DELETE', /^\/api\/v1\/settings\/([^/]+)$/, 'settings', 'unset', ['key']],
+  ['GET', /^\/api\/v1\/capabilities$/, 'capabilities', 'list', []],
+  ['POST', /^\/api\/v1\/capabilities$/, 'capabilities', 'create', [], 201],
+  ['GET', /^\/api\/v1\/capabilities\/([^/]+)\/history$/, 'capabilities', 'history', ['id']],
+  ['POST', /^\/api\/v1\/capabilities\/([^/]+)\/versions$/, 'capabilities', 'edit', ['id'], 201],
+  ['POST', /^\/api\/v1\/capabilities\/([^/]+)\/tests$/, 'capabilities', 'test', ['id'], 201],
+  ['POST', /^\/api\/v1\/capabilities\/([^/]+)\/enable$/, 'capabilities', 'enable', ['id']],
+  ['POST', /^\/api\/v1\/capabilities\/([^/]+)\/revoke$/, 'capabilities', 'revoke', ['id']],
+  ['GET', /^\/api\/v1\/capabilities\/([^/]+)\/permissions$/, 'capabilities', 'permissions', ['id']],
+  ['POST', /^\/api\/v1\/capabilities\/([^/]+)\/permissions\/grant$/, 'capabilities', 'grant', ['id'], 201],
+  ['POST', /^\/api\/v1\/capabilities\/([^/]+)\/permissions\/revoke$/, 'capabilities', 'revokePermission', ['id'], 201],
+  ['GET', /^\/api\/v1\/capabilities\/([^/]+)$/, 'capabilities', 'get', ['id']],
   ...['presets', 'templates', 'blueprints'].flatMap((resource) => [
     ['GET', new RegExp(`^/api/v1/${resource}/export$`), resource, 'export', []],
     ['POST', new RegExp(`^/api/v1/${resource}/import$`), resource, 'import', []],
@@ -147,6 +202,11 @@ export const RESOURCE_ROUTES = Object.freeze([
   ...['correct', 'commit', 'pin', 'unpin', 'forget', 'promote'].map((action) => ['POST', new RegExp(`^/api/v1/memory/items/([^/]+)/${action}$`), 'memory', action, ['id']]),
   ['POST', /^\/api\/v1\/runs\/([^/]+)\/patch$/, 'runs', 'patch', ['runId']],
   ['GET', /^\/api\/v1\/runs\/([^/]+)\/patches$/, 'runs', 'patches', ['runId']],
+  ['POST', /^\/api\/v1\/runs\/([^/]+)\/plan\/patches$/, 'runs', 'planPatch', ['runId'], 201],
+  ['GET', /^\/api\/v1\/runs\/([^/]+)\/plan$/, 'runs', 'plan', ['runId']],
+  ['GET', /^\/api\/v1\/runs\/([^/]+)\/delegations$/, 'delegations', 'list', ['runId']],
+  ['POST', /^\/api\/v1\/delegations\/([^/]+)\/approve$/, 'delegations', 'approve', ['receiptId']],
+  ['POST', /^\/api\/v1\/delegations\/([^/]+)\/reject$/, 'delegations', 'reject', ['receiptId']],
 ]);
 
 // Resolves an HTTP request against the route table. Returns null when no resource route matches.
@@ -160,4 +220,12 @@ export function matchResourceRoute(method, path) {
     return { resource, action, params, status };
   }
   return null;
+}
+
+function decideDelegationExpansion(engine, params, fixedDecision = null) {
+  const receiptId = need(params, 'receiptId');
+  const decision = fixedDecision || need(params, 'decision');
+  if (!['approve', 'reject'].includes(decision)) throw invalid('decision must be "approve" or "reject"', { field: 'decision' });
+  const requestId = need(params, 'requestId');
+  return engine.decideDelegationExpansion({ receiptId, decision, requestId });
 }

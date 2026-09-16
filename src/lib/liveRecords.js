@@ -12,6 +12,24 @@ function asString(value, fallback = '') {
   return fallback;
 }
 
+function asNumber(value, fallback = null) {
+  if (value === undefined || value === null || value === '') return fallback;
+  const number = Number(value);
+  return Number.isFinite(number) ? number : fallback;
+}
+
+function firstRecord(...values) {
+  return values.find((value) => isPlainRecord(value)) || null;
+}
+
+function firstNumber(...values) {
+  for (const value of values) {
+    const number = asNumber(value);
+    if (number !== null) return number;
+  }
+  return null;
+}
+
 export function displayStatus(status, fallback = 'unknown') {
   return asString(status, fallback).replaceAll('_', ' ');
 }
@@ -24,6 +42,18 @@ function normalizeRun(value, index = 0) {
     status: asString(value.status, 'unknown'),
     objective: asString(value.objective, asString(value.prompt, 'Untitled run')),
     goalId: asString(value.goalId, ''),
+    plan: normalizePlanSummary(value.plan),
+  };
+}
+
+function normalizePlanSummary(value) {
+  if (!isPlainRecord(value)) return value ?? null;
+  return {
+    ...value,
+    version: firstNumber(value.version, value.currentVersion, value.current_version),
+    tasks: Array.isArray(value.tasks) ? value.tasks : [],
+    dependencies: Array.isArray(value.dependencies) ? value.dependencies : [],
+    lastAppendReason: value.lastAppendReason ?? value.last_append_reason ?? value.reason ?? null,
   };
 }
 
@@ -36,6 +66,7 @@ function normalizeTask(value, index = 0) {
     title: asString(value.title, 'Untitled task'),
     kind: asString(value.kind, 'unknown'),
     worker: asString(value.worker, 'local'),
+    planVersion: value.planVersion ?? value.plan_version ?? null,
     children: asArray(value.children).map(normalizeTask).filter(Boolean),
   };
 }
@@ -79,11 +110,12 @@ export function selectCurrentProposal(proposals, { retrospective, run } = {}) {
 }
 
 export function normalizeSnapshot(snapshot) {
-  if (!isPlainRecord(snapshot)) return { runs: [], goals: [], taskTree: [], tasks: [], agents: [], evidence: [], proposals: [], policies: [], providers: [], telemetry: null };
+  if (!isPlainRecord(snapshot)) return { runs: [], goals: [], taskTree: [], tasks: [], agents: [], evidence: [], proposals: [], policies: [], providers: [], telemetry: null, eventCursor: null };
   const runs = asArray(snapshot.runs).map(normalizeRun).filter(Boolean);
   const run = normalizeRun(snapshot.run) || runs[0] || null;
   return {
     ...snapshot,
+    eventCursor: firstNumber(snapshot.eventCursor, snapshot.event_cursor, snapshot.cursor),
     run,
     runs,
     goals: asArray(snapshot.goals).map(normalizeGoal).filter(Boolean),
@@ -100,7 +132,10 @@ export function normalizeSnapshot(snapshot) {
     telemetry: isPlainRecord(snapshot.telemetry)
       ? {
         ...snapshot.telemetry,
-        workers: asArray(snapshot.telemetry.workers).filter(isPlainRecord),
+        workers: asArray(snapshot.telemetry.workers).filter(isPlainRecord).map((item) => ({
+          ...item,
+          planVersion: item.planVersion ?? item.plan_version ?? null,
+        })),
         tokens: isPlainRecord(snapshot.telemetry.tokens) ? snapshot.telemetry.tokens : {},
         counts: isPlainRecord(snapshot.telemetry.counts) ? snapshot.telemetry.counts : {},
       }
@@ -108,5 +143,83 @@ export function normalizeSnapshot(snapshot) {
     decision: isPlainRecord(snapshot.decision) ? snapshot.decision : null,
     retrospective: isPlainRecord(snapshot.retrospective) ? snapshot.retrospective : null,
     memory: isPlainRecord(snapshot.memory) ? snapshot.memory : null,
+  };
+}
+
+function normalizePlanHistoryItem(value) {
+  if (!isPlainRecord(value)) return null;
+  const nested = firstRecord(value.snapshot, value.plan, value.selectedSnapshot);
+  return {
+    ...value,
+    version: firstNumber(value.version, value.planVersion, value.plan_version, nested?.version),
+    snapshot: nested,
+    reason: value.reason ?? value.appendReason ?? value.append_reason ?? null,
+    createdAt: value.createdAt ?? value.created_at ?? value.at ?? value.ts ?? null,
+  };
+}
+
+function planSnapshotCandidate(source) {
+  const candidates = [
+    source.selectedSnapshot,
+    source.selected?.snapshot,
+    source.selected?.plan,
+    source.snapshot,
+    source.current?.snapshot,
+    source.current?.plan,
+    source.currentPlan,
+    source.current_plan,
+    source.current,
+    source.plan?.snapshot,
+    source.plan,
+  ];
+  return candidates.find((value) => isPlainRecord(value) && (Array.isArray(value.tasks) || Array.isArray(value.dependencies))) || null;
+}
+
+export function normalizePlanResponse(value) {
+  const source = isPlainRecord(value) ? value : {};
+  const pointer = firstRecord(source.pointer, source.currentPointer, source.current_pointer, source.current, source.planPointer, source.plan_pointer);
+  const snapshot = planSnapshotCandidate(source);
+  const selected = firstRecord(source.selected, source.selectedVersion, source.selectedPlan) || (snapshot ? { snapshot } : null);
+  const historySource = source.history ?? source.versions ?? source.planHistory ?? source.plan_history ?? source.timeline;
+  const patchesSource = source.patches ?? source.patchHistory ?? source.patch_history ?? source.appendPatches ?? source.append_patches;
+  const receiptsSource = source.receipts ?? source.patchReceipts ?? source.patch_receipts ?? patchesSource;
+  const currentVersion = firstNumber(
+    source.currentVersion,
+    source.current_version,
+    pointer?.version,
+    pointer?.currentVersion,
+    pointer?.current_version,
+    source.version,
+    snapshot?.version,
+  );
+  return {
+    ...source,
+    pointer,
+    currentVersion,
+    history: asArray(historySource).map(normalizePlanHistoryItem).filter(Boolean),
+    selected,
+    snapshot,
+    patches: asArray(patchesSource).filter(isPlainRecord),
+    receipts: asArray(receiptsSource).filter(isPlainRecord),
+    lastAppendReason: source.lastAppendReason
+      ?? source.last_append_reason
+      ?? pointer?.lastAppendReason
+      ?? pointer?.last_append_reason
+      ?? pointer?.reason
+      ?? asArray(patchesSource).at(-1)?.reason
+      ?? null,
+  };
+}
+
+export function normalizeReplayResponse(value) {
+  const source = isPlainRecord(value) ? value : {};
+  const events = source.events ?? source.items ?? source.records;
+  return {
+    ...source,
+    events: asArray(events).filter(isPlainRecord),
+    nextCursor: firstNumber(source.nextCursor, source.next_cursor, source.cursor, source.latest),
+    earliest: firstNumber(source.earliest, source.earliestCursor, source.earliest_cursor),
+    latest: firstNumber(source.latest, source.latestCursor, source.latest_cursor),
+    resyncRequired: Boolean(source.resyncRequired ?? source.resync_required ?? false),
   };
 }

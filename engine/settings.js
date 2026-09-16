@@ -11,6 +11,8 @@ import { PRESET_INPUT_SCHEMA, PRESET_LIMITS, REQUIRED_SECTIONS, ROLE_KINDS } fro
 import { BLUEPRINT_INPUT_SCHEMA, BLUEPRINT_CONFIG_SCHEMA, HUMAN_GATE_TRIGGERS } from './blueprints.js';
 import { MEMORY_WRITE_SCHEMA, MEMORY_TYPES } from './memory/index.js';
 import { RESOURCE_ROUTES } from './api.js';
+import { CAPABILITY_INPUT_SCHEMA, CAPABILITY_KINDS, CAPABILITY_PERMISSIONS, CAPABILITY_SCOPES } from './capabilities.js';
+import { IMPROVEMENT_EVALUATION_INPUT_SCHEMA } from './improvements.js';
 
 export const SETTING_SCOPES = Object.freeze(['global', 'project', 'swarm', 'role', 'agent', 'run']);
 export const SETTINGS_EXPORT_FORMAT = 'aos-settings/1';
@@ -38,18 +40,18 @@ const memoryPolicySchema = t.object({
 // Every setting the engine honours. `scopes` lists where a value may be set; `runPatchable`
 // marks settings an operator may change on an active run through a versioned patch.
 export const SETTING_DEFINITIONS = Object.freeze([
-  { key: 'execution.mode', group: 'models_harnesses', schema: t.enumOf(['local', 'codex']), default: 'local', scopes: [], readOnly: true, description: 'Execution mode of the running engine (from AOS_EXECUTION at start). Read-only here.' },
-  { key: 'execution.allowedHarnesses', group: 'models_harnesses', schema: t.array(t.enumOf(KNOWN_HARNESSES), { unique: true, minItems: 1 }), default: ['local', 'codex'], scopes: ['global', 'project'], description: 'Harnesses a template may select. Adapters not yet implemented still fail closed at dispatch.' },
-  { key: 'execution.allowedModels', group: 'models_harnesses', schema: t.record(t.array(t.string({ maxLength: 120 }), { unique: true })), default: { codex: ['gpt-5.6-luna'] }, scopes: ['global', 'project'], description: 'Per-harness model allowlist. The Codex adapter keeps its own fail-closed allowlist.' },
+  { key: 'execution.mode', group: 'models_harnesses', schema: t.enumOf(['local', 'codex', 'mixed']), default: 'local', scopes: [], readOnly: true, description: 'Execution mode of the running engine (from AOS_EXECUTION at start). Read-only here.' },
+  { key: 'execution.allowedHarnesses', group: 'models_harnesses', schema: t.array(t.enumOf(KNOWN_HARNESSES), { unique: true, minItems: 1 }), default: ['local', 'codex', 'claude'], scopes: ['global', 'project'], description: 'Harnesses a template may select. Adapters still fail closed until configured and ready.' },
+  { key: 'execution.allowedModels', group: 'models_harnesses', schema: t.record(t.array(t.string({ maxLength: 120 }), { unique: true })), default: { codex: ['gpt-5.6-luna'], claude: ['opus'] }, scopes: ['global', 'project'], description: 'Per-harness model allowlist. Each mounted adapter keeps its own runtime checks.' },
   { key: 'execution.defaultEffort', group: 'models_harnesses', schema: t.nullable(t.string({ maxLength: 40 })), default: null, scopes: ['global', 'project', 'role'], description: 'Default reasoning effort when a template does not set one.' },
-  { key: 'capabilities.enabled', group: 'capabilities', schema: t.array(t.string({ maxLength: 200 }), { unique: true }), default: [], scopes: ['global', 'project', 'swarm', 'role'], description: 'Capability ids workers may mount. The capability registry (skills, MCP, plugins, tools) is a later stage; this list gates what templates may reference.' },
+  { key: 'capabilities.enabled', group: 'capabilities', schema: t.array(t.string({ maxLength: 200 }), { unique: true }), default: [], scopes: ['global', 'project', 'swarm', 'role'], description: 'Version-pinned capability references workers may mount, such as search-skill@2. Registry tests, permissions and revocation still gate dispatch.' },
   { key: 'memory', group: 'memory', schema: memoryPolicySchema, default: { enabled: false }, scopes: ['global', 'project', 'swarm', 'role'], runPatchable: true, description: 'Memory policy layer for this scope. Outer layers can only be narrowed. Off by default.' },
   { key: 'maxConcurrency', group: 'budgets_concurrency', schema: t.nullable(t.integer({ min: 1 })), default: 2, scopes: ['global', 'project'], runPatchable: true, description: 'Default concurrent workers per run; null means no engine cap (providers and budgets still bound it).' },
   { key: 'maxRetries', group: 'budgets_concurrency', schema: t.integer({ min: 0, max: 20 }), default: 1, scopes: ['global', 'project', 'role'], description: 'Default retries per task when the template does not set one.' },
   { key: 'budget.tokens', group: 'budgets_concurrency', schema: t.nullable(t.integer({ min: 1 })), default: null, scopes: ['global', 'project', 'swarm', 'role', 'agent'], runPatchable: true, description: 'Token ceiling; null means unlimited by policy (still bounded by provider quotas).' },
   { key: 'budget.usd', group: 'budgets_concurrency', schema: t.nullable(t.number({ min: 0 })), default: null, scopes: ['global', 'project', 'swarm', 'role', 'agent'], runPatchable: true, description: 'Cost ceiling in USD; null means unlimited by policy.' },
   { key: 'budget.timeMs', group: 'budgets_concurrency', schema: t.nullable(t.integer({ min: 1000 })), default: null, scopes: ['global', 'project', 'swarm', 'role', 'agent'], runPatchable: true, description: 'Wall-clock ceiling; null means unlimited by policy.' },
-  { key: 'approvals.improvementMode', group: 'approvals_safety', schema: t.enumOf(['manual', 'auto_safe', 'auto_all']), default: 'manual', scopes: ['global', 'project'], description: 'How improvement proposals are adopted. Only manual is implemented; the others are recorded and treated as manual until the evaluation loop ships.' },
+  { key: 'approvals.improvementMode', group: 'approvals_safety', schema: t.enumOf(['manual', 'auto_safe', 'auto_all']), default: 'manual', scopes: ['global', 'project'], description: 'How evaluated improvement proposals are adopted. Benchmark gating is implemented; automatic modes remain recorded as manual until promotion safety policy ships.' },
   { key: 'approvals.humanGates', group: 'approvals_safety', schema: t.array(t.enumOf(['before_synthesis', 'before_adopt', 'on_budget_exhausted', 'on_conflict', 'on_expansion']), { unique: true }), default: ['before_adopt'], scopes: ['global', 'project', 'swarm'], runPatchable: true, description: 'Points where a run waits for a human.' },
   { key: 'approvals.defaultSandbox', group: 'approvals_safety', schema: t.enumOf(SANDBOX_TIERS), default: 'read_only', scopes: ['global', 'project', 'role'], description: 'Sandbox tier when a template does not set one.' },
   { key: 'approvals.destructiveConfirmation', group: 'approvals_safety', schema: t.boolean(), default: true, scopes: ['global', 'project'], description: 'Whether destructive memory operations need an explicit confirmation or the approval gate.' },
@@ -106,6 +108,7 @@ export class SettingsRegistry {
       enumerations: {
         roleKinds: ROLE_KINDS, harnesses: KNOWN_HARNESSES, sandboxTiers: SANDBOX_TIERS, memoryScopes: MEMORY_SCOPES, memoryTypes: MEMORY_TYPES,
         promotionModes: PROMOTION_MODES, humanGateTriggers: HUMAN_GATE_TRIGGERS, settingScopes: SETTING_SCOPES, requiredPresetSections: REQUIRED_SECTIONS, presetLimits: PRESET_LIMITS,
+        capabilityKinds: CAPABILITY_KINDS, capabilityPermissions: CAPABILITY_PERMISSIONS, capabilityScopes: CAPABILITY_SCOPES,
       },
       inputSchemas: {
         preset: describeSchema(PRESET_INPUT_SCHEMA),
@@ -115,6 +118,8 @@ export class SettingsRegistry {
         blueprintConfig: describeSchema(BLUEPRINT_CONFIG_SCHEMA),
         memoryWrite: describeSchema(MEMORY_WRITE_SCHEMA),
         memoryPolicy: describeSchema(memoryPolicySchema),
+        capability: describeSchema(CAPABILITY_INPUT_SCHEMA),
+        improvementEvaluation: describeSchema(IMPROVEMENT_EVALUATION_INPUT_SCHEMA),
       },
       routes: RESOURCE_ROUTES.map(([method, pattern, resource, action, params, status = 200]) => { const names = [...params]; return { method, path: pattern.source.replace(/^\^/, '').replace(/\$$/, '').replace(/\\\//g, '/').replace(/\(\[\^\/\]\+\)/g, () => `:${names.shift() || 'id'}`), resource, action, status, ...(DESTRUCTIVE[`${resource}.${action}`] ? { destructive: DESTRUCTIVE[`${resource}.${action}`] } : {}) }; }),
       registries: {
@@ -122,6 +127,9 @@ export class SettingsRegistry {
         templates: { group: 'templates', operations: ['list', 'get', 'history', 'create', 'edit', 'fork', 'archive', 'restore', 'validate', 'from-task', 'export', 'import'], http: '/api/v1/templates', cli: 'aos template <action>' },
         blueprints: { group: 'swarms', operations: ['list', 'get', 'history', 'effective', 'estimate', 'create', 'edit', 'fork', 'archive', 'restore', 'validate', 'export', 'import'], http: '/api/v1/blueprints', cli: 'aos blueprint <action>' },
         memory: { group: 'memory', operations: ['stats', 'policy', 'search', 'show', 'add', 'correct', 'commit', 'pin', 'unpin', 'forget', 'promote', 'clear', 'retention', 'export', 'import'], http: '/api/v1/memory', cli: 'aos memory <action>' },
+        capabilities: { group: 'capabilities', operations: ['list', 'get', 'history', 'create', 'edit', 'test', 'enable', 'revoke', 'permissions', 'grant', 'revoke-permission'], http: '/api/v1/capabilities', cli: 'aos capability <action>' },
+        sessions: { group: 'models_harnesses', operations: ['list', 'get', 'reset', 'retention'], http: '/api/v1/sessions', cli: 'aos session <action>' },
+        improvements: { group: 'approvals_safety', operations: ['evaluate', 'evaluations', 'genome', 'rollback'], http: '/api/v1/improvements', cli: 'aos improvement <action>' },
         runs: { group: 'budgets_concurrency', operations: ['patch', 'patches'], http: '/api/v1/runs/:id/patch', cli: 'aos run patch <runId> <key> <json>' },
       },
       diagnostics: this.diagnostics(),
@@ -132,7 +140,7 @@ export class SettingsRegistry {
     return {
       store: { version: this.engine.state.version, migrations: this.engine.state.migrations || [], diagnostics: this.engine.store.diagnostics },
       memory: this.engine.memory.stats().diagnostics,
-      counts: { projects: this.engine.state.projects.length, goals: this.engine.state.goals.length, runs: this.engine.state.runs.length, tasks: this.engine.state.tasks.length, presets: this.engine.state.presets.length, templates: this.engine.state.templates.length, blueprints: this.engine.state.blueprints.length, settings: this.records.length, memoryIndex: (this.engine.state.memoryIndex || []).length },
+      counts: { projects: this.engine.state.projects.length, goals: this.engine.state.goals.length, runs: this.engine.state.runs.length, tasks: this.engine.state.tasks.length, presets: this.engine.state.presets.length, templates: this.engine.state.templates.length, blueprints: this.engine.state.blueprints.length, capabilities: this.engine.state.capabilities.length, harnessSessions: this.engine.state.harnessSessions.length, improvementEvaluations: this.engine.state.improvementEvaluations.length, genomeVersions: this.engine.state.genomeVersions.length, settings: this.records.length, memoryIndex: (this.engine.state.memoryIndex || []).length },
       execution: this.engine.executionSummary(),
     };
   }

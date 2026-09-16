@@ -29,6 +29,57 @@ export function conflict(code, message, details = null) {
   return new AosError(code, message, { statusCode: 409, details });
 }
 
+// Worker-to-operator questions are deliberately bounded. This validator only
+// checks the wire payload; the engine adds IDs and answer metadata when it
+// commits a wait state.
+export function validateTaskQuestions(questions) {
+  if (!Array.isArray(questions) || questions.length < 1 || questions.length > 3) {
+    throw new AosError('task_question_payload_invalid', 'Worker questions must contain 1 to 3 items', {
+      statusCode: 409,
+      details: { field: 'questions', minItems: 1, maxItems: 3 },
+    });
+  }
+  let totalPromptChars = 0;
+  const normalized = questions.map((question, index) => {
+    if (!question || typeof question !== 'object' || Array.isArray(question)) {
+      throw new AosError('task_question_payload_invalid', `Worker question ${index + 1} must be an object`, {
+        statusCode: 409,
+        details: { field: `questions[${index}]` },
+      });
+    }
+    const extraKeys = Object.keys(question).filter((key) => key !== 'prompt' && key !== 'reason');
+    if (extraKeys.length) {
+      throw new AosError('task_question_payload_invalid', `Worker question ${index + 1} contains unsupported fields`, {
+        statusCode: 409,
+        details: { field: `questions[${index}]`, extraKeys },
+      });
+    }
+    if (typeof question.prompt !== 'string' || !question.prompt.trim() || question.prompt.trim().length > 500) {
+      throw new AosError('task_question_payload_invalid', `Worker question ${index + 1} prompt must be 1 to 500 nonblank characters`, {
+        statusCode: 409,
+        details: { field: `questions[${index}].prompt`, maxLength: 500 },
+      });
+    }
+    const prompt = question.prompt.trim();
+    totalPromptChars += prompt.length;
+    if (typeof question.reason !== 'undefined' && (typeof question.reason !== 'string' || question.reason.length > 300)) {
+      throw new AosError('task_question_payload_invalid', `Worker question ${index + 1} reason must be at most 300 characters`, {
+        statusCode: 409,
+        details: { field: `questions[${index}].reason`, maxLength: 300 },
+      });
+    }
+    const reason = typeof question.reason === 'string' ? question.reason.trim() : undefined;
+    return reason ? { prompt, reason } : { prompt };
+  });
+  if (totalPromptChars > 1500) {
+    throw new AosError('task_question_payload_invalid', 'Worker question prompts must total at most 1500 characters', {
+      statusCode: 409,
+      details: { field: 'questions', maxPromptChars: 1500, totalPromptChars },
+    });
+  }
+  return normalized;
+}
+
 export function errorEnvelope(error) {
   if (error instanceof AosError) return error.toJSON();
   return { error: error?.message || String(error), code: error?.code || 'internal_error', details: error?.details ?? null };
