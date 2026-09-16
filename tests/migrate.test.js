@@ -30,7 +30,7 @@ test('a version 1 store from the real project migrates to the current version wi
     assert.deepEqual(aos.state[name].map((item) => item.id), before[name].map((item) => item.id), `${name} ids preserved in order`);
   }
   assert.deepEqual(aos.state.providers.slice(0, before.providers.length), before.providers, 'historical provider records preserved in order');
-  assert.deepEqual(aos.state.providers.slice(before.providers.length).map((item) => item.id), ['ollama'], 'new catalog providers append without rewriting history');
+  assert.deepEqual(aos.state.providers.slice(before.providers.length).map((item) => item.id), ['ollama', 'openai'], 'new catalog providers append without rewriting history');
   for (const name of [...COLLECTIONS_V2, ...COLLECTIONS_V3, ...COLLECTIONS_V5, ...COLLECTIONS_V6, ...COLLECTIONS_V7, ...COLLECTIONS_V8, ...COLLECTIONS_V9, ...COLLECTIONS_V10]) assert.deepEqual(aos.state[name], [], `${name} added empty`);
   assert.equal(aos.state.eventCursor, aos.state.events.length, 'legacy in-state event tail seeds the cursor when no durable log exists');
   assert.ok(aos.state.tasks.every((task) => task.lease === null), 'old tasks gain lease: null');

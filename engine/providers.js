@@ -58,6 +58,18 @@ export function defaultProviders() {
       note: 'Loopback-only local model adapter. It is mounted only for explicit mixed execution configuration and remains unavailable until local model preflight observes the configured model; no auth or token environment is accepted.',
     },
     {
+      id: 'openai',
+      name: 'OpenAI Responses (API key)',
+      kind: 'api_key',
+      auth: { type: 'api_key', secretEnv: 'OPENAI_API_KEY', session: null },
+      liveAuthSupported: true,
+      liveExecutionEnabled: false,
+      configured: false,
+      adapterMounted: false,
+      secretPresent: false,
+      note: 'Disabled-by-default direct OpenAI Responses API-key adapter. Its named environment variable is never stored or printed. This is not a Codex ChatGPT account session or generic OAuth adapter.',
+    },
+    {
       id: 'grok',
       name: 'Grok',
       kind: 'api_key',
@@ -128,6 +140,12 @@ export function publicProviderView(provider, { execution = null } = {}) {
               ? `Loopback Ollama preflight observed configured model ${config?.model || readiness.model || 'unknown'} at ${config?.baseUrl || 'http://127.0.0.1:11434'}; local response attestation only, at most ${config?.maxConcurrency || 1} concurrent workers, no delegation or fallback.`
               : `Configured for local model ${config?.model || 'unknown'} at ${config?.baseUrl || 'http://127.0.0.1:11434'}; availability is ${readiness.status.replace('_', ' ')} until explicit Ollama preflight succeeds.`
             : 'Ollama is disabled; local model execution requires explicit mixed-mode configuration.'
+        : provider.id === 'openai'
+          ? executionConfigured
+            ? readiness.status === 'available'
+              ? `OpenAI Responses preflight observed configured model ${config?.model || readiness.model || 'unknown'} at ${config?.origin || 'https://api.openai.com'} with API-key environment reference ${environmentReference || 'OPENAI_API_KEY'}; store is disabled, tools and session resume are refused, and no ChatGPT account-session claim is made.`
+              : `Configured for exact OpenAI Responses model ${config?.model || 'unknown'} using API-key environment reference ${environmentReference || 'OPENAI_API_KEY'}; availability is ${readiness.status.replace('_', ' ')} until explicit preflight succeeds.`
+            : 'OpenAI Responses API-key execution is disabled; it is distinct from Codex ChatGPT account-session execution.'
         : provider.id === 'grok'
           ? 'Grok API-key configuration is detected without reading the value; no runnable adapter is mounted.'
           : provider.id === 'command'
@@ -207,6 +225,23 @@ export function applyExecutionToProviders(providers, execution, codexReadiness =
         adapterMounted: enabled,
         liveExecutionEnabled: enabled && providerReadiness.status === 'available',
         configured: enabled,
+        readiness: providerReadiness,
+      };
+    }
+    if (provider.id === 'openai') {
+      const providerReadiness = enabled
+        ? readiness.openai || { status: 'unverified', checkedAt: null }
+        : { status: 'disabled', checkedAt: null };
+      const apiKeyEnv = config?.apiKeyEnv || 'OPENAI_API_KEY';
+      const secretPresent = enabled && envPresent(apiKeyEnv);
+      return {
+        ...provider,
+        adapterMounted: enabled,
+        auth: { type: 'api_key', secretEnv: apiKeyEnv, session: null },
+        liveAuthSupported: true,
+        liveExecutionEnabled: enabled && secretPresent && providerReadiness.status === 'available',
+        configured: enabled && secretPresent,
+        secretPresent,
         readiness: providerReadiness,
       };
     }

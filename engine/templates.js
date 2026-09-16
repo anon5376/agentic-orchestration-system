@@ -9,7 +9,7 @@ import { AosError, check, identifier, invalid, notFound, t } from './schema.js';
 
 export const TEMPLATE_SCHEMA_VERSION = 1;
 export const TEMPLATE_EXPORT_FORMAT = 'aos-templates/1';
-export const KNOWN_HARNESSES = Object.freeze(['local', 'codex', 'claude', 'api', 'ollama', 'command']);
+export const KNOWN_HARNESSES = Object.freeze(['local', 'codex', 'claude', 'openai', 'api', 'ollama', 'command']);
 // host_process is intentionally a disclosure tier, not a filesystem or network
 // sandbox. Only the fixed external-harness adapter may admit such a task.
 export const SANDBOX_TIERS = Object.freeze(['read_only', 'workspace_write', 'network', 'host_process']);

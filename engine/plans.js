@@ -4,7 +4,7 @@
 import { fingerprint, newId } from './ids.js';
 import { applyTemplateToTask } from './templates.js';
 import { validatePlan } from './intake.js';
-import { assertOllamaTaskAdmission } from './provider-contracts.js';
+import { assertOllamaTaskAdmission, assertOpenAIResponsesTaskAdmission } from './provider-contracts.js';
 import { AosError, invalid, notFound } from './schema.js';
 
 export const PLAN_SCHEMA_VERSION = 1;
@@ -303,7 +303,7 @@ export class PlanService {
       if (model != null && allowed && !allowed.includes(model)) {
         throw new AosError('plan_policy', `Model ${model} is not allowed for harness ${harness}`, { statusCode: 409, details: { taskId: planned.id, harness, model, allowedModels: allowed } });
       }
-      if (this.engine.execution.mode === 'mixed' && !isAdoptEngine && ['codex', 'claude', 'ollama'].includes(harness)) {
+      if (this.engine.execution.mode === 'mixed' && !isAdoptEngine && ['codex', 'claude', 'ollama', 'openai'].includes(harness)) {
         const configured = this.engine.execution[harness];
         if (!configured) {
           throw new AosError('plan_provider_unconfigured', `Plan task ${planned.id} selects ${harness}, but that provider is not configured for this engine`, { statusCode: 409, details: { taskId: planned.id, harness } });
@@ -311,10 +311,10 @@ export class PlanService {
         const codexRoleBinding = harness === 'codex' ? this.engine.roleRuntimeForPlanTask(effective) : null;
         const requestedModel = model ?? (harness === 'codex' ? codexRoleBinding?.model : configured.model);
         const requestedEffort = effective.effort ?? (harness === 'codex' ? codexRoleBinding?.effort : configured.effort);
-        if ((harness !== 'codex' && (requestedModel !== configured.model || (harness !== 'ollama' && requestedEffort !== configured.effort)))
+        if ((harness !== 'codex' && (requestedModel !== configured.model || (!['ollama', 'openai'].includes(harness) && requestedEffort !== configured.effort) || (harness === 'openai' && requestedEffort != null)))
           || (harness === 'codex' && (!codexRoleBinding || requestedModel !== codexRoleBinding.model || requestedEffort !== codexRoleBinding.effort))) {
           const expected = harness === 'codex' ? codexRoleBinding : configured;
-          throw new AosError('plan_provider_config_invalid', `Plan task ${planned.id} must use the configured ${harness} runtime ${expected.model}${harness === 'ollama' ? '' : `/${expected.effort}`}`, { statusCode: 409, details: { taskId: planned.id, harness, requested: { model: requestedModel, ...(harness === 'ollama' ? {} : { effort: requestedEffort }) }, expected: { model: expected.model, ...(harness === 'ollama' ? {} : { effort: expected.effort }) } } });
+          throw new AosError('plan_provider_config_invalid', `Plan task ${planned.id} must use the configured ${harness} runtime ${expected.model}${['ollama', 'openai'].includes(harness) ? '' : `/${expected.effort}`}`, { statusCode: 409, details: { taskId: planned.id, harness, requested: { model: requestedModel, ...(['ollama', 'openai'].includes(harness) ? {} : { effort: requestedEffort }) }, expected: { model: expected.model, ...(['ollama', 'openai'].includes(harness) ? {} : { effort: expected.effort }) } } });
         }
         if (harness === 'ollama') {
           const presetRole = effective.presetId
@@ -322,6 +322,7 @@ export class PlanService {
             : null;
           assertOllamaTaskAdmission(planned, effective, { presetRole });
         }
+        if (harness === 'openai') assertOpenAIResponsesTaskAdmission(planned, effective);
       }
       if (this.engine.live) {
         if (this.engine.execution.mode === 'codex') {

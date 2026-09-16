@@ -5,13 +5,14 @@ import { AosError } from './schema.js';
 
 export const PROVIDER_CONTRACT_SCHEMA_VERSION = 1;
 
-const MOUNTED_ADAPTERS = new Set(['local', 'codex', 'claude', 'ollama', 'command']);
+const MOUNTED_ADAPTERS = new Set(['local', 'codex', 'claude', 'ollama', 'openai', 'command']);
 
 const AUTH_BOUNDARIES = Object.freeze({
   local: Object.freeze({ type: 'none', boundary: 'none', reference: null }),
   codex: Object.freeze({ type: 'cli_session', boundary: 'external_cli_session', reference: Object.freeze({ kind: 'session_name', name: 'codex-cli' }) }),
   claude: Object.freeze({ type: 'cli_session', boundary: 'external_cli_session', reference: Object.freeze({ kind: 'session_name', name: 'claude-cli' }) }),
   ollama: Object.freeze({ type: 'none', boundary: 'none', reference: null }),
+  openai: Object.freeze({ type: 'api_key', boundary: 'process_environment', reference: Object.freeze({ kind: 'environment_name', name: 'OPENAI_API_KEY' }) }),
   grok: Object.freeze({ type: 'api_key', boundary: 'process_environment', reference: Object.freeze({ kind: 'environment_name', name: 'XAI_API_KEY' }) }),
   command: Object.freeze({ type: 'external_cli_session', boundary: 'external_cli_session', reference: Object.freeze({ kind: 'session_name', name: 'external-harness' }) }),
   api: Object.freeze({ type: 'unsupported_oauth', boundary: 'unsupported', reference: null }),
@@ -108,13 +109,56 @@ export function assertExternalHarnessTaskAdmission(planned = {}, effective = pla
   return true;
 }
 
+// Direct Responses execution is intentionally smaller than the generic worker
+// result surface: a task cannot select transport/auth/model controls, tools,
+// delegation, fallback, or a prior response/session.
+export function assertOpenAIResponsesTaskAdmission(planned = {}, effective = planned) {
+  const task = effective && typeof effective === 'object' ? effective : {};
+  const source = planned && typeof planned === 'object' ? planned : task;
+  const taskId = source.id || task.id || '(unknown)';
+  const config = task.config?.effective || task.config || {};
+  const harness = config.harness || {};
+  const sandbox = task.sandbox ?? config.filesystem?.sandbox ?? null;
+  if (sandbox != null && !['read_only', 'read-only', 'remote_api_no_tools'].includes(String(sandbox))) {
+    throw new AosError('plan_openai_responses_sandbox_invalid', `Plan task ${taskId} selects OpenAI Responses with incompatible sandbox ${sandbox}`, {
+      statusCode: 409,
+      details: { taskId, sandbox, expected: ['read_only', 'remote_api_no_tools'] },
+    });
+  }
+  const delegation = task.delegation || config.delegation || {};
+  const delegates = task.mayDelegate === true
+    || delegation.unlimited === true
+    || delegation.maxChildren === null
+    || delegation.maxDepth === null
+    || (Number.isInteger(delegation.maxChildren) && delegation.maxChildren > 0)
+    || (Number.isInteger(delegation.maxDepth) && delegation.maxDepth > 0);
+  if (delegates) {
+    throw new AosError('plan_openai_responses_delegation_invalid', `Plan task ${taskId} selects OpenAI Responses but delegates work`, { statusCode: 409, details: { taskId, delegation } });
+  }
+  const capabilities = task.capabilities || config.capabilities || {};
+  const mounted = Object.values(capabilities).some((value) => Array.isArray(value) ? value.length > 0 : value != null);
+  if (mounted || task.capabilityExecution || config.capabilityExecution) {
+    throw new AosError('plan_openai_responses_capability_invalid', `Plan task ${taskId} selects OpenAI Responses with a capability mount`, { statusCode: 409, details: { taskId } });
+  }
+  const fallback = task.fallback ?? harness.fallback ?? task.harness?.fallback ?? [];
+  if ((Array.isArray(fallback) && fallback.length) || (!Array.isArray(fallback) && fallback != null)) {
+    throw new AosError('plan_openai_responses_fallback_invalid', `Plan task ${taskId} selects OpenAI Responses with a fallback`, { statusCode: 409, details: { taskId } });
+  }
+  const controls = { ...task, ...config, ...harness };
+  for (const key of ['apiKey', 'api_key', 'apiKeyEnv', 'authorization', 'headers', 'origin', 'baseUrl', 'baseURL', 'endpoint', 'url', 'tools', 'toolChoice', 'previousResponseId', 'conversation', 'sessionId', 'resumeSession', 'threadId']) {
+    if (controls[key] != null) {
+      throw new AosError('plan_openai_responses_control_invalid', `Plan task ${taskId} supplies unsupported OpenAI Responses control ${key}`, { statusCode: 409, details: { taskId, key } });
+    }
+  }
+  return true;
+}
+
 function implementationFor(provider) {
   const id = provider.id;
-  // Ollama's code is available, but its adapter is mounted only when the
-  // engine has an explicit mixed-mode config. The static catalog entry must
-  // not turn a disabled process into an optimistically runnable provider.
+  // Explicitly configured adapters are mounted only after their narrow
+  // configuration is present. Static catalog entries never become runnable.
   const mounted = MOUNTED_ADAPTERS.has(id)
-    && (id !== 'ollama' ? true : provider.adapterMounted !== false && (provider.adapterMounted === true || provider.configured === true));
+    && (!['ollama', 'openai'].includes(id) ? true : provider.adapterMounted !== false && (provider.adapterMounted === true || provider.configured === true));
   return {
     status: mounted ? 'mounted' : 'typed_boundary',
     mounted,
@@ -130,7 +174,9 @@ function authContract(provider, execution) {
   const config = executionConfig(execution, provider.id);
   const expected = provider.id === 'command' && config?.authType === 'none'
     ? { type: 'none', boundary: 'none', reference: null }
-    : AUTH_BOUNDARIES[provider.id] || { type: 'unsupported', boundary: 'unsupported', reference: null };
+    : provider.id === 'openai'
+      ? { type: 'api_key', boundary: 'process_environment', reference: { kind: 'environment_name', name: config?.apiKeyEnv || 'OPENAI_API_KEY' } }
+      : AUTH_BOUNDARIES[provider.id] || { type: 'unsupported', boundary: 'unsupported', reference: null };
   const reportedType = provider.auth?.type || provider.authType || 'none';
   const consistent = reportedType === expected.type;
   return {
@@ -146,19 +192,22 @@ function authContract(provider, execution) {
 
 function runtimeContract(provider, execution) {
   const config = executionConfig(execution, provider.id);
-  if (!config || !['codex', 'claude', 'ollama', 'command'].includes(provider.id)) return { requested: null, effective: null };
+  if (!config || !['codex', 'claude', 'ollama', 'openai', 'command'].includes(provider.id)) return { requested: null, effective: null };
   const requested = provider.id === 'claude'
     ? { model: config.model, effort: config.effort, sandbox: CLAUDE_SANDBOX }
     : provider.id === 'ollama'
       ? { model: config.model, sandbox: 'loopback-only' }
+      : provider.id === 'openai'
+        ? { model: config.model, sandbox: 'remote_api_no_tools', store: false, tools: false, sessionResume: false }
       : provider.id === 'command'
         ? { model: config.model, sandbox: EXTERNAL_HARNESS_SANDBOX, authType: config.authType, sessionMode: config.sessionMode, protocol: EXTERNAL_HARNESS_PROTOCOL }
         : { model: config.model, effort: config.effort, sandbox: 'read-only' };
   const effective = provider.readiness?.status === 'available'
     ? {
       model: provider.readiness.model || config.model,
-      ...(provider.id !== 'ollama' ? { effort: provider.readiness.effort || config.effort } : {}),
+      ...(!['ollama', 'openai'].includes(provider.id) ? { effort: provider.readiness.effort || config.effort } : {}),
       sandbox: provider.readiness.sandbox || requested.sandbox,
+      ...(provider.id === 'openai' ? { store: false, tools: false, sessionResume: false } : {}),
       ...(provider.id === 'command' ? {
         authType: provider.readiness.authType || config.authType,
         sessionMode: provider.readiness.sessionMode || config.sessionMode,
@@ -182,6 +231,7 @@ function sandboxContract(id) {
   if (id === 'codex') return { mode: 'read-only', required: true, enforced: true, enforcedBy: 'codex_cli' };
   if (id === 'claude') return { mode: CLAUDE_SANDBOX, required: true, enforced: true, enforcedBy: 'claude_cli_restricted' };
   if (id === 'ollama') return { mode: 'loopback-only', required: true, enforced: true, enforcedBy: 'ollama_url_validation' };
+  if (id === 'openai') return { mode: 'remote_api_no_tools', required: true, enforced: true, enforcedBy: 'fixed_responses_request' };
   if (id === 'local') return { mode: 'task-workspace', required: true, enforced: true, enforcedBy: 'aos_path_boundary' };
   if (id === 'command') return { mode: EXTERNAL_HARNESS_SANDBOX, required: true, enforced: true, enforcedBy: 'fixed_argv_process_group', isolation: false };
   return { mode: 'unknown', required: true, enforced: false, enforcedBy: null };
@@ -206,6 +256,7 @@ function cancellationContract(id) {
   if (id === 'ollama') {
     return { level: 'request', required: true, request: 'abort_signal', confirmation: 'request_settled' };
   }
+  if (id === 'openai') return { level: 'request', required: true, request: 'abort_signal', confirmation: 'request_settled' };
   return { level: 'unsupported', required: true, request: 'none', confirmation: 'none' };
 }
 
@@ -236,6 +287,15 @@ function attestationContract(id, provider) {
       verified: provider.readiness?.status === 'available',
       binds: ['provider', 'loopback_base_url', 'model', 'usage', 'timestamps'],
       externalIdentity: false,
+    };
+  }
+  if (id === 'openai') {
+    return {
+      strength: 'api_response_observed',
+      required: true,
+      verified: provider.readiness?.status === 'available',
+      externalIdentity: false,
+      binds: ['provider', 'api_key_environment_name', 'https_origin', 'model', 'store', 'tools', 'session_resume', 'usage', 'timestamps'],
     };
   }
   if (id === 'command') return {
@@ -271,6 +331,15 @@ function catalogContract(provider) {
     return {
       provenance: 'ollama_local_model_list',
       revision: 'ollama-v1',
+      checkedAt: provider.readiness?.checkedAt || null,
+      models: provider.readiness?.model ? [provider.readiness.model] : null,
+      efforts: null,
+    };
+  }
+  if (provider.id === 'openai') {
+    return {
+      provenance: 'operator_configured_exact',
+      revision: 'openai-responses-v1',
       checkedAt: provider.readiness?.checkedAt || null,
       models: provider.readiness?.model ? [provider.readiness.model] : null,
       efforts: null,
@@ -322,6 +391,15 @@ function quotaContract(provider, execution) {
       checkedAt: provider.readiness?.checkedAt || null,
     };
   }
+  if (provider.id === 'openai') {
+    const config = executionConfig(execution, 'openai');
+    if (config) return {
+      signal: 'configured_limit',
+      maxConcurrency: config.maxConcurrency ?? null,
+      remaining: null,
+      checkedAt: provider.readiness?.checkedAt || null,
+    };
+  }
   if (provider.id === 'command') {
     const config = executionConfig(execution, 'command');
     if (config) return {
@@ -351,6 +429,8 @@ export function createProviderContract(provider, { execution = null } = {}) {
     }
     : provider.id === 'command'
       ? { kind: 'stdio', scope: 'same_host', protocol: EXTERNAL_HARNESS_PROTOCOL, shell: false }
+      : provider.id === 'openai'
+        ? { kind: 'https', scope: 'pinned_origin', origin: executionConfig(execution, 'openai')?.origin || null, redirects: 'disabled', endpoint: '/v1/responses' }
       : null;
   const limitations = provider.id === 'ollama'
     ? [
@@ -367,6 +447,13 @@ export function createProviderContract(provider, { execution = null } = {}) {
         'fixed executable and argv only; task-provided commands, fallback, delegation, capability mounts, and resume are refused',
         'provider/model/session evidence is self-reported protocol attestation, not external identity verification',
       ]
+      : provider.id === 'openai'
+        ? [
+          'direct OpenAI API-key execution is distinct from a Codex ChatGPT account session and is not generic OAuth',
+          'only the explicitly configured model and pinned HTTPS origin are allowed',
+          'store is false; tools, capability mounts, delegation, fallback, and response/session resume are refused',
+          'the receipt observes an API response and exact model, not an external account identity claim',
+        ]
       : [];
   const readiness = provider.readiness?.status
     || (provider.liveExecutionEnabled ? 'available' : provider.configured ? 'configured' : 'not_live');

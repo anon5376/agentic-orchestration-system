@@ -4,6 +4,7 @@ import { fingerprint } from './ids.js';
 import { CodexCliWorker } from './codex.js';
 import { ClaudeCliWorker } from './claude.js';
 import { OllamaWorker } from './ollama.js';
+import { OpenAIResponsesWorker } from './openai-responses.js';
 import { ExternalHarnessWorker } from './external-harness.js';
 
 export class IsolationError extends Error {
@@ -188,6 +189,7 @@ export function createWorkerRegistry({
   codex: codexConfig = null,
   claude: claudeConfig = null,
   ollama: ollamaConfig = null,
+  openai: openaiConfig = null,
   command: commandConfig = null,
   adapters = null,
 } = {}) {
@@ -222,6 +224,15 @@ export function createWorkerRegistry({
       label: 'Ollama',
       reason: 'Local Ollama execution is not enabled. Use AOS_EXECUTION=mixed with AOS_OLLAMA_ENABLED=1 and an explicit AOS_OLLAMA_MODEL; there is no fallback.',
     });
+  const openaiEntry = adapters && Object.prototype.hasOwnProperty.call(adapters, 'openai') ? adapters.openai : openaiConfig;
+  const openaiExplicit = Boolean(openaiEntry && openaiEntry !== false && openaiEntry.enabled === true);
+  const openai = openaiExplicit && configured('openai', openaiConfig)
+    ? new OpenAIResponsesWorker(configured('openai', openaiConfig))
+    : new DisabledLiveWorker({
+      id: 'openai',
+      label: 'OpenAI Responses (API key)',
+      reason: 'OpenAI Responses API-key execution is disabled. Use AOS_EXECUTION=openai or AOS_EXECUTION=mixed with AOS_OPENAI_RESPONSES_ENABLED=1, an exact model, and a named API-key environment variable; there is no fallback.',
+    });
   const commandEntry = adapters && Object.prototype.hasOwnProperty.call(adapters, 'command') ? adapters.command : commandConfig;
   const commandExplicit = Boolean(commandEntry && commandEntry !== false && commandEntry.enabled === true);
   const command = commandExplicit && configured('command', commandConfig)
@@ -244,6 +255,7 @@ export function createWorkerRegistry({
     [codex.id, codex],
     [claude.id, claude],
     [ollama.id, ollama],
+    [openai.id, openai],
     [grok.id, grok],
   ]);
 }

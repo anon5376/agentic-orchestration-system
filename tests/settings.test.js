@@ -57,7 +57,7 @@ test('the manifest describes every setting group, definition and registry for a 
   assert.ok(manifest.inputSchemas.deterministicImprovementEvaluation.fields.requestId, 'deterministic evaluation schema is described');
   assert.ok(manifest.routes.some((route) => route.method === 'POST' && route.path === '/api/v1/memory/clear' && route.destructive.gate === 'approval'), 'destructive gates are declared');
   assert.ok(manifest.routes.some((route) => route.path === '/api/v1/presets/:id/preview'), 'route params are named');
-  assert.deepEqual(manifest.enumerations.harnesses, ['local', 'codex', 'claude', 'api', 'ollama', 'command']);
+  assert.deepEqual(manifest.enumerations.harnesses, ['local', 'codex', 'claude', 'openai', 'api', 'ollama', 'command']);
   assert.ok(manifest.diagnostics.counts.presets >= 0);
   assert.ok(RESOURCE_ROUTES.length > 60);
 });

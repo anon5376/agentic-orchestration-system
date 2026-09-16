@@ -15,7 +15,7 @@ import { useWorkspace } from '../app/WorkspaceContext';
 import { aosApi } from '../lib/aosApi';
 import '../styles/models.css';
 
-const KNOWN_HARNESSES = ['local', 'codex', 'claude', 'api', 'ollama', 'command'];
+const KNOWN_HARNESSES = ['local', 'codex', 'claude', 'openai', 'api', 'ollama', 'command'];
 const EFFORTS = ['none', 'minimal', 'low', 'medium', 'high', 'xhigh', 'max', 'ultra'];
 
 const PREVIEW_PROVIDERS = [
@@ -44,7 +44,16 @@ const PREVIEW_PROVIDERS = [
     configured: false,
     liveExecutionEnabled: false,
     readiness: { status: 'not_live' },
-    note: 'Account login is typed but its live adapter is not mounted in this MVP.',
+    note: 'The live adapter uses the existing Claude Code account session and fails closed until preflight passes.',
+  },
+  {
+    id: 'openai',
+    name: 'OpenAI Responses',
+    authType: 'api_key',
+    configured: false,
+    liveExecutionEnabled: false,
+    readiness: { status: 'not_live' },
+    note: 'The live adapter reads a key from a named environment variable and verifies one exact configured model.',
   },
   {
     id: 'api',

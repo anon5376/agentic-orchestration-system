@@ -6,10 +6,11 @@ import { fingerprint, newId, nowIso } from './ids.js';
 import { identifyAmbiguities, interpretGoal, questionsFromAmbiguities, validatePlan } from './intake.js';
 import { claimWorkspace, createWorkerRegistry, IsolationError } from './workers.js';
 import { applyExecutionToProviders, defaultProviders, publicProviderView, redactSecrets, refreshProviderSecrets } from './providers.js';
-import { assertExternalHarnessTaskAdmission, assertOllamaTaskAdmission, assertProviderDispatchable } from './provider-contracts.js';
+import { assertExternalHarnessTaskAdmission, assertOllamaTaskAdmission, assertOpenAIResponsesTaskAdmission, assertProviderDispatchable } from './provider-contracts.js';
 import { CODEX_AUTH_PATH, codexHomeDir, readSessionEvidence, redactText, resolveCodexConfig, verifySession } from './codex.js';
 import { CLAUDE_AUTH_PATH, CLAUDE_SANDBOX, resolveClaudeConfig } from './claude.js';
 import { resolveOllamaConfig } from './ollama.js';
+import { OPENAI_RESPONSES_ATTESTATION, OPENAI_RESPONSES_AUTH_PATH, resolveOpenAIResponsesConfig } from './openai-responses.js';
 import {
   EXTERNAL_HARNESS_ATTESTATION,
   EXTERNAL_HARNESS_PROTOCOL,
@@ -109,6 +110,10 @@ export function resolveExecution(input) {
     const claude = resolveClaudeConfig(input?.claude || {});
     return freezeExecution({ mode: 'mixed', claude, adapters: { claude: { enabled: true, ...claude } } });
   }
+  if (input === 'openai' || input.mode === 'openai') {
+    const openai = resolveOpenAIResponsesConfig(input?.openai || input?.adapters?.openai || {});
+    return freezeExecution({ mode: 'mixed', openai, adapters: { openai: { enabled: true, ...openai } } });
+  }
   if (!input || typeof input !== 'object' || (!['mixed', 'providers'].includes(input.mode) && !input.adapters && !input.providers)) {
     throw new Error(`Unknown execution mode: ${input?.mode}`);
   }
@@ -125,21 +130,33 @@ export function resolveExecution(input) {
   if (input.codex && adapters.codex === undefined) adapters.codex = { enabled: true, ...input.codex };
   if (input.claude && adapters.claude === undefined) adapters.claude = { enabled: true, ...input.claude };
   if (input.ollama && adapters.ollama === undefined) adapters.ollama = { enabled: true, ...input.ollama };
+  if (input.openai && adapters.openai === undefined) adapters.openai = { enabled: true, ...input.openai };
   if (input.command && adapters.command === undefined) adapters.command = { enabled: true, ...input.command };
   const codexEntry = adapters.codex?.enabled === false ? null : adapters.codex;
   const claudeEntry = adapters.claude?.enabled === false ? null : adapters.claude;
   const ollamaEntry = adapters.ollama?.enabled === false ? null : adapters.ollama;
+  const openaiEntry = adapters.openai?.enabled === false ? null : adapters.openai;
   const commandEntry = adapters.command?.enabled === false ? null : adapters.command;
   const codex = codexEntry ? resolveCodexConfig(codexEntry.config || codexEntry) : null;
   const claude = claudeEntry ? resolveClaudeConfig(claudeEntry.config || claudeEntry) : null;
   const ollama = ollamaEntry ? resolveOllamaConfig(ollamaEntry.config || ollamaEntry) : null;
+  const openai = openaiEntry ? resolveOpenAIResponsesAdapterConfig(openaiEntry) : null;
   const command = commandEntry ? resolveCommandAdapterConfig(commandEntry) : null;
   if (codex) adapters.codex = { enabled: true, ...codex };
   if (claude) adapters.claude = { enabled: true, ...claude };
   if (ollama) adapters.ollama = { enabled: true, ...ollama };
+  if (openai) adapters.openai = { enabled: true, ...openai };
   if (command) adapters.command = { enabled: true, ...command };
   if (!Object.keys(adapters).length) adapters.local = { enabled: true };
-  return freezeExecution({ mode: 'mixed', adapters, ...(codex ? { codex } : {}), ...(claude ? { claude } : {}), ...(ollama ? { ollama } : {}), ...(command ? { command } : {}) });
+  return freezeExecution({ mode: 'mixed', adapters, ...(codex ? { codex } : {}), ...(claude ? { claude } : {}), ...(ollama ? { ollama } : {}), ...(openai ? { openai } : {}), ...(command ? { command } : {}) });
+}
+
+function resolveOpenAIResponsesAdapterConfig(entry) {
+  if (!entry || typeof entry !== 'object' || Array.isArray(entry)) return resolveOpenAIResponsesConfig(entry);
+  if (!Object.prototype.hasOwnProperty.call(entry, 'config')) return resolveOpenAIResponsesConfig(entry);
+  const nested = entry.config;
+  const extras = Object.keys(entry).filter((key) => !['enabled', 'config'].includes(key));
+  return resolveOpenAIResponsesConfig({ ...(nested && typeof nested === 'object' ? nested : {}), ...Object.fromEntries(extras.map((key) => [key, entry[key]])) });
 }
 
 function resolveCommandAdapterConfig(entry) {
@@ -162,6 +179,7 @@ function executionAdapterConfig(execution, providerId) {
   if (!execution) return null;
   if (providerId === 'codex' && execution.codex) return execution.codex;
   if (providerId === 'claude' && execution.claude) return execution.claude;
+  if (providerId === 'openai' && execution.openai) return execution.openai;
   if (providerId === 'command' && execution.command) return execution.command;
   const entry = execution.adapters?.[providerId] || execution.providers?.[providerId];
   if (!entry || entry === false || entry.enabled === false) return null;
@@ -191,6 +209,8 @@ function providerProfile(execution, providerId, task = null) {
       ? CLAUDE_SANDBOX
       : providerId === 'ollama'
         ? 'loopback-only'
+        : providerId === 'openai'
+          ? 'remote_api_no_tools'
       : providerId === 'local'
         ? 'task-workspace'
         : providerId === 'command'
@@ -200,7 +220,9 @@ function providerProfile(execution, providerId, task = null) {
     ? 'external_cli_session'
     : providerId === 'command'
       ? config.authType || 'external_cli_session'
-      : ['local', 'ollama'].includes(providerId) ? 'none' : 'unknown';
+      : providerId === 'openai'
+        ? 'api_key_environment'
+        : ['local', 'ollama'].includes(providerId) ? 'none' : 'unknown';
   const maxConcurrency = Number.isInteger(config.maxConcurrency) ? config.maxConcurrency : null;
   const timeoutMs = Number.isFinite(config.timeoutMs) ? config.timeoutMs : null;
   const profile = {
@@ -226,12 +248,12 @@ export class AosEngine {
     this.execution = resolveExecution(execution);
     this.projectReadRoot = resolveProjectReadRoot({ projectReadRoot, readRoot, repoRoot, execution: this.execution });
     this.providerReadiness = {};
-    for (const id of ['codex', 'claude', 'ollama', 'command']) {
+    for (const id of ['codex', 'claude', 'ollama', 'openai', 'command']) {
       const configured = this.execution.mode === id || this.execution.adapters?.[id]?.enabled === true;
       if (configured) this.providerReadiness[id] = { status: 'unverified', checkedAt: null };
     }
     this.store = new JsonStore({ dataDir, clock });
-    this.workers = createWorkerRegistry({ codex: this.execution.codex || null, claude: this.execution.claude || null, ollama: this.execution.ollama || null, command: this.execution.command || null, adapters: this.execution.adapters || null });
+    this.workers = createWorkerRegistry({ codex: this.execution.codex || null, claude: this.execution.claude || null, ollama: this.execution.ollama || null, openai: this.execution.openai || null, command: this.execution.command || null, adapters: this.execution.adapters || null });
     this.inflight = new Map();
     this.drivers = new Map();
     this.slotWaiters = [];
@@ -381,7 +403,7 @@ export class AosEngine {
           plan: validatePlan(plan),
         };
       } else {
-        const enabledWorkers = ['codex', 'claude'].filter((id) => this.execution.mode === id || this.execution.adapters?.[id]?.enabled === true);
+        const enabledWorkers = ['codex', 'claude', 'openai'].filter((id) => this.execution.mode === id || this.execution.adapters?.[id]?.enabled === true);
         const defaultExecution = this.execution.mode === 'codex'
           ? 'codex'
           : enabledWorkers[0] || 'local';
@@ -1759,6 +1781,54 @@ export class AosEngine {
     }
   }
 
+  // API-key preflight proves only that the pinned Responses endpoint accepted
+  // the named environment key and returned the exact configured model. It does
+  // not claim a ChatGPT account session or external account identity.
+  async preflightOpenAIResponses({ worker = null } = {}) {
+    if (!this.execution.openai) throw new AosError('openai_preflight_unavailable', 'OpenAI Responses preflight requires explicit API-key adapter configuration', { statusCode: 409 });
+    try {
+      const adapter = worker || this.workers.get('openai');
+      if (!adapter || typeof adapter.preflight !== 'function') {
+        throw new AosError('openai_preflight_unavailable', 'The mounted OpenAI Responses worker does not expose preflight', { statusCode: 409 });
+      }
+      const result = await adapter.preflight();
+      this.#validateOpenAIResponsesPreflight(result);
+      this.providerReadiness.openai = {
+        status: 'available',
+        checkedAt: result.checkedAt || new Date(this.clock()).toISOString(),
+        model: this.execution.openai.model,
+        sandbox: 'remote_api_no_tools',
+      };
+      return result;
+    } catch (error) {
+      this.providerReadiness.openai = { status: 'unavailable', checkedAt: new Date(this.clock()).toISOString() };
+      throw error;
+    }
+  }
+
+  #validateOpenAIResponsesPreflight(result) {
+    const config = this.execution.openai;
+    const validObject = result && typeof result === 'object' && !Array.isArray(result);
+    if (!validObject) throw new AosError('openai_preflight_invalid', 'OpenAI Responses preflight did not return a result object', { statusCode: 409 });
+    const exact = result.provider === 'openai'
+      && result.authPath === OPENAI_RESPONSES_AUTH_PATH
+      && result.requested?.model === config.model
+      && result.model === config.model
+      && result.origin === config.origin
+      && result.transport === 'https_pinned_origin'
+      && result.store === false
+      && result.tools === false
+      && result.sessionResume === false
+      && result.attestation === OPENAI_RESPONSES_ATTESTATION
+      && result.verified === true;
+    if (!exact) {
+      throw new AosError('openai_preflight_attestation_invalid', 'OpenAI Responses preflight did not attest the exact configured API-key boundary', {
+        statusCode: 409,
+        details: { expected: { model: config.model, origin: config.origin, store: false, tools: false, sessionResume: false } },
+      });
+    }
+  }
+
   // The adapter can attest only that an operator-owned wrapper spoke the fixed
   // protocol. It does not establish an OpenCode/OpenClaw identity or OAuth.
   async preflightCommand({ worker = null } = {}) {
@@ -1819,6 +1889,7 @@ export class AosEngine {
     if (providerId === 'codex') return this.preflightCodex();
     if (providerId === 'claude') return this.preflightClaude();
     if (providerId === 'ollama') return this.preflightOllama();
+    if (providerId === 'openai') return this.preflightOpenAIResponses();
     if (providerId === 'command') return this.preflightCommand();
     return null;
   }
@@ -1920,7 +1991,7 @@ export class AosEngine {
     if (this.execution.mode === 'mixed') {
       const providerIds = [...new Set(this.#tasks(runId)
         .map((task) => task.worker)
-        .filter((providerId) => ['codex', 'claude', 'ollama', 'command'].includes(providerId)))];
+        .filter((providerId) => ['codex', 'claude', 'ollama', 'openai', 'command'].includes(providerId)))];
       if (!providerIds.length) return true;
       const results = {};
       for (const providerId of providerIds) {
@@ -1938,6 +2009,17 @@ export class AosEngine {
                   ? { auth: result.auth || null, posture: result.posture || null }
                   : providerId === 'ollama'
                     ? { models: Array.isArray(result.models) ? result.models : null, transport: result.transport || 'loopback', attestation: result.attestation || 'local_response' }
+                    : providerId === 'openai'
+                      ? {
+                        model: result.model || null,
+                        origin: result.origin || null,
+                        transport: result.transport || null,
+                        store: result.store === false ? false : null,
+                        tools: result.tools === false ? false : null,
+                        sessionResume: result.sessionResume === false ? false : null,
+                        attestation: result.attestation || null,
+                        verified: result.verified === true,
+                      }
                     : {
                       protocol: result.protocol,
                       provider: result.provider,
@@ -1949,7 +2031,7 @@ export class AosEngine {
                       verified: false,
                       strippedEnvCount: Number.isInteger(result.strippedEnvCount) ? result.strippedEnvCount : null,
                     }),
-            ...(providerId === 'command' ? {} : { strippedEnv: result.strippedEnv || [] }),
+            ...(['command', 'openai'].includes(providerId) ? {} : { strippedEnv: result.strippedEnv || [] }),
           };
         } catch (error) {
           results[providerId] = {
@@ -2945,16 +3027,17 @@ export class AosEngine {
           throw new Error(`Mixed execution refuses task "${task.title}" on provider "${providerId}" because no worker adapter is mounted`);
         }
         const config = this.#providerConfig(providerId);
-        if (['codex', 'claude', 'ollama', 'command'].includes(providerId)) {
+        if (['codex', 'claude', 'ollama', 'openai', 'command'].includes(providerId)) {
           const codexRoleBinding = providerId === 'codex' ? this.#assertCodexRoleRuntime(effectiveTask) : null;
           const requestedModel = effectiveTask.model ?? effectiveTask.config?.effective?.harness?.model ?? effectiveTask.config?.model ?? (providerId === 'codex' ? codexRoleBinding.model : providerId === 'ollama' ? null : config?.model);
           const requestedEffort = effectiveTask.effort ?? effectiveTask.config?.effective?.harness?.effort ?? effectiveTask.config?.effort ?? (providerId === 'codex' ? codexRoleBinding.effort : config?.effort);
-          if ((providerId !== 'codex' && (requestedModel !== config?.model || (!['ollama', 'command'].includes(providerId) && requestedEffort !== config?.effort) || (providerId === 'command' && requestedEffort != null)))
+          if ((providerId !== 'codex' && (requestedModel !== config?.model || (!['ollama', 'openai', 'command'].includes(providerId) && requestedEffort !== config?.effort) || (['openai', 'command'].includes(providerId) && requestedEffort != null)))
             || (providerId === 'codex' && (requestedModel !== codexRoleBinding.model || requestedEffort !== codexRoleBinding.effort))) {
             const expected = providerId === 'codex' ? codexRoleBinding : config;
-            throw new Error(`Mixed execution task "${task.title}" must use configured ${providerId} runtime ${expected?.model}${providerId === 'ollama' ? '' : `/${expected?.effort}`}; there is no substitution`);
+            throw new Error(`Mixed execution task "${task.title}" must use configured ${providerId} runtime ${expected?.model}${['ollama', 'openai', 'command'].includes(providerId) ? '' : `/${expected?.effort}`}; there is no substitution`);
           }
           if (providerId === 'ollama') this.#validateOllamaTask(task, effectiveTask);
+          if (providerId === 'openai') this.#validateOpenAIResponsesTask(task, effectiveTask);
           if (providerId === 'command') this.#validateExternalHarnessTask(task, effectiveTask);
         }
       }
@@ -3092,6 +3175,7 @@ export class AosEngine {
         }
       }
       try {
+        if (worker.id === 'openai') assertOpenAIResponsesTaskAdmission(task, task);
         task.capabilityMounts = this.capabilities.resolveTask(task, {
           projectId: run.projectId,
           roleId: task.presetId || task.kind,
@@ -3964,7 +4048,7 @@ export class AosEngine {
       }
       const harness = scratch.worker || 'local';
       if (harness === 'codex') this.#assertCodexRoleRuntime(scratch);
-      if (this.execution.mode === 'mixed' && ['codex', 'claude', 'ollama', 'command'].includes(harness)) {
+      if (this.execution.mode === 'mixed' && ['codex', 'claude', 'ollama', 'openai', 'command'].includes(harness)) {
         const configured = this.#providerConfig(harness);
         if (!configured) {
           throw new AosError('plan_provider_unconfigured', `Plan task ${planned.id} selects ${harness}, but that provider is not configured for this engine`, { statusCode: 409, details: { taskId: planned.id, harness } });
@@ -3972,12 +4056,13 @@ export class AosEngine {
         const codexRoleBinding = harness === 'codex' ? this.#assertCodexRoleRuntime(scratch) : null;
         const requestedModel = scratch.model ?? scratch.config?.effective?.harness?.model ?? scratch.config?.model ?? (harness === 'codex' ? codexRoleBinding.model : harness === 'ollama' ? null : configured.model);
         const requestedEffort = scratch.effort ?? scratch.config?.effective?.harness?.effort ?? scratch.config?.effort ?? (harness === 'codex' ? codexRoleBinding.effort : configured.effort);
-        if ((harness !== 'codex' && (requestedModel !== configured.model || (!['ollama', 'command'].includes(harness) && requestedEffort !== configured.effort) || (harness === 'command' && requestedEffort != null)))
+        if ((harness !== 'codex' && (requestedModel !== configured.model || (!['ollama', 'openai', 'command'].includes(harness) && requestedEffort !== configured.effort) || (['openai', 'command'].includes(harness) && requestedEffort != null)))
           || (harness === 'codex' && (requestedModel != null && requestedModel !== codexRoleBinding.model || requestedEffort != null && requestedEffort !== codexRoleBinding.effort))) {
           const expected = harness === 'codex' ? codexRoleBinding : configured;
-          throw new AosError('plan_provider_config_invalid', `Plan task ${planned.id} must use the configured ${harness} runtime ${expected.model}${['ollama', 'command'].includes(harness) ? '' : `/${expected.effort}`}`, { statusCode: 409, details: { taskId: planned.id, harness, requested: { model: requestedModel, ...(['ollama', 'command'].includes(harness) ? {} : { effort: requestedEffort }) }, expected: { model: expected.model, ...(['ollama', 'command'].includes(harness) ? {} : { effort: expected.effort }) } } });
+          throw new AosError('plan_provider_config_invalid', `Plan task ${planned.id} must use the configured ${harness} runtime ${expected.model}${['ollama', 'openai', 'command'].includes(harness) ? '' : `/${expected.effort}`}`, { statusCode: 409, details: { taskId: planned.id, harness, requested: { model: requestedModel, ...(['ollama', 'openai', 'command'].includes(harness) ? {} : { effort: requestedEffort }) }, expected: { model: expected.model, ...(['ollama', 'openai', 'command'].includes(harness) ? {} : { effort: expected.effort }) } } });
         }
         if (harness === 'ollama') this.#validateOllamaTask(planned, scratch);
+        if (harness === 'openai') this.#validateOpenAIResponsesTask(planned, scratch);
         if (harness === 'command') this.#validateExternalHarnessTask(planned, scratch);
       }
       if (!scratch.presetId) continue;
@@ -3996,6 +4081,10 @@ export class AosEngine {
       ? this.presets.effective(effective.presetId, effective.presetVersion ?? null).role
       : null;
     return assertOllamaTaskAdmission(planned, effective, { presetRole });
+  }
+
+  #validateOpenAIResponsesTask(planned, effective) {
+    return assertOpenAIResponsesTaskAdmission(planned, effective);
   }
 
   #validateExternalHarnessTask(planned, effective) {

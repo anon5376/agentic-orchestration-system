@@ -177,7 +177,7 @@ export function buildHierarchicalPlan(prompt, ambiguities = [], { execution = 'l
   const branches = inferBranches(prompt);
   const tasks = [];
   const dependencies = [];
-  const defaultWorker = ['codex', 'claude'].includes(execution) ? execution : 'local';
+  const defaultWorker = ['codex', 'claude', 'openai'].includes(execution) ? execution : 'local';
 
   const add = (partial) => {
     const worker = partial.kind === 'adopt' ? (defaultWorker === 'codex' ? 'engine' : 'local') : defaultWorker;

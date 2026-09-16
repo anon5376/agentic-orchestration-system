@@ -42,7 +42,7 @@ test('snapshot separates policy, adapter truth, and template worker assignment',
   const aos = engine();
   const snapshot = control(aos).snapshot();
 
-  assert.deepEqual(snapshot.allowedHarnesses, ['local', 'codex', 'claude']);
+  assert.deepEqual(snapshot.allowedHarnesses, ['local', 'codex', 'claude', 'openai']);
   assert.deepEqual(snapshot.allowedModels, { codex: ['gpt-5.6-terra', 'gpt-5.6-luna'], claude: ['opus'] });
   assert.equal(snapshot.defaultEffort, null);
   assert.equal(snapshot.execution.mode, 'local');

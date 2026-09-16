@@ -2,6 +2,7 @@ import { AosEngine } from './engine.js';
 import { preflightCodex, resolveCodexConfig } from './codex.js';
 import { preflightClaude, resolveClaudeConfig } from './claude.js';
 import { resolveOllamaConfig } from './ollama.js';
+import { resolveOpenAIResponsesConfig } from './openai-responses.js';
 import { readFileSync } from 'node:fs';
 import { apiActions } from './api.js';
 import { AosError } from './schema.js';
@@ -13,7 +14,7 @@ Usage:
   aos pool run --worker codex [--run RUN_ID] [--once] [--owner ID]
   aos status
   aos providers
-  aos live preflight [codex|claude|ollama|command]
+  aos live preflight [codex|claude|ollama|openai|command]
   aos project create <name>
   aos goal create "<prompt>" [--context PATH] [--planning-mode lead --request-id ID]
   aos goal plan <goalId> --request-id ID [--derived-from ID]
@@ -76,6 +77,10 @@ Live execution (off by default):
   AOS_OLLAMA_ENABLED=1 with AOS_EXECUTION=mixed enables the loopback-only
   Ollama adapter; AOS_OLLAMA_MODEL is required, base URL is optional, and
   concurrency/timeout are bounded. Ollama has no auth or token environment.
+  AOS_EXECUTION=openai enables the direct OpenAI Responses API-key adapter.
+  AOS_OPENAI_RESPONSES_MODEL is required; AOS_OPENAI_RESPONSES_API_KEY_ENV
+  names the key environment variable (default OPENAI_API_KEY). The key value
+  is never stored or printed. This path is distinct from a Codex ChatGPT login.
   AOS_ADAPTERS may explicitly configure the disabled-by-default command adapter
   as a fixed external-harness JSON protocol wrapper. It never accepts a task
   command, provider token, or generic OAuth configuration.
@@ -127,7 +132,7 @@ export async function dispatch(engine, argv) {
     );
   }
   if (cmd === 'live' && sub === 'preflight') {
-    const provider = rest[0] || (engine.execution.mode === 'mixed' && engine.execution.ollama ? 'ollama' : engine.execution.mode === 'mixed' && engine.execution.claude ? 'claude' : engine.execution.mode === 'mixed' && engine.execution.command ? 'command' : 'codex');
+    const provider = rest[0] || (engine.execution.mode === 'mixed' && engine.execution.openai ? 'openai' : engine.execution.mode === 'mixed' && engine.execution.ollama ? 'ollama' : engine.execution.mode === 'mixed' && engine.execution.claude ? 'claude' : engine.execution.mode === 'mixed' && engine.execution.command ? 'command' : 'codex');
     if (provider === 'claude') {
       const config = engine.execution.claude || resolveClaudeConfig({});
       const result = engine.execution.claude ? await engine.preflightClaude() : await preflightClaude(config);
@@ -155,6 +160,19 @@ export async function dispatch(engine, argv) {
         `observed  ${result.checkedAt || 'now'}  attestation=local-response-observed  external-identity=none`,
         `limits    concurrency=${engine.execution.ollama.maxConcurrency} timeoutMs=${engine.execution.ollama.timeoutMs}`,
         `execution ${engine.execution.mode === 'mixed' ? 'mixed Ollama' : 'disabled'}`,
+      ];
+    }
+    if (provider === 'openai') {
+      if (!engine.execution.openai) throw new AosError('openai_preflight_unavailable', 'OpenAI Responses preflight requires AOS_EXECUTION=openai or explicit mixed-mode OpenAI Responses configuration', { statusCode: 409 });
+      const result = await engine.preflightOpenAIResponses();
+      return [
+        `openai    ${result.origin}`,
+        `endpoint  /v1/responses  redirects=disabled`,
+        `auth      API key from ${engine.execution.openai.apiKeyEnv} (value not printed)`,
+        `model     ${result.model}`,
+        `request   store=false tools=false session-resume=false`,
+        `receipt   API response observed; ChatGPT account identity=not-claimed`,
+        `limits    concurrency=${engine.execution.openai.maxConcurrency} timeoutMs=${engine.execution.openai.timeoutMs}`,
       ];
     }
     if (provider === 'command') {
@@ -486,8 +504,32 @@ export function executionFromEnv(env = process.env) {
       timeoutMs: env.AOS_OLLAMA_TIMEOUT_MS ? Number(env.AOS_OLLAMA_TIMEOUT_MS) : undefined,
     })
     : null;
+  const openaiEnabled = (mode === 'mixed' || mode === 'providers' || mode === 'openai')
+    && (mode === 'openai' || env.AOS_OPENAI_RESPONSES_ENABLED === '1');
+  const openai = openaiEnabled
+    ? resolveOpenAIResponsesConfig({
+      model: env.AOS_OPENAI_RESPONSES_MODEL || undefined,
+      apiKeyEnv: env.AOS_OPENAI_RESPONSES_API_KEY_ENV || undefined,
+      origin: env.AOS_OPENAI_RESPONSES_ORIGIN || undefined,
+      allowCustomOrigin: env.AOS_OPENAI_RESPONSES_ALLOW_CUSTOM_ORIGIN === '1',
+      maxConcurrency: env.AOS_OPENAI_RESPONSES_MAX_CONCURRENCY ? Number(env.AOS_OPENAI_RESPONSES_MAX_CONCURRENCY) : undefined,
+      timeoutMs: env.AOS_OPENAI_RESPONSES_TIMEOUT_MS ? Number(env.AOS_OPENAI_RESPONSES_TIMEOUT_MS) : undefined,
+      maxResponseBytes: env.AOS_OPENAI_RESPONSES_MAX_RESPONSE_BYTES ? Number(env.AOS_OPENAI_RESPONSES_MAX_RESPONSE_BYTES) : undefined,
+      maxPromptBytes: env.AOS_OPENAI_RESPONSES_MAX_PROMPT_BYTES ? Number(env.AOS_OPENAI_RESPONSES_MAX_PROMPT_BYTES) : undefined,
+      maxOutputTokens: env.AOS_OPENAI_RESPONSES_MAX_OUTPUT_TOKENS ? Number(env.AOS_OPENAI_RESPONSES_MAX_OUTPUT_TOKENS) : undefined,
+    })
+    : null;
   if (mode === 'codex') return { mode: 'codex', codex };
   if (mode === 'claude') return { mode: 'claude', claude };
+  if (mode === 'openai') {
+    return {
+      mode: 'mixed',
+      adapters: {
+        local: { enabled: env.AOS_LOCAL_ENABLED !== '0' },
+        openai: { enabled: true, ...openai },
+      },
+    };
+  }
   if (mode === 'mixed' || mode === 'providers') {
     let adapters = null;
     const encoded = env.AOS_ADAPTERS || env.AOS_PROVIDERS;
@@ -501,6 +543,13 @@ export function executionFromEnv(env = process.env) {
       // disabled unless the dedicated mixed-mode flag is explicit.
       adapters.ollama = { enabled: false };
     }
+    if (openaiEnabled) {
+      if (adapters) adapters.openai = { enabled: true, ...openai };
+    } else if (adapters?.openai) {
+      // Generic adapter JSON cannot opt in an API-key transport. Its explicit
+      // environment-mode gate names the key reference without carrying a key.
+      adapters.openai = { enabled: false };
+    }
     return adapters ? { mode: 'mixed', adapters } : {
       mode: 'mixed',
       adapters: {
@@ -508,10 +557,11 @@ export function executionFromEnv(env = process.env) {
         codex: { enabled: env.AOS_CODEX_ENABLED === '1', ...codex },
         claude: { enabled: env.AOS_CLAUDE_ENABLED === '1', ...claude },
         ollama: ollamaEnabled ? { enabled: true, ...ollama } : { enabled: false },
+        openai: openaiEnabled ? { enabled: true, ...openai } : { enabled: false },
       },
     };
   }
-  throw new Error(`AOS_EXECUTION must be "local", "codex", "claude", or "mixed"; got "${mode}"`);
+  throw new Error(`AOS_EXECUTION must be "local", "codex", "claude", "openai", or "mixed"; got "${mode}"`);
 }
 
 function statusLines(engine) {

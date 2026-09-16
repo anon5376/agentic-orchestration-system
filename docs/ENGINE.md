@@ -55,7 +55,7 @@ AOS_EXECUTION=mixed AOS_CODEX_ENABLED=1 AOS_CODEX_MODEL=gpt-5.6-luna AOS_CODEX_E
   node bin/aos.mjs pool run --worker codex --once
 ```
 
-Without `--once`, the command drains currently ready Codex work and exits when the pool is idle. Start more runner processes for more local slots; engine, project, run, and provider limits remain authoritative. The runner refuses every other worker, delegation, mounted capabilities, MCP execution, write access, profile drift, non-loopback targets, and unverified successful receipts. Codex processes are fenced by PID/PGID heartbeats, and the engine independently re-reads the Codex-owned session record before accepting success. Claude and Ollama remain in-process until they have an equally independent receipt source.
+Without `--once`, the command drains currently ready Codex work and exits when the pool is idle. Start more runner processes for more local slots; engine, project, run, and provider limits remain authoritative. The runner refuses every other worker, delegation, mounted capabilities, MCP execution, write access, profile drift, non-loopback targets, and unverified successful receipts. Codex processes are fenced by PID/PGID heartbeats, and the engine independently re-reads the Codex-owned session record before accepting success. Claude, OpenAI Responses, and Ollama remain in-process until they have an equally independent receipt source.
 
 ## Live provider execution
 
@@ -85,6 +85,16 @@ AOS_EXECUTION=claude npm run engine
 AOS_EXECUTION=mixed AOS_LOCAL_ENABLED=1 AOS_CODEX_ENABLED=1 AOS_CLAUDE_ENABLED=1 npm run engine
 ```
 
+The direct `openai` harness uses a named environment variable for an API key and calls only the OpenAI Responses API. It is independent from the Codex ChatGPT-login session:
+
+```bash
+export OPENAI_API_KEY
+AOS_EXECUTION=openai AOS_OPENAI_RESPONSES_MODEL=<exact-model> node bin/aos.mjs live preflight openai
+AOS_EXECUTION=openai AOS_OPENAI_RESPONSES_MODEL=<exact-model> npm run engine
+```
+
+Preflight makes one bounded model request and attests the exact response model, API-key environment name, official HTTPS origin, disabled storage, disabled tools, and disabled session resume. Dispatch uses strict structured output, bounded request and response sizes, provider usage counters, abort and timeout control, and redacted receipts. Model mismatch and unsupported output fail without fallback. The automated suite injects the transport and does not prove a live account or model.
+
 Mixed mode preserves the worker named in each task. A failed provider preflight fails only that provider's assigned tasks before workspace claim; other configured providers continue. Provider, project, and run concurrency limits are checked before every reservation. A temporary slot race defers the task automatically rather than asking the operator to approve more capacity.
 
 One limit remains: provider workers can read any file allowed by their CLI sandbox and the paths supplied by the operator.
@@ -99,11 +109,11 @@ This is a host-process integration, not filesystem or network isolation. A regis
 
 1. **Illustrative remains the dashboard default.** Live mode is explicit so the Electric Archive preview is not replaced by an empty store.
 2. **Default concurrency is 2.** `maxConcurrency` null or `<= 0` means no engine-imposed cap for local workers. Live Codex runs are capped at 4.
-3. **Acceptance tests use deterministic local workers, fake Codex and Claude binaries, and an injected Ollama transport.** Live account sessions and local-model calls are opt-in and never used by `npm test`. Grok and generic HTTP remain typed boundaries that do not execute.
+3. **Acceptance tests use deterministic local workers, fake Codex and Claude binaries, and injected Ollama and OpenAI transports.** Live account sessions, API calls, and local-model calls are opt-in and never used by `npm test`. Grok and generic HTTP remain typed boundaries that do not execute.
 4. **Improvement proposals are proposal-only.** Approval records consent. Allowlisted policy keys (`maxConcurrency`, `maxRetries`, `retentionDays`) may then apply. Engine source is never self-modified.
 5. **Auth types:** API key (env name only, value never stored or printed), CLI account session (Codex/Claude), local/none. Generic HTTP OAuth is labelled unsupported.
 6. **HTTP is loopback-only.**
 
 ## What is not claimed
 
-The Claude adapter has focused fake-binary coverage; a real Claude worker result is not part of the automated suite. Live Codex results are only as good as the evidence under `evidence/luna-max-e2e/`. Ollama is mounted for exact-model, loopback-only, non-delegating bulk work, but no live Ollama daemon was called by the automated suite. Grok and generic HTTP remain unimplemented. Secret values are not written to public state or logs. Black Atlas mockups and specimen assets are retained under `design/mockups/black-atlas-v1/` and `public/assets/`.
+The Claude adapter has focused fake-binary coverage; a real Claude worker result is not part of the automated suite. Live Codex results are only as good as the evidence under `evidence/luna-max-e2e/`. OpenAI Responses is mounted with injected-transport coverage, but no operator API key was available for a live request in this run. Ollama is mounted for exact-model, loopback-only, non-delegating bulk work, but no live Ollama daemon was called by the automated suite. Grok and generic HTTP remain unimplemented. Secret values are not written to public state or logs. Black Atlas mockups and specimen assets are retained under `design/mockups/black-atlas-v1/` and `public/assets/`.

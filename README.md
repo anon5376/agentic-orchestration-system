@@ -11,6 +11,7 @@ The dashboard and CLI use the same on-disk state in `.aos/`.
 - Agent-originated hierarchical delegation with immutable plan versions, exact child-template pins, and operator gates
 - Deterministic local execution for development and testing
 - Live Codex and Claude Code execution through existing account logins
+- Direct OpenAI Responses execution through a named API-key environment variable
 - Disabled-by-default fixed-argv external-harness protocol for operator-owned CLI wrappers
 - Per-worker budgets, sandbox access, capabilities, memory, and delegation limits
 - Engine-owned and operator-pinned local MCP capabilities for bounded staged-text reads
@@ -18,7 +19,7 @@ The dashboard and CLI use the same on-disk state in `.aos/`.
 - Run telemetry, token accounting, artifacts, evidence, approval gates, and retrospectives
 - Proposal-only self-improvement with explicit approval and rollback boundaries
 
-Mounted worker adapters cover deterministic local execution, Codex, Claude Code, an explicit loopback-only Ollama worker, and a disabled-by-default external-harness protocol wrapper. The wrapper is not a native OpenCode/OpenClaw integration and does not implement provider OAuth. Generic API-key providers and arbitrary OAuth providers remain configuration-only. An unavailable adapter stops its assigned task instead of silently substituting another worker.
+Mounted worker adapters cover deterministic local execution, Codex, Claude Code, the OpenAI Responses API, an explicit loopback-only Ollama worker, and a disabled-by-default external-harness protocol wrapper. The direct OpenAI path uses an API key; it is separate from the Codex ChatGPT-login path and is not OAuth. Other generic API-key providers and arbitrary OAuth providers remain configuration-only. An unavailable adapter stops its assigned task instead of silently substituting another worker.
 
 ## Start locally
 
@@ -92,13 +93,30 @@ AOS_EXECUTION=mixed \
   npm run dev:all
 ```
 
+### Direct OpenAI API worker
+
+The `openai` harness calls the official Responses API with one exact operator-selected model. Put the key in the environment, then start or preflight the adapter without placing the key in AOS state or command arguments:
+
+```bash
+export OPENAI_API_KEY
+AOS_EXECUTION=openai \
+  AOS_OPENAI_RESPONSES_MODEL=<exact-model> \
+  node bin/aos.mjs live preflight openai
+
+AOS_EXECUTION=openai \
+  AOS_OPENAI_RESPONSES_MODEL=<exact-model> \
+  npm run dev:all
+```
+
+This adapter sends `store: false`, refuses tools, delegation, fallback, session resume, redirects, model substitution, and non-OpenAI API hosts. `AOS_EXECUTION=openai` assigns new deterministic-plan work to the OpenAI worker, except the local approval-only adoption task. The automated suite uses an injected transport; a real account/model preflight still requires the operator's key.
+
 To execute ready provider tasks from separate same-host processes, start one or more fenced pool runners with the same `AOS_HOME` and provider environment as the engine:
 
 ```bash
 node bin/aos.mjs pool run --worker codex
 ```
 
-Each runner handles one Codex task at a time and exits when its queue is idle. It uses the engine's loopback bearer-authenticated claim protocol; it is not a public or cross-host worker service. Claude and Ollama still run inside the engine process because their pool completion path does not yet have independent receipt verification.
+Each runner handles one Codex task at a time and exits when its queue is idle. It uses the engine's loopback bearer-authenticated claim protocol; it is not a public or cross-host worker service. Claude, OpenAI Responses, and Ollama still run inside the engine process because their pool completion path does not yet have independent receipt verification.
 
 Claude Code runs with restricted mode, safe mode, no custom MCP configuration, no browser integration, no permission prompts, and only read-oriented tools. AOS accepts the result only when Claude reports the requested model family and complete usage data.
 
